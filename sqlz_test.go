@@ -12,7 +12,7 @@ import (
 
 	"github.com/rafaberaldo/sqlz"
 	"github.com/rafaberaldo/sqlz/internal/parser"
-	"github.com/rafaberaldo/sqlz/internal/testing/testutil"
+	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/go-sql-driver/mysql"

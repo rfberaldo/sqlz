@@ -26,6 +26,9 @@ func Compile(bind parser.Bind, query string, arg any) (string, []any, error) {
 }
 
 func (n *Named) compile(query string, arg any) (string, []any, error) {
+	if query == "" {
+		return "", nil, fmt.Errorf("sqlz: query cannot be blank")
+	}
 	if arg == nil {
 		return "", nil, fmt.Errorf("sqlz: argument cannot be nil on named query")
 	}

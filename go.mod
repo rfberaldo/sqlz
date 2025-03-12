@@ -7,7 +7,6 @@ toolchain go1.23.7
 require (
 	github.com/georgysavva/scany v1.2.3
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/google/go-cmp v0.7.0
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/stretchr/testify v1.10.0

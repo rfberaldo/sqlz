@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/rafaberaldo/sqlz/internal/parser"
-	"github.com/rafaberaldo/sqlz/internal/testing/testutil"
+	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/rafaberaldo/sqlz/sqlu"
 	"github.com/stretchr/testify/assert"
 
@@ -42,7 +42,7 @@ func TestSQLU(t *testing.T) {
 		}
 
 		for _, fn := range tests {
-			t.Run(testutil.FuncName(fn), func(t *testing.T) {
+			t.Run("sqlu_"+testutil.FuncName(fn), func(t *testing.T) {
 				t.Parallel()
 				fn(t, db, parser.BindQuestion)
 			})
@@ -58,7 +58,7 @@ func TestSQLU(t *testing.T) {
 		}
 
 		for _, fn := range tests {
-			t.Run(testutil.FuncName(fn), func(t *testing.T) {
+			t.Run("sqlu_"+testutil.FuncName(fn), func(t *testing.T) {
 				t.Parallel()
 				fn(t, db, parser.BindDollar)
 			})

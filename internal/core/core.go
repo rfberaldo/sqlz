@@ -17,8 +17,15 @@ type Querier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
+// Query will adapt depending on args:
+//
+//	No args: perform a regular query.
+//	1 arg struct/map: perform a named query.
+//	Anything else: parse query for `IN` clause and then query.
+//
+// Query return values will be scanned to dst.
 func Query(ctx context.Context, db Querier, bind parser.Bind, dst any, query string, args ...any) error {
-	rows, err := QueryDecider(ctx, db, bind, query, args...)
+	rows, err := queryDecider(ctx, db, bind, query, args...)
 
 	if err != nil {
 		return fmt.Errorf("sqlz: querying multiple rows: %w", err)
@@ -31,8 +38,10 @@ func Query(ctx context.Context, db Querier, bind parser.Bind, dst any, query str
 	return nil
 }
 
+// QueryRow is like [Query], but will only scan one row,
+// will return error if query result is more than one row.
 func QueryRow(ctx context.Context, db Querier, bind parser.Bind, dst any, query string, args ...any) error {
-	rows, err := QueryDecider(ctx, db, bind, query, args...)
+	rows, err := queryDecider(ctx, db, bind, query, args...)
 
 	if err != nil {
 		return fmt.Errorf("sqlz: querying single row: %w", err)
@@ -45,31 +54,24 @@ func QueryRow(ctx context.Context, db Querier, bind parser.Bind, dst any, query 
 	return nil
 }
 
-func QueryDecider(ctx context.Context, db Querier, bind parser.Bind, query string, args ...any) (*sql.Rows, error) {
+func queryDecider(ctx context.Context, db Querier, bind parser.Bind, query string, args ...any) (*sql.Rows, error) {
 	// no args, just query directly
 	if len(args) == 0 {
 		return db.QueryContext(ctx, query)
 	}
 
-	// args >1, it's a regular query with `IN` clause parsing
-	if len(args) > 1 {
-		q, args, err := parser.ParseIn(bind, query, args...)
-		if err != nil {
-			return nil, err
+	if len(args) == 1 {
+		arg := args[0] // first element
+		kind := reflect.TypeOf(arg).Kind()
+		switch kind {
+		// 1 arg map/struct is a named query
+		case reflect.Map, reflect.Struct:
+			q, args, err := named.Compile(bind, query, arg)
+			if err != nil {
+				return nil, err
+			}
+			return db.QueryContext(ctx, q, args...)
 		}
-		return db.QueryContext(ctx, q, args...)
-	}
-
-	// only one arg, if first element is struct/map then its named
-	arg := args[0]
-	kind := reflect.TypeOf(arg).Kind()
-	switch kind {
-	case reflect.Map, reflect.Struct:
-		q, args, err := named.Compile(bind, query, arg)
-		if err != nil {
-			return nil, err
-		}
-		return db.QueryContext(ctx, q, args...)
 	}
 
 	// otherwise it's a regular query with `IN` clause parsing
@@ -80,22 +82,24 @@ func QueryDecider(ctx context.Context, db Querier, bind parser.Bind, query strin
 	return db.QueryContext(ctx, q, args...)
 }
 
+// Exec will adapt depending on args:
+//
+//	1 arg struct/map: perform a named exec.
+//	1 arg slice/array: perform a named batch insert.
+//	Anything else: regular exec.
 func Exec(ctx context.Context, db Querier, bind parser.Bind, query string, args ...any) (sql.Result, error) {
-	// if no args, or args >1 then it's a regular exec
-	if len(args) == 0 || len(args) > 1 {
-		return db.ExecContext(ctx, query, args...)
-	}
-
-	// only one arg, if first element is struct/map/slice then its named
-	arg := args[0]
-	kind := reflect.TypeOf(arg).Kind()
-	switch kind {
-	case reflect.Map, reflect.Struct, reflect.Array, reflect.Slice:
-		q, args, err := named.Compile(bind, query, arg)
-		if err != nil {
-			return nil, err
+	if len(args) == 1 {
+		arg := args[0]
+		kind := reflect.TypeOf(arg).Kind()
+		switch kind {
+		// 1 arg map/struct/array/slice is a named exec
+		case reflect.Map, reflect.Struct, reflect.Array, reflect.Slice:
+			q, args, err := named.Compile(bind, query, arg)
+			if err != nil {
+				return nil, err
+			}
+			return db.ExecContext(ctx, q, args...)
 		}
-		return db.ExecContext(ctx, q, args...)
 	}
 
 	// otherwise it's a regular exec
