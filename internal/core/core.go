@@ -11,13 +11,13 @@ import (
 	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
-// querier can be [sql.DB], [sql.Tx] or [sql.Conn]
-type querier interface {
+// Querier can be [sql.DB], [sql.Tx] or [sql.Conn]
+type Querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-func Query(ctx context.Context, db querier, bind parser.Bind, dst any, query string, args ...any) error {
+func Query(ctx context.Context, db Querier, bind parser.Bind, dst any, query string, args ...any) error {
 	rows, err := QueryDecider(ctx, db, bind, query, args...)
 
 	if err != nil {
@@ -31,7 +31,7 @@ func Query(ctx context.Context, db querier, bind parser.Bind, dst any, query str
 	return nil
 }
 
-func QueryRow(ctx context.Context, db querier, bind parser.Bind, dst any, query string, args ...any) error {
+func QueryRow(ctx context.Context, db Querier, bind parser.Bind, dst any, query string, args ...any) error {
 	rows, err := QueryDecider(ctx, db, bind, query, args...)
 
 	if err != nil {
@@ -45,7 +45,7 @@ func QueryRow(ctx context.Context, db querier, bind parser.Bind, dst any, query 
 	return nil
 }
 
-func QueryDecider(ctx context.Context, db querier, bind parser.Bind, query string, args ...any) (*sql.Rows, error) {
+func QueryDecider(ctx context.Context, db Querier, bind parser.Bind, query string, args ...any) (*sql.Rows, error) {
 	// no args, just query directly
 	if len(args) == 0 {
 		return db.QueryContext(ctx, query)
@@ -80,7 +80,7 @@ func QueryDecider(ctx context.Context, db querier, bind parser.Bind, query strin
 	return db.QueryContext(ctx, q, args...)
 }
 
-func Exec(ctx context.Context, db querier, bind parser.Bind, query string, args ...any) (sql.Result, error) {
+func Exec(ctx context.Context, db Querier, bind parser.Bind, query string, args ...any) (sql.Result, error) {
 	// if no args, or args >1 then it's a regular exec
 	if len(args) == 0 || len(args) > 1 {
 		return db.ExecContext(ctx, query, args...)

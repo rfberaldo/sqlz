@@ -10,11 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rafaberaldo/sqlz"
 	"github.com/rafaberaldo/sqlz/internal/parser"
-	"github.com/rafaberaldo/sqlz/internal/testing/assert"
 	"github.com/rafaberaldo/sqlz/internal/testing/testutil"
 	"github.com/rafaberaldo/sqlz/sqlu"
+	"github.com/stretchr/testify/assert"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -78,20 +77,20 @@ func basicQueryMethods(t *testing.T, db *sql.DB, bind parser.Bind) {
 	expectedSlice := []string{"Hello World"}
 
 	ss, err = sqlu.Query[string](db, query)
-	assert.NoError(t, "db Query", err)
-	assert.Equal(t, "db Query scan", ss, expectedSlice)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedSlice, ss)
 
 	ss, err = sqlu.QueryCtx[string](ctx, db, query)
-	assert.NoError(t, "db Query", err)
-	assert.Equal(t, "db Query scan", ss, expectedSlice)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedSlice, ss)
 
 	s, err = sqlu.QueryRow[string](db, query)
-	assert.NoError(t, "db QueryRow", err)
-	assert.Equal(t, "db QueryRow scan", s, expected)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, s)
 
 	s, err = sqlu.QueryRowCtx[string](ctx, db, query)
-	assert.NoError(t, "db QueryRow", err)
-	assert.Equal(t, "db QueryRow scan", s, expected)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, s)
 }
 
 func shouldReturnErrorForWrongQuery(t *testing.T, db *sql.DB, bind parser.Bind) {
@@ -101,34 +100,28 @@ func shouldReturnErrorForWrongQuery(t *testing.T, db *sql.DB, bind parser.Bind) 
 	const str = "WRONG"
 
 	_, err = sqlu.Exec(db, query)
-	assert.Equal(t, "should contain 'WRONG' in error",
-		strings.Contains(err.Error(), str), true)
-	assert.Error(t, "db Exec", err)
+	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	assert.Error(t, err)
 
 	_, err = sqlu.ExecCtx(ctx, db, query)
-	assert.Equal(t, "should contain 'WRONG' in error",
-		strings.Contains(err.Error(), str), true)
-	assert.Error(t, "db Exec", err)
+	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	assert.Error(t, err)
 
 	_, err = sqlu.Query[int](db, query)
-	assert.Equal(t, "should contain 'WRONG' in error",
-		strings.Contains(err.Error(), str), true)
-	assert.Error(t, "db Query", err)
+	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	assert.Error(t, err)
 
 	_, err = sqlu.QueryCtx[int](ctx, db, query)
-	assert.Equal(t, "should contain 'WRONG' in error",
-		strings.Contains(err.Error(), str), true)
-	assert.Error(t, "db Query", err)
+	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	assert.Error(t, err)
 
 	_, err = sqlu.QueryRow[int](db, query)
-	assert.Equal(t, "should contain 'WRONG' in error",
-		strings.Contains(err.Error(), str), true)
-	assert.Error(t, "db QueryRow", err)
+	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	assert.Error(t, err)
 
 	_, err = sqlu.QueryRowCtx[int](ctx, db, query)
-	assert.Equal(t, "should contain 'WRONG' in error",
-		strings.Contains(err.Error(), str), true)
-	assert.Error(t, "db QueryRow", err)
+	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	assert.Error(t, err)
 }
 
 func shouldReturnNotFound(t *testing.T, db *sql.DB, bind parser.Bind) {
@@ -138,17 +131,17 @@ func shouldReturnNotFound(t *testing.T, db *sql.DB, bind parser.Bind) {
 
 	createTmpl := `CREATE TABLE %s (id INT PRIMARY KEY)`
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
-	assert.NoError(t, "create table", err)
+	assert.NoError(t, err)
 
 	query := fmt.Sprintf("SELECT * FROM %s", table)
 
 	_, err = sqlu.QueryRow[string](db, query)
-	assert.Error(t, "db QueryRow should error", err)
-	assert.Equal(t, "db QueryRow error should be IsNotFound", sqlz.IsNotFound(err), true)
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, sql.ErrNoRows)
 
 	_, err = sqlu.QueryRowCtx[string](ctx, db, query)
-	assert.Error(t, "db QueryRowCtx should error", err)
-	assert.Equal(t, "db QueryRowCtx error should be IsNotFound", sqlz.IsNotFound(err), true)
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, sql.ErrNoRows)
 }
 
 func queryShouldReturnCorrect(t *testing.T, db *sql.DB, bind parser.Bind) {
@@ -165,7 +158,7 @@ func queryShouldReturnCorrect(t *testing.T, db *sql.DB, bind parser.Bind) {
 			active BOOL
 		)`
 	_, err := sqlu.Exec(db, fmt.Sprintf(createTmpl, table))
-	assert.NoError(t, "create table", err)
+	assert.NoError(t, err)
 
 	insertTmpl := testutil.Schema(bind, `
 		INSERT INTO %s (id, username, email, password, age, active)
@@ -173,7 +166,7 @@ func queryShouldReturnCorrect(t *testing.T, db *sql.DB, bind parser.Bind) {
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
 		1, "Alice", "alice@wonderland.com", "123456", 18, true,
 	)
-	assert.NoError(t, "insert", err)
+	assert.NoError(t, err)
 
 	selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ?`)
 
@@ -192,20 +185,20 @@ func queryShouldReturnCorrect(t *testing.T, db *sql.DB, bind parser.Bind) {
 	var user User
 
 	user, err = sqlu.QueryRow[User](db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, "QueryRow should not error", err)
-	assert.Equal(t, "QueryRow result should be correct", user, expected)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, user)
 
 	user, err = sqlu.QueryRowCtx[User](ctx, db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, "QueryRowCtx should not error", err)
-	assert.Equal(t, "QueryRow ctx result should be correct", user, expected)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, user)
 
 	users, err := sqlu.Query[User](db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, "Query should not error", err)
-	assert.Equal(t, "Query result should be correct", users, []User{expected})
+	assert.NoError(t, err)
+	assert.Equal(t, []User{expected}, users)
 
 	users, err = sqlu.QueryCtx[User](ctx, db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, "QueryCtx should not error", err)
-	assert.Equal(t, "QueryCtx result should be correct", users, []User{expected})
+	assert.NoError(t, err)
+	assert.Equal(t, []User{expected}, users)
 }
 
 func batchInsertStruct(t *testing.T, db *sql.DB, bind parser.Bind) {
@@ -222,7 +215,7 @@ func batchInsertStruct(t *testing.T, db *sql.DB, bind parser.Bind) {
 			age INT
 		)`
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
-	assert.NoError(t, "create table", err)
+	assert.NoError(t, err)
 
 	type User struct {
 		Id       int
@@ -243,27 +236,27 @@ func batchInsertStruct(t *testing.T, db *sql.DB, bind parser.Bind) {
 			INSERT INTO %s (id, username, email, password, age)
 			VALUES (:id, :username, :email, :password, :age)`
 	_, err = sqlu.Exec(db, fmt.Sprintf(insertTmpl, table), args)
-	assert.MustNoError(t, "insert", err)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 
 	lastUser := User{COUNT, "John", "john@id.com", "abc123", testutil.PtrTo(COUNT + 17)}
 
 	users, err := sqlu.Query[User](db, fmt.Sprintf(`SELECT * FROM %s`, table))
-	assert.NoError(t, "Query should not error", err)
-	assert.Equal(t, "Query should return 1000 records", len(users), COUNT)
+	assert.NoError(t, err)
+	assert.Equal(t, COUNT, len(users))
 
 	users, err = sqlu.QueryCtx[User](ctx, db, fmt.Sprintf(`SELECT * FROM %s`, table))
-	assert.NoError(t, "QueryCtx should not error", err)
-	assert.Equal(t, "QueryCtx should return 1000 records", len(users), COUNT)
+	assert.NoError(t, err)
+	assert.Equal(t, COUNT, len(users))
 
 	user, err := sqlu.QueryRow[User](db, fmt.Sprintf(`SELECT * FROM %s WHERE id = :id`, table), User{Id: COUNT})
-	assert.NoError(t, "QueryRowNamed should not error", err)
-	assert.Equal(t, "QueryRowNamed should return last user", user, lastUser)
+	assert.NoError(t, err)
+	assert.Equal(t, lastUser, user)
 
 	user, err = sqlu.QueryRowCtx[User](ctx, db, fmt.Sprintf(`SELECT * FROM %s WHERE id = :id`, table), User{Id: COUNT})
-	assert.NoError(t, "QueryRowNamedCtx should not error", err)
-	assert.Equal(t, "QueryRowNamedCtx should return last user", user, lastUser)
+	assert.NoError(t, err)
+	assert.Equal(t, lastUser, user)
 }
 
 // func batchInsertMap(t *testing.T, db *sql.DB, bind parser.Bind) {

@@ -17,48 +17,50 @@ func init() {
 	defaultBind.Store(parser.BindQuestion)
 }
 
+// SetDefaultBind sets the package-level bindvar placeholder.
 func SetDefaultBind(bind parser.Bind) {
 	defaultBind.Store(bind)
 }
 
-// bind returns the default [parser.Bind].
+// bind returns the package-level default [parser.Bind].
 func bind() parser.Bind { return defaultBind.Load().(parser.Bind) }
 
-// querier can be [sql.DB], [sql.Tx] or [sql.Conn]
-type querier interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
+const (
+	BindAt       = parser.BindAt       // BindAt is the placeholder '@p1'
+	BindColon    = parser.BindColon    // BindColon is the placeholder ':name'
+	BindDollar   = parser.BindDollar   // BindDollar is the placeholder '$1'
+	BindQuestion = parser.BindQuestion // BindQuestion is the placeholder '?'
+)
 
-func QueryCtx[T any](ctx context.Context, db querier, query string, args ...any) ([]T, error) {
+func QueryCtx[T any](ctx context.Context, db core.Querier, query string, args ...any) ([]T, error) {
 	var data []T
 	err := core.Query(ctx, db, bind(), &data, query, args...)
 	return data, err
 }
 
-func Query[T any](db querier, query string, args ...any) ([]T, error) {
+func Query[T any](db core.Querier, query string, args ...any) ([]T, error) {
 	var data []T
 	err := core.Query(context.Background(), db, bind(), &data, query, args...)
 	return data, err
 }
 
-func QueryRowCtx[T any](ctx context.Context, db querier, query string, args ...any) (T, error) {
+func QueryRowCtx[T any](ctx context.Context, db core.Querier, query string, args ...any) (T, error) {
 	var data T
 	err := core.QueryRow(ctx, db, bind(), &data, query, args...)
 	return data, err
 }
 
-func QueryRow[T any](db querier, query string, args ...any) (T, error) {
+func QueryRow[T any](db core.Querier, query string, args ...any) (T, error) {
 	var data T
 	err := core.QueryRow(context.Background(), db, bind(), &data, query, args...)
 	return data, err
 }
 
-func ExecCtx(ctx context.Context, db querier, query string, args ...any) (sql.Result, error) {
+func ExecCtx(ctx context.Context, db core.Querier, query string, args ...any) (sql.Result, error) {
 	return core.Exec(ctx, db, bind(), query, args...)
 }
 
-func Exec(db querier, query string, args ...any) (sql.Result, error) {
+func Exec(db core.Querier, query string, args ...any) (sql.Result, error) {
 	return core.Exec(context.Background(), db, bind(), query, args...)
 }
 

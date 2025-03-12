@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/rafaberaldo/sqlz/internal/parser"
-	"github.com/rafaberaldo/sqlz/internal/testing/assert"
 	"github.com/rafaberaldo/sqlz/internal/testing/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNamed(t *testing.T) {
@@ -310,24 +310,24 @@ func TestNamed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query, args, err := Compile(parser.BindAt, tt.inputQuery, tt.inputArg)
-			assert.ExpectedError(t, "'at' error", err, tt.expectError)
-			assert.Equal(t, "'at' query", query, tt.expectedAt)
-			assert.Equal(t, "'at' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedAt, query)
+			assert.Equal(t, tt.expectedArgs, args)
 
 			query, args, err = Compile(parser.BindColon, tt.inputQuery, tt.inputArg)
-			assert.ExpectedError(t, "'colon' error", err, tt.expectError)
-			assert.Equal(t, "'colon' query", query, tt.expectedColon)
-			assert.Equal(t, "'colon' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedColon, query)
+			assert.Equal(t, tt.expectedArgs, args)
 
 			query, args, err = Compile(parser.BindDollar, tt.inputQuery, tt.inputArg)
-			assert.ExpectedError(t, "'dollar' error", err, tt.expectError)
-			assert.Equal(t, "'dollar' query", query, tt.expectedDollar)
-			assert.Equal(t, "'dollar' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedDollar, query)
+			assert.Equal(t, tt.expectedArgs, args)
 
 			query, args, err = Compile(parser.BindQuestion, tt.inputQuery, tt.inputArg)
-			assert.ExpectedError(t, "'question' error", err, tt.expectError)
-			assert.Equal(t, "'question' query", query, tt.expectedQuestion)
-			assert.Equal(t, "'question' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedQuestion, query)
+			assert.Equal(t, tt.expectedArgs, args)
 		})
 	}
 }
@@ -361,9 +361,9 @@ func TestConcurrency(t *testing.T) {
 	for range 1000 {
 		go func() {
 			query, args, err := Compile(parser.BindQuestion, inputQuery, persons)
-			assert.Equal(t, "query should be equal expected", query, expectedQuery)
-			assert.Equal(t, "args should be equal expected", args, expectedArgs)
-			assert.NoError(t, "should not error", err)
+			assert.Equal(t, expectedQuery, query)
+			assert.Equal(t, expectedArgs, args)
+			assert.NoError(t, err)
 		}()
 	}
 }
@@ -383,7 +383,7 @@ func BenchmarkNamedMap(b *testing.B) {
 
 	for range b.N {
 		_, _, err := Compile(parser.BindQuestion, input, args)
-		assert.NoError(b, "error", err)
+		assert.NoError(b, err)
 	}
 }
 
@@ -409,6 +409,6 @@ func BenchmarkNamedStruct(b *testing.B) {
 
 	for range b.N {
 		_, _, err := Compile(parser.BindQuestion, input, args)
-		assert.NoError(b, "should not error", err)
+		assert.NoError(b, err)
 	}
 }

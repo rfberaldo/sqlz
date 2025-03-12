@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/rafaberaldo/sqlz"
-	"github.com/rafaberaldo/sqlz/internal/testing/assert"
+	"github.com/stretchr/testify/assert"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -25,14 +25,14 @@ func BenchmarkExec(b *testing.B) {
 			name TEXT NOT NULL
 		)`
 	_, err := db.Exec(createTmpl)
-	assert.NoError(b, "create table should not error", err)
+	assert.NoError(b, err)
 
 	input := "SELECT * FROM benchmark WHERE id = ? AND name = ?"
 	args := []any{1, "Alice"}
 
 	for range b.N {
 		_, err := db.Exec(input, args...)
-		assert.NoError(b, "exec should not error", err)
+		assert.NoError(b, err)
 	}
 }
 
@@ -50,7 +50,7 @@ func BenchmarkQueryNamed(b *testing.B) {
 			name TEXT NOT NULL
 		)`
 	_, err := db.Exec(createTmpl)
-	assert.NoError(b, "create table should not error", err)
+	assert.NoError(b, err)
 
 	input := "SELECT * FROM benchmark WHERE id = :id AND name = :name"
 	arg := map[string]any{"id": 1, "name": "Alice"}
@@ -62,7 +62,7 @@ func BenchmarkQueryNamed(b *testing.B) {
 
 	for range b.N {
 		err := db.Query(&users, input, arg)
-		assert.NoError(b, "query named should not error", err)
+		assert.NoError(b, err)
 	}
 }
 
@@ -83,7 +83,7 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 			age INTEGER
 		)`
 	_, err := db.Exec(createTmpl)
-	assert.NoError(b, "create table should not error", err)
+	assert.NoError(b, err)
 
 	type user struct {
 		Id       int
@@ -101,7 +101,7 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 
 	for range b.N {
 		_, err := db.Exec(input, args)
-		assert.NoError(b, "insert should not error", err)
+		assert.NoError(b, err)
 	}
 }
 
@@ -122,7 +122,7 @@ func BenchmarkQueryBulk(b *testing.B) {
 			age INTEGER
 		)`
 	_, err := db.Exec(createTmpl)
-	assert.NoError(b, "create table should not error", err)
+	assert.NoError(b, err)
 
 	type user struct {
 		Id       int
@@ -138,14 +138,14 @@ func BenchmarkQueryBulk(b *testing.B) {
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
 	_, err = db.Exec(insertTmpl, args)
-	assert.NoError(b, "insert should not error", err)
+	assert.NoError(b, err)
 
 	input := "SELECT * FROM benchmark"
 
 	for range b.N {
 		var users []user
 		err := db.Query(&users, input)
-		assert.NoError(b, "query should not error", err)
+		assert.NoError(b, err)
 	}
 }
 
@@ -166,7 +166,7 @@ func BenchmarkInClause(b *testing.B) {
 			age INTEGER
 		)`
 	_, err := db.Exec(createTmpl)
-	assert.NoError(b, "create table should not error", err)
+	assert.NoError(b, err)
 
 	type user struct {
 		Id       int
@@ -182,7 +182,7 @@ func BenchmarkInClause(b *testing.B) {
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
 	_, err = db.Exec(insertTmpl, args)
-	assert.NoError(b, "insert should not error", err)
+	assert.NoError(b, err)
 
 	input := "SELECT * FROM benchmark WHERE id IN (:ids)"
 	arg := map[string]any{"ids": []int{15, 732, 489, 256, 843, 127, 964,
@@ -192,6 +192,6 @@ func BenchmarkInClause(b *testing.B) {
 	for range b.N {
 		var users []user
 		err := db.Query(&users, input, arg)
-		assert.NoError(b, "query should not error", err)
+		assert.NoError(b, err)
 	}
 }

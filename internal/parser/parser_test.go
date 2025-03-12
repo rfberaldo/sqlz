@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/internal/testing/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParse(t *testing.T) {
@@ -149,20 +149,20 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query, idents := ParseNamed(BindAt, tt.input)
-			assert.Equal(t, "'at' query", query, tt.expectedAt)
-			assert.Equal(t, "'at' idents", idents, tt.expectedIdents)
+			assert.Equal(t, tt.expectedAt, query)
+			assert.Equal(t, tt.expectedIdents, idents)
 
 			query, idents = ParseNamed(BindColon, tt.input)
-			assert.Equal(t, "'colon' query", query, tt.expectedColon)
-			assert.Equal(t, "'colon' idents", idents, tt.expectedIdents)
+			assert.Equal(t, tt.expectedColon, query)
+			assert.Equal(t, tt.expectedIdents, idents)
 
 			query, idents = ParseNamed(BindDollar, tt.input)
-			assert.Equal(t, "'dollar' query", query, tt.expectedDollar)
-			assert.Equal(t, "'dollar' idents", idents, tt.expectedIdents)
+			assert.Equal(t, tt.expectedDollar, query)
+			assert.Equal(t, tt.expectedIdents, idents)
 
 			query, idents = ParseNamed(BindQuestion, tt.input)
-			assert.Equal(t, "'question' query", query, tt.expectedQuestion)
-			assert.Equal(t, "'question' idents", idents, tt.expectedIdents)
+			assert.Equal(t, tt.expectedQuestion, query)
+			assert.Equal(t, tt.expectedIdents, idents)
 		})
 	}
 }
@@ -248,24 +248,24 @@ func TestParseInClause(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query, args, err := ParseInNamed(BindAt, tt.input, tt.inputArgs)
-			assert.ExpectedError(t, "'at' error", err, tt.expectError)
-			assert.Equal(t, "'at' query", query, tt.expectedAt)
-			assert.Equal(t, "'at' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedAt, query)
+			assert.Equal(t, tt.expectedArgs, args)
 
 			query, args, err = ParseInNamed(BindColon, tt.input, tt.inputArgs)
-			assert.ExpectedError(t, "'colon' error", err, tt.expectError)
-			assert.Equal(t, "'colon' query", query, tt.expectedColon)
-			assert.Equal(t, "'colon' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedColon, query)
+			assert.Equal(t, tt.expectedArgs, args)
 
 			query, args, err = ParseInNamed(BindDollar, tt.input, tt.inputArgs)
-			assert.ExpectedError(t, "'dollar' error", err, tt.expectError)
-			assert.Equal(t, "'dollar' query", query, tt.expectedDollar)
-			assert.Equal(t, "'dollar' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedDollar, query)
+			assert.Equal(t, tt.expectedArgs, args)
 
 			query, args, err = ParseInNamed(BindQuestion, tt.input, tt.inputArgs)
-			assert.ExpectedError(t, "'question' error", err, tt.expectError)
-			assert.Equal(t, "'question' query", query, tt.expectedQuestion)
-			assert.Equal(t, "'question' args", args, tt.expectedArgs)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			assert.Equal(t, tt.expectedQuestion, query)
+			assert.Equal(t, tt.expectedArgs, args)
 		})
 	}
 }
@@ -370,31 +370,31 @@ func TestParseRawIn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query, args, err := ParseIn(BindAt, tt.input, tt.args...)
-			assert.ExpectedError(t, "'at' query error", err, tt.expectWrongBindError)
+			assert.Equal(t, tt.expectWrongBindError, err != nil, err)
 			if !tt.expectWrongBindError {
-				assert.Equal(t, "'at' query should be equal input", query, tt.input)
-				assert.Equal(t, "'at' args should be equal input", args, tt.args)
+				assert.Equal(t, tt.input, query)
+				assert.Equal(t, tt.args, args)
 			}
 
 			query, args, err = ParseIn(BindColon, tt.input, tt.args...)
-			assert.ExpectedError(t, "'colon' query error", err, tt.expectWrongBindError)
+			assert.Equal(t, tt.expectWrongBindError, err != nil, err)
 			if !tt.expectWrongBindError {
-				assert.Equal(t, "'colon' query should be equal input", query, tt.input)
-				assert.Equal(t, "'colon' args should be equal input", args, tt.args)
+				assert.Equal(t, tt.input, query)
+				assert.Equal(t, tt.args, args)
 			}
 
 			query, args, err = ParseIn(BindDollar, tt.input, tt.args...)
-			assert.ExpectedError(t, "'dollar' query error", err, tt.expectWrongBindError)
+			assert.Equal(t, tt.expectWrongBindError, err != nil, err)
 			if !tt.expectWrongBindError {
-				assert.Equal(t, "'dollar' query should be equal input", query, tt.input)
-				assert.Equal(t, "'dollar' args should be equal input", args, tt.args)
+				assert.Equal(t, tt.input, query)
+				assert.Equal(t, tt.args, args)
 			}
 
 			query, args, err = ParseIn(BindQuestion, tt.input, tt.args...)
-			assert.ExpectedError(t, "'question' query error", err, tt.expectError)
+			assert.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
-				assert.Equal(t, "'question' query should be equal expected", query, tt.expectedOutput)
-				assert.Equal(t, "'question' args should be equal expected", args, tt.expectedArgs)
+				assert.Equal(t, tt.expectedOutput, query)
+				assert.Equal(t, tt.expectedArgs, args)
 			}
 		})
 	}
@@ -408,8 +408,8 @@ func TestConcurrency(t *testing.T) {
 	for range 1000 {
 		go func() {
 			query, idents := ParseNamed(BindQuestion, input)
-			assert.Equal(t, "query should be equal expected", query, expectedQuery)
-			assert.Equal(t, "idents should be equal expected", idents, expectedIdents)
+			assert.Equal(t, expectedQuery, query)
+			assert.Equal(t, expectedIdents, idents)
 		}()
 	}
 }
