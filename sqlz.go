@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/rafaberaldo/sqlz/internal/common"
+	"github.com/rafaberaldo/sqlz/internal/core"
 	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
@@ -58,12 +58,12 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // Query uses [context.Background] internally;
 // to specify the context, use [DB.QueryCtx].
 func (db *DB) Query(dst any, query string, args ...any) error {
-	return common.Query(context.Background(), db.conn, db.bind, dst, query, args...)
+	return core.Query(context.Background(), db.conn, db.bind, dst, query, args...)
 }
 
 // QueryCtx is like [DB.Query], with context.
 func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return common.Query(ctx, db.conn, db.bind, dst, query, args...)
+	return core.Query(ctx, db.conn, db.bind, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -80,12 +80,12 @@ func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [DB.QueryRowCtx].
 func (db *DB) QueryRow(dst any, query string, args ...any) error {
-	return common.QueryRow(context.Background(), db.conn, db.bind, dst, query, args...)
+	return core.QueryRow(context.Background(), db.conn, db.bind, dst, query, args...)
 }
 
 // QueryRowCtx is like [DB.QueryRow], with context.
 func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return common.QueryRow(ctx, db.conn, db.bind, dst, query, args...)
+	return core.QueryRow(ctx, db.conn, db.bind, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -99,12 +99,12 @@ func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // Exec uses [context.Background] internally;
 // to specify the context, use [DB.ExecCtx].
 func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
-	return common.Exec(context.Background(), db.conn, db.bind, query, args...)
+	return core.Exec(context.Background(), db.conn, db.bind, query, args...)
 }
 
 // ExecCtx is like [DB.Exec], with context.
 func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return common.Exec(context.Background(), db.conn, db.bind, query, args...)
+	return core.Exec(context.Background(), db.conn, db.bind, query, args...)
 }
 
 // Tx is an in-progress database transaction.
@@ -139,12 +139,12 @@ func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 // Query uses [context.Background] internally;
 // to specify the context, use [Tx.QueryCtx].
 func (tx *Tx) Query(dst any, query string, args ...any) error {
-	return common.Query(context.Background(), tx.conn, tx.bind, dst, query, args...)
+	return core.Query(context.Background(), tx.conn, tx.bind, dst, query, args...)
 }
 
 // QueryCtx is like [Tx.Query], with context.
 func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return common.Query(ctx, tx.conn, tx.bind, dst, query, args...)
+	return core.Query(ctx, tx.conn, tx.bind, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -161,12 +161,12 @@ func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [Tx.QueryRowCtx].
 func (tx *Tx) QueryRow(dst any, query string, args ...any) error {
-	return common.QueryRow(context.Background(), tx.conn, tx.bind, dst, query, args...)
+	return core.QueryRow(context.Background(), tx.conn, tx.bind, dst, query, args...)
 }
 
 // QueryRowCtx is like [Tx.QueryRow], with context.
 func (tx *Tx) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return common.QueryRow(ctx, tx.conn, tx.bind, dst, query, args...)
+	return core.QueryRow(ctx, tx.conn, tx.bind, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -181,10 +181,10 @@ func (tx *Tx) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // Exec uses [context.Background] internally;
 // to specify the context, use [Tx.ExecCtx].
 func (tx *Tx) Exec(query string, args ...any) (sql.Result, error) {
-	return common.Exec(context.Background(), tx.conn, tx.bind, query, args...)
+	return core.Exec(context.Background(), tx.conn, tx.bind, query, args...)
 }
 
 // ExecCtx is like [Tx.Exec], with context.
 func (tx *Tx) ExecCtx(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return common.Exec(ctx, tx.conn, tx.bind, query, args...)
+	return core.Exec(ctx, tx.conn, tx.bind, query, args...)
 }

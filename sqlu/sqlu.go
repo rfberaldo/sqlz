@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/rafaberaldo/sqlz/internal/common"
+	"github.com/rafaberaldo/sqlz/internal/core"
 	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
@@ -32,34 +32,34 @@ type querier interface {
 
 func QueryCtx[T any](ctx context.Context, db querier, query string, args ...any) ([]T, error) {
 	var data []T
-	err := common.Query(ctx, db, bind(), &data, query, args...)
+	err := core.Query(ctx, db, bind(), &data, query, args...)
 	return data, err
 }
 
 func Query[T any](db querier, query string, args ...any) ([]T, error) {
 	var data []T
-	err := common.Query(context.Background(), db, bind(), &data, query, args...)
+	err := core.Query(context.Background(), db, bind(), &data, query, args...)
 	return data, err
 }
 
 func QueryRowCtx[T any](ctx context.Context, db querier, query string, args ...any) (T, error) {
 	var data T
-	err := common.QueryRow(ctx, db, bind(), &data, query, args...)
+	err := core.QueryRow(ctx, db, bind(), &data, query, args...)
 	return data, err
 }
 
 func QueryRow[T any](db querier, query string, args ...any) (T, error) {
 	var data T
-	err := common.QueryRow(context.Background(), db, bind(), &data, query, args...)
+	err := core.QueryRow(context.Background(), db, bind(), &data, query, args...)
 	return data, err
 }
 
 func ExecCtx(ctx context.Context, db querier, query string, args ...any) (sql.Result, error) {
-	return common.Exec(ctx, db, bind(), query, args...)
+	return core.Exec(ctx, db, bind(), query, args...)
 }
 
 func Exec(db querier, query string, args ...any) (sql.Result, error) {
-	return common.Exec(context.Background(), db, bind(), query, args...)
+	return core.Exec(context.Background(), db, bind(), query, args...)
 }
 
 // Connect opens a database specified by its database driver name and a
