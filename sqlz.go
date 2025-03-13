@@ -50,7 +50,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // Returned rows will be scaned to dst.
 // The args are for any placeholder parameters in the query.
 //
-// The placeholder depends on the driver.
+// The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 // A struct can have a struct-tag `db:"id"`, `db:"name"`, etc.
@@ -72,7 +72,7 @@ func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // Returned rows will be scaned to dst.
 // The args are for any placeholder parameters in the query.
 //
-// The placeholder depends on the driver.
+// The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 // A struct can have a struct-tag `db:"id"`, `db:"name"`, etc.
@@ -91,7 +91,7 @@ func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // Exec executes a query without returning any rows.
 // The args are for any placeholder parameters in the query.
 //
-// The placeholder depends on the driver.
+// The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 // A struct can have a struct-tag `db:"id"`, `db:"name"`, etc.
@@ -118,7 +118,7 @@ type Tx struct {
 	conn *sql.Tx
 }
 
-// Conn return the underlying [*sql.TX].
+// Conn return the underlying [*sql.Tx].
 func (tx *Tx) Conn() *sql.Tx { return tx.conn }
 
 // Commit commits the transaction.
@@ -131,7 +131,7 @@ func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 // Returned rows will be scaned to dst.
 // The args are for any placeholder parameters in the query.
 //
-// The placeholder depends on the driver.
+// The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 // A struct can have a struct-tag `db:"id"`, `db:"name"`, etc.
@@ -153,7 +153,7 @@ func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // Returned rows will be scaned to dst.
 // The args are for any placeholder parameters in the query.
 //
-// The placeholder depends on the driver.
+// The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 // A struct can have a struct-tag `db:"id"`, `db:"name"`, etc.
@@ -173,7 +173,7 @@ func (tx *Tx) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // The args are for any placeholder parameters in the query.
 // If args is an array, it will expand query and args for a batch INSERT.
 //
-// The placeholder depends on the driver.
+// The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 // A struct can have a struct-tag `db:"id"`, `db:"name"`, etc.

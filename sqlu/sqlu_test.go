@@ -1,41 +1,50 @@
-package sqlu_test
+package sqlu
 
 import (
 	"cmp"
-	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/rafaberaldo/sqlz/internal/parser"
 	"github.com/rafaberaldo/sqlz/internal/testutil"
-	"github.com/rafaberaldo/sqlz/sqlu"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func TestSQLU(t *testing.T) {
+func TestNotFound(t *testing.T) {
+	err := errors.New("some custom error")
+	assert.Equal(t, false, IsNotFound(err))
+
+	err = fmt.Errorf("some custom error")
+	assert.Equal(t, false, IsNotFound(err))
+
+	err = errors.Join(fmt.Errorf("some custom error"), sql.ErrNoRows)
+	assert.Equal(t, true, IsNotFound(err))
+
+	err = fmt.Errorf("a wrapper around sql.ErrNoRows: %w", sql.ErrNoRows)
+	assert.Equal(t, true, IsNotFound(err))
+}
+
+func TestSQLUtil(t *testing.T) {
 	// tests must be self-contained and able to run in parallel
 	type Test func(t *testing.T, db *sql.DB, bind parser.Bind)
 	tests := []Test{
 		basicQueryMethods,
 		shouldReturnErrorForWrongQuery,
-		shouldReturnNotFound,
-		queryShouldReturnCorrect,
-		batchInsertStruct,
-		// batchInsertMap,
-		// shouldScanBuiltinType,
-		// namedQueryShouldParseInClause,
-		// queryShouldParseInClause,
+		shouldReturnNotFoundOnQueryRow,
+		queryArgs,
+		queryRowArgs,
+		execArgs,
 	}
 	t.Run("MySQL", func(t *testing.T) {
 		dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
-		db, err := sqlu.Connect("mysql", dsn)
+		db, err := Connect("mysql", dsn)
 		if err != nil {
 			log.Printf("Skipping MySQL tests: %v", err)
 			t.Skip()
@@ -51,7 +60,7 @@ func TestSQLU(t *testing.T) {
 
 	t.Run("PostgreSQL", func(t *testing.T) {
 		dsn := cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
-		db, err := sqlu.Connect("pgx", dsn)
+		db, err := Connect("pgx", dsn)
 		if err != nil {
 			log.Printf("Skipping PostgreSQL tests: %v", err)
 			t.Skip()
@@ -67,65 +76,43 @@ func TestSQLU(t *testing.T) {
 }
 
 func basicQueryMethods(t *testing.T, db *sql.DB, bind parser.Bind) {
-	ctx := context.Background()
-	var err error
-	var s string
-	var ss []string
+	SetDefaultBind(bind)
 
 	query := "SELECT 'Hello World'"
 	expected := "Hello World"
 	expectedSlice := []string{"Hello World"}
 
-	ss, err = sqlu.Query[string](db, query)
+	ss, err := Query[string](db, query)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedSlice, ss)
 
-	ss, err = sqlu.QueryCtx[string](ctx, db, query)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedSlice, ss)
-
-	s, err = sqlu.QueryRow[string](db, query)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, s)
-
-	s, err = sqlu.QueryRowCtx[string](ctx, db, query)
+	s, err := QueryRow[string](db, query)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, s)
 }
 
 func shouldReturnErrorForWrongQuery(t *testing.T, db *sql.DB, bind parser.Bind) {
-	ctx := context.Background()
-	var err error
+	SetDefaultBind(bind)
+
 	const query = "WRONG QUERY"
-	const str = "WRONG"
+	const shouldContain = "WRONG"
 
-	_, err = sqlu.Exec(db, query)
-	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	_, err := Exec(db, query)
 	assert.Error(t, err)
+	assert.ErrorContains(t, err, shouldContain)
 
-	_, err = sqlu.ExecCtx(ctx, db, query)
-	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	_, err = Query[string](db, query)
 	assert.Error(t, err)
+	assert.ErrorContains(t, err, shouldContain)
 
-	_, err = sqlu.Query[int](db, query)
-	assert.Equal(t, true, strings.Contains(err.Error(), str))
+	_, err = QueryRow[string](db, query)
 	assert.Error(t, err)
-
-	_, err = sqlu.QueryCtx[int](ctx, db, query)
-	assert.Equal(t, true, strings.Contains(err.Error(), str))
-	assert.Error(t, err)
-
-	_, err = sqlu.QueryRow[int](db, query)
-	assert.Equal(t, true, strings.Contains(err.Error(), str))
-	assert.Error(t, err)
-
-	_, err = sqlu.QueryRowCtx[int](ctx, db, query)
-	assert.Equal(t, true, strings.Contains(err.Error(), str))
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, shouldContain)
 }
 
-func shouldReturnNotFound(t *testing.T, db *sql.DB, bind parser.Bind) {
-	ctx := context.Background()
+func shouldReturnNotFoundOnQueryRow(t *testing.T, db *sql.DB, bind parser.Bind) {
+	SetDefaultBind(bind)
+
 	table := testutil.TableName(t.Name())
 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -135,16 +122,14 @@ func shouldReturnNotFound(t *testing.T, db *sql.DB, bind parser.Bind) {
 
 	query := fmt.Sprintf("SELECT * FROM %s", table)
 
-	_, err = sqlu.QueryRow[string](db, query)
+	_, err = QueryRow[any](db, query)
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, sql.ErrNoRows)
-
-	_, err = sqlu.QueryRowCtx[string](ctx, db, query)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, sql.ErrNoRows)
+	assert.Equal(t, true, errors.Is(err, sql.ErrNoRows), err)
 }
 
-func queryShouldReturnCorrect(t *testing.T, db *sql.DB, bind parser.Bind) {
+func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
+	SetDefaultBind(bind)
+
 	table := testutil.TableName(t.Name())
 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -157,52 +142,123 @@ func queryShouldReturnCorrect(t *testing.T, db *sql.DB, bind parser.Bind) {
 			age INT,
 			active BOOL
 		)`
-	_, err := sqlu.Exec(db, fmt.Sprintf(createTmpl, table))
+	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
 	insertTmpl := testutil.Schema(bind, `
 		INSERT INTO %s (id, username, email, password, age, active)
-		VALUES (?,?,?,?,?,?)`)
+		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
 		1, "Alice", "alice@wonderland.com", "123456", 18, true,
+		2, "Rob", "rob@google.com", "123456", 38, true,
+		3, "John", "john@id.com", "123456", 24, false,
 	)
 	assert.NoError(t, err)
-
-	selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ?`)
 
 	type User struct {
 		Id       int
 		Username string
 		Email    string
 		Pw       string `db:"password"`
-		Age      *int
+		Age      int
 		Active   bool
 	}
 
-	expected := User{1, "Alice", "alice@wonderland.com", "123456", testutil.PtrTo(18), true}
-	ctx := context.Background()
+	t.Run("query without args should perform a regular query", func(t *testing.T) {
+		t.Parallel()
+		expected := []User{
+			{1, "Alice", "alice@wonderland.com", "123456", 18, true},
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+			{3, "John", "john@id.com", "123456", 24, false},
+		}
+		users, err := Query[User](db, fmt.Sprintf("SELECT * FROM %s", table))
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(users))
+		assert.Equal(t, expected, users)
+	})
 
-	var user User
+	t.Run("query should work with multiple default placeholders", func(t *testing.T) {
+		t.Parallel()
+		expected := []User{
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+			{3, "John", "john@id.com", "123456", 24, false},
+		}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ? OR id = ?`)
+		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), 2, 3)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(users))
+		assert.Equal(t, expected, users)
+	})
 
-	user, err = sqlu.QueryRow[User](db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, user)
+	t.Run("query should parse IN clause using default placeholder", func(t *testing.T) {
+		t.Parallel()
+		if bind != parser.BindQuestion {
+			t.Skip("skipping because IN clause only supported by '?' placeholders for now")
+		}
+		expected := []User{
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+			{3, "John", "john@id.com", "123456", 24, false},
+		}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (?)`)
+		ids := []int{2, 3}
+		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), ids)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(users))
+		assert.Equal(t, expected, users)
+	})
 
-	user, err = sqlu.QueryRowCtx[User](ctx, db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, user)
+	t.Run("query should work with struct named arg", func(t *testing.T) {
+		t.Parallel()
+		expected := []User{
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+		}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		arg := struct{ Id int }{Id: 2}
+		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), arg)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, expected, users)
+	})
 
-	users, err := sqlu.Query[User](db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, err)
-	assert.Equal(t, []User{expected}, users)
+	t.Run("query should work with map named arg", func(t *testing.T) {
+		t.Parallel()
+		expected := []User{
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+		}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		arg := map[string]any{"id": 2}
+		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), arg)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, expected, users)
+	})
 
-	users, err = sqlu.QueryCtx[User](ctx, db, fmt.Sprintf(selectTmpl, table), 1)
-	assert.NoError(t, err)
-	assert.Equal(t, []User{expected}, users)
+	t.Run("query should parse IN clause using named arg", func(t *testing.T) {
+		t.Parallel()
+		expected := []User{
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+			{3, "John", "john@id.com", "123456", 24, false},
+		}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
+		arg := map[string]any{"ids": []int{2, 3}}
+		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), arg)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(users))
+		assert.Equal(t, expected, users)
+	})
+
+	t.Run("query should return length 0 if no result is found", func(t *testing.T) {
+		t.Parallel()
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = 42`)
+		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table))
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(users))
+	})
 }
 
-func batchInsertStruct(t *testing.T, db *sql.DB, bind parser.Bind) {
-	sqlu.SetDefaultBind(bind)
+func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
+	SetDefaultBind(bind)
+
 	table := testutil.TableName(t.Name())
 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -212,193 +268,205 @@ func batchInsertStruct(t *testing.T, db *sql.DB, bind parser.Bind) {
 			username VARCHAR(255),
 			email VARCHAR(255),
 			password VARCHAR(255),
-			age INT
+			age INT,
+			active BOOL
 		)`
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
+	assert.NoError(t, err)
+
+	insertTmpl := testutil.Schema(bind, `
+		INSERT INTO %s (id, username, email, password, age, active)
+		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
+	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
+		1, "Alice", "alice@wonderland.com", "123456", 18, true,
+		2, "Rob", "rob@google.com", "123456", 38, true,
+		3, "John", "john@id.com", "123456", 24, false,
+	)
 	assert.NoError(t, err)
 
 	type User struct {
 		Id       int
 		Username string
 		Email    string
-		Password string
-		Age      *int
+		Pw       string `db:"password"`
+		Age      int
+		Active   bool
 	}
 
-	const COUNT = 5
-	args := make([]*User, 0, COUNT)
-	for i := range COUNT {
-		user := &User{i + 1, "John", "john@id.com", "abc123", testutil.PtrTo(18 + i)}
-		args = append(args, user)
-	}
+	t.Run("query row without args should perform a regular query", func(t *testing.T) {
+		t.Parallel()
+		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
+		user, err := QueryRow[User](db, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
 
-	insertTmpl := `
-			INSERT INTO %s (id, username, email, password, age)
-			VALUES (:id, :username, :email, :password, :age)`
-	_, err = sqlu.Exec(db, fmt.Sprintf(insertTmpl, table), args)
-	assert.NoError(t, err)
+	t.Run("query row should work with multiple default placeholders", func(t *testing.T) {
+		t.Parallel()
+		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ? AND active = ?`)
+		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), 2, true)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
 
-	ctx := context.Background()
+	t.Run("query row should parse IN clause using default placeholder", func(t *testing.T) {
+		t.Parallel()
+		if bind != parser.BindQuestion {
+			t.Skip("skipping because IN clause only supported by '?' placeholders for now")
+		}
+		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (?)`)
+		ids := []int{2}
+		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), ids)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
 
-	lastUser := User{COUNT, "John", "john@id.com", "abc123", testutil.PtrTo(COUNT + 17)}
+	t.Run("query row should work with struct named arg", func(t *testing.T) {
+		t.Parallel()
+		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		arg := struct{ Id int }{Id: 2}
+		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), arg)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
 
-	users, err := sqlu.Query[User](db, fmt.Sprintf(`SELECT * FROM %s`, table))
-	assert.NoError(t, err)
-	assert.Equal(t, COUNT, len(users))
+	t.Run("query row should work with map named arg", func(t *testing.T) {
+		t.Parallel()
+		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		arg := map[string]any{"id": 2}
+		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), arg)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
 
-	users, err = sqlu.QueryCtx[User](ctx, db, fmt.Sprintf(`SELECT * FROM %s`, table))
-	assert.NoError(t, err)
-	assert.Equal(t, COUNT, len(users))
+	t.Run("query row should parse IN clause using named arg", func(t *testing.T) {
+		t.Parallel()
+		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
+		arg := map[string]any{"ids": []int{2}}
+		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), arg)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
 
-	user, err := sqlu.QueryRow[User](db, fmt.Sprintf(`SELECT * FROM %s WHERE id = :id`, table), User{Id: COUNT})
-	assert.NoError(t, err)
-	assert.Equal(t, lastUser, user)
-
-	user, err = sqlu.QueryRowCtx[User](ctx, db, fmt.Sprintf(`SELECT * FROM %s WHERE id = :id`, table), User{Id: COUNT})
-	assert.NoError(t, err)
-	assert.Equal(t, lastUser, user)
+	t.Run("query row should return error if no result is found", func(t *testing.T) {
+		t.Parallel()
+		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = 42`)
+		_, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table))
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, sql.ErrNoRows)
+	})
 }
 
-// func batchInsertMap(t *testing.T, db *sql.DB, bind parser.Bind) {
-// 	table := testutil.TableName(t.Name())
-// 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
+func execArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
+	SetDefaultBind(bind)
 
-// 	createTmpl := `
-// 		CREATE TABLE %s (
-// 			id INT PRIMARY KEY,
-// 			username VARCHAR(255),
-// 			email VARCHAR(255),
-// 			password VARCHAR(255),
-// 			age INT
-// 		)`
-// 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
-// 	assert.NoError(t, "create table", err)
+	table := testutil.TableName(t.Name())
+	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
-// 	const COUNT = 1000
-// 	users := make([]map[string]any, 0, COUNT)
-// 	for i := range COUNT {
-// 		user := map[string]any{
-// 			"id":       i + 1,
-// 			"username": "John",
-// 			"email":    "john@id.com",
-// 			"password": "abc123",
-// 			"age":      testutil.PtrTo(18 + i)}
-// 		users = append(users, user)
-// 	}
+	createTmpl := `
+		CREATE TABLE %s (
+			id INT PRIMARY KEY,
+			name VARCHAR(255),
+			age INT
+		)`
+	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
+	assert.NoError(t, err)
 
-// 	insertTmpl := `
-// 		INSERT INTO %s (id, username, email, password, age)
-// 		VALUES (:id, :username, :email, :password, :age)`
-// 	_, err = db.ExecNamed(fmt.Sprintf(insertTmpl, table), users)
-// 	assert.NoError(t, "insert batch", err)
+	// these subtests must run sequentially
 
-// 	type User struct {
-// 		Id       int
-// 		Username string
-// 		Email    string
-// 		Pw       string `db:"password"`
-// 		Age      *int
-// 	}
+	t.Run("multiple args should perform a regular exec", func(t *testing.T) {
+		insertTmpl := testutil.Schema(bind, `
+			INSERT INTO %s (id, name, age)
+			VALUES (?,?,?),(?,?,?),(?,?,?)`)
+		re, err := Exec(db, fmt.Sprintf(insertTmpl, table),
+			1, "Alice", 18,
+			2, "Rob", 38,
+			3, "John", 4,
+		)
+		assert.NoError(t, err)
 
-// 	ctx := context.Background()
+		rows, err := re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, 3, int(rows))
+	})
 
-// 	var user User
-// 	var users2 []User
-// 	lastUser := User{COUNT, "John", "john@id.com", "abc123", testutil.PtrTo(COUNT + 17)}
+	t.Run("1 arg struct should perform a named exec", func(t *testing.T) {
+		deleteStmt := "DELETE FROM %s WHERE id = :id"
+		arg := struct{ Id int }{Id: 1}
+		re, err := Exec(db, fmt.Sprintf(deleteStmt, table), arg)
+		assert.NoError(t, err)
 
-// 	err = db.Query(&users2, fmt.Sprintf(`SELECT * FROM %s`, table))
-// 	assert.NoError(t, "Query should not error", err)
-// 	assert.Equal(t, "Query should return 1000 records", len(users), COUNT)
+		rows, err := re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, 1, int(rows))
+	})
 
-// 	err = db.QueryCtx(ctx, &users2, fmt.Sprintf(`SELECT * FROM %s`, table))
-// 	assert.NoError(t, "QueryCtx should not error", err)
-// 	assert.Equal(t, "QueryCtx should return 1000 records", len(users), COUNT)
+	t.Run("1 arg map should perform a named exec", func(t *testing.T) {
+		deleteStmt := "DELETE FROM %s WHERE id = :id"
+		arg := map[string]any{"id": 2}
+		re, err := Exec(db, fmt.Sprintf(deleteStmt, table), arg)
+		assert.NoError(t, err)
 
-// 	err = db.QueryRowNamed(&user, fmt.Sprintf(`SELECT * FROM %s WHERE id = :id`, table), User{Id: COUNT})
-// 	assert.NoError(t, "QueryRowNamed should not error", err)
-// 	assert.Equal(t, "QueryRowNamed should return last user", user, lastUser)
+		rows, err := re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, 1, int(rows))
+	})
 
-// 	err = db.QueryRowNamedCtx(ctx, &user, fmt.Sprintf(`SELECT * FROM %s WHERE id = :id`, table), User{Id: COUNT})
-// 	assert.NoError(t, "QueryRowNamedCtx should not error", err)
-// 	assert.Equal(t, "QueryRowNamedCtx should return last user", user, lastUser)
-// }
+	t.Run("1 arg int should perform a regular exec", func(t *testing.T) {
+		deleteStmt := testutil.Schema(bind, "DELETE FROM %s WHERE id = ?")
+		arg := 3
+		re, err := Exec(db, fmt.Sprintf(deleteStmt, table), arg)
+		assert.NoError(t, err)
 
-// func shouldScanBuiltinType(t *testing.T, db *sql.DB, bind parser.Bind) {
-// 	table := testutil.TableName(t.Name())
-// 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
+		rows, err := re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, 1, int(rows))
+	})
 
-// 	createTmpl := `
-// 		CREATE TABLE %s (id INT PRIMARY KEY, name VARCHAR(255))`
-// 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
-// 	assert.NoError(t, "create table", err)
+	t.Run("1 arg []struct should perform a named batch insert", func(t *testing.T) {
+		type Person struct {
+			Id   int
+			Name string
+			Age  int
+		}
+		const COUNT = 100
+		args := make([]Person, COUNT)
+		for i := range COUNT {
+			args[i] = Person{i + 1, "Name", 20}
+		}
+		insertTmpl := `INSERT INTO %s (id, name, age) VALUES (:id, :name, :age)`
+		re, err := Exec(db, fmt.Sprintf(insertTmpl, table), args)
+		assert.NoError(t, err)
 
-// 	insertTmpl := testutil.Schema(bind, `INSERT INTO %s (id, name) VALUES (?, ?)`)
-// 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table), 1, "Alice")
-// 	assert.NoError(t, "insert", err)
+		rows, err := re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, COUNT, int(rows))
 
-// 	selectTmplId := testutil.Schema(bind, `SELECT id FROM %s WHERE id = ?`)
-// 	selectTmplName := testutil.Schema(bind, `SELECT name FROM %s WHERE id = ?`)
+		re, err = Exec(db, "DELETE FROM "+table)
+		assert.NoError(t, err)
 
-// 	var id int
-// 	err = db.QueryRow(&id, fmt.Sprintf(selectTmplId, table), 1)
-// 	assert.NoError(t, "QueryRow should not error", err)
-// 	assert.Equal(t, "QueryRow scanned string", id, 1)
+		rows, err = re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, COUNT, int(rows))
+	})
 
-// 	var name string
-// 	err = db.QueryRow(&name, fmt.Sprintf(selectTmplName, table), 1)
-// 	assert.NoError(t, "QueryRow should not error", err)
-// 	assert.Equal(t, "QueryRow scanned string", name, "Alice")
-// }
+	t.Run("1 arg []map should perform a named batch insert", func(t *testing.T) {
+		const COUNT = 100
+		args := make([]map[string]any, COUNT)
+		for i := range COUNT {
+			args[i] = map[string]any{"id": i + 1, "name": "Name", "age": 20}
+		}
+		insertTmpl := `INSERT INTO %s (id, name, age) VALUES (:id, :name, :age)`
+		re, err := Exec(db, fmt.Sprintf(insertTmpl, table), args)
+		assert.NoError(t, err)
 
-// func namedQueryShouldParseInClause(t *testing.T, db *sql.DB, bind parser.Bind) {
-// 	table := testutil.TableName(t.Name())
-// 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
-
-// 	createTmpl := `
-// 		CREATE TABLE %s (id INT PRIMARY KEY, name VARCHAR(255))`
-// 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
-// 	assert.NoError(t, "create table", err)
-
-// 	insertTmpl := testutil.Schema(bind, `
-// 		INSERT INTO %s (id, name) VALUES (?,?),(?,?),(?,?),(?,?),(?,?)`)
-// 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
-// 		1, "Alice", 2, "John", 3, "Carl", 4, "Chad", 5, "Brenda",
-// 	)
-// 	assert.NoError(t, "insert", err)
-
-// 	selectTmpl := `SELECT name FROM %s WHERE id IN (:ids)`
-
-// 	var names []string
-// 	arg := map[string]any{"ids": []int{2, 3}}
-// 	err = db.QueryNamed(&names, fmt.Sprintf(selectTmpl, table), arg)
-// 	assert.NoError(t, "QueryNamed should not error", err)
-// 	assert.Equal(t, "QueryNamed result should match", names, []string{"John", "Carl"})
-// }
-
-// func queryShouldParseInClause(t *testing.T, db *sql.DB, bind parser.Bind) {
-// 	table := testutil.TableName(t.Name())
-// 	t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
-
-// 	createTmpl := `
-// 		CREATE TABLE %s (id INT PRIMARY KEY, name VARCHAR(255))`
-// 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
-// 	assert.NoError(t, "create table", err)
-
-// 	insertTmpl := testutil.Schema(bind, `
-// 		INSERT INTO %s (id, name) VALUES (?,?),(?,?),(?,?),(?,?),(?,?)`)
-// 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
-// 		1, "Alice", 2, "John", 3, "Carl", 4, "Chad", 5, "Brenda",
-// 	)
-// 	assert.NoError(t, "insert", err)
-
-// 	selectTmpl := testutil.Schema(bind, `SELECT name FROM %s WHERE id IN (?)`)
-
-// 	var names []string
-// 	err = db.Query(&names, fmt.Sprintf(selectTmpl, table), []int{2, 3})
-// 	if bind == parser.BindQuestion {
-// 		assert.NoError(t, "Query should not error", err)
-// 		assert.Equal(t, "Query result should match", names, []string{"John", "Carl"})
-// 	} else {
-// 		assert.Error(t, "Query should error, IN clause for non question bind", err)
-// 	}
-// }
+		rows, err := re.RowsAffected()
+		assert.NoError(t, err)
+		assert.Equal(t, COUNT, int(rows))
+	})
+}
