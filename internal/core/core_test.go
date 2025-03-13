@@ -171,7 +171,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	}
 
 	t.Run("query without args should perform a regular query", func(t *testing.T) {
-		t.Parallel()
 		expected := []User{
 			{1, "Alice", "alice@wonderland.com", "123456", 18, true},
 			{2, "Rob", "rob@google.com", "123456", 38, true},
@@ -185,7 +184,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query should work with multiple default placeholders", func(t *testing.T) {
-		t.Parallel()
 		expected := []User{
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 			{3, "John", "john@id.com", "123456", 24, false},
@@ -199,7 +197,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query should parse IN clause using default placeholder", func(t *testing.T) {
-		t.Parallel()
 		if bind != parser.BindQuestion {
 			t.Skip("skipping because IN clause only supported by '?' placeholders for now")
 		}
@@ -217,7 +214,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query should work with struct named arg", func(t *testing.T) {
-		t.Parallel()
 		expected := []User{
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 		}
@@ -231,7 +227,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query should work with map named arg", func(t *testing.T) {
-		t.Parallel()
 		expected := []User{
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 		}
@@ -245,7 +240,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query should parse IN clause using named arg", func(t *testing.T) {
-		t.Parallel()
 		expected := []User{
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 			{3, "John", "john@id.com", "123456", 24, false},
@@ -260,7 +254,6 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query should return length 0 if no result is found", func(t *testing.T) {
-		t.Parallel()
 		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 42`)
 		var users []User
 		err = Query(ctx, db, bind, &users, fmt.Sprintf(selectTmpl, table))
@@ -306,7 +299,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	}
 
 	t.Run("query row without args should perform a regular query", func(t *testing.T) {
-		t.Parallel()
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
 		err = QueryRow(ctx, db, bind, &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
@@ -315,7 +307,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query row should work with multiple default placeholders", func(t *testing.T) {
-		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
 		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? AND active = ?`)
 		var user User
@@ -325,7 +316,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query row should parse IN clause using default placeholder", func(t *testing.T) {
-		t.Parallel()
 		if bind != parser.BindQuestion {
 			t.Skip("skipping because IN clause only supported by '?' placeholders for now")
 		}
@@ -339,7 +329,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query row should work with struct named arg", func(t *testing.T) {
-		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
 		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 		var user User
@@ -350,7 +339,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query row should work with map named arg", func(t *testing.T) {
-		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
 		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 		var user User
@@ -361,7 +349,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query row should parse IN clause using named arg", func(t *testing.T) {
-		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
 		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 		var user User
@@ -372,7 +359,6 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("query row should return error if no result is found", func(t *testing.T) {
-		t.Parallel()
 		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 42`)
 		var user User
 		err = QueryRow(ctx, db, bind, &user, fmt.Sprintf(selectTmpl, table))
@@ -394,8 +380,6 @@ func execArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 		)`
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
-
-	// these subtests must run sequentially
 
 	t.Run("multiple args should perform a regular exec", func(t *testing.T) {
 		insertTmpl := testutil.Rebind(bind, `

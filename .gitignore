@@ -8,6 +8,9 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Test coverage output
+*.out
+
 # Go workspace file
 go.work
 go.work.sum
