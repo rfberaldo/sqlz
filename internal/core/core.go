@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"reflect"
 
 	"github.com/georgysavva/scany/sqlscan"
@@ -26,13 +25,12 @@ type Querier interface {
 // Query return values will be scanned to dst.
 func Query(ctx context.Context, db Querier, bind parser.Bind, dst any, query string, args ...any) error {
 	rows, err := queryDecider(ctx, db, bind, query, args...)
-
 	if err != nil {
-		return fmt.Errorf("sqlz: querying multiple rows: %w", err)
+		return err
 	}
 
 	if err := sqlscan.ScanAll(dst, rows); err != nil {
-		return fmt.Errorf("sqlz: scanning multiple rows: %w", err)
+		return err
 	}
 
 	return nil
@@ -42,13 +40,12 @@ func Query(ctx context.Context, db Querier, bind parser.Bind, dst any, query str
 // will return error if query result is more than one row.
 func QueryRow(ctx context.Context, db Querier, bind parser.Bind, dst any, query string, args ...any) error {
 	rows, err := queryDecider(ctx, db, bind, query, args...)
-
 	if err != nil {
-		return fmt.Errorf("sqlz: querying single row: %w", err)
+		return err
 	}
 
 	if err := sqlscan.ScanOne(dst, rows); err != nil {
-		return fmt.Errorf("sqlz: scanning single row: %w", err)
+		return err
 	}
 
 	return nil
@@ -61,7 +58,7 @@ func queryDecider(ctx context.Context, db Querier, bind parser.Bind, query strin
 	}
 
 	if len(args) == 1 {
-		arg := args[0] // first element
+		arg := args[0]
 		kind := reflect.TypeOf(arg).Kind()
 		switch kind {
 		// 1 arg map/struct is a named query
