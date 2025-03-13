@@ -104,7 +104,7 @@ func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
 
 // ExecCtx is like [DB.Exec], with context.
 func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return core.Exec(context.Background(), db.conn, db.bind, query, args...)
+	return core.Exec(ctx, db.conn, db.bind, query, args...)
 }
 
 // Tx is an in-progress database transaction.
