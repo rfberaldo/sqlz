@@ -29,9 +29,9 @@ func TestFuncName(t *testing.T) {
 	assert.Equal(t, expected, got)
 }
 
-func TestSchema(t *testing.T) {
+func TestRebind(t *testing.T) {
 	input := "SELECT * FROM user WHERE id = ? AND age = ?"
 	expected := "SELECT * FROM user WHERE id = $1 AND age = $2"
-	got := Schema(parser.BindDollar, input)
+	got := Rebind(parser.BindDollar, input)
 	assert.Equal(t, expected, got)
 }

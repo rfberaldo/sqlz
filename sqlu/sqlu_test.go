@@ -145,7 +145,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
-	insertTmpl := testutil.Schema(bind, `
+	insertTmpl := testutil.Rebind(bind, `
 		INSERT INTO %s (id, username, email, password, age, active)
 		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
@@ -183,7 +183,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 			{3, "John", "john@id.com", "123456", 24, false},
 		}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ? OR id = ?`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? OR id = ?`)
 		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), 2, 3)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(users))
@@ -199,7 +199,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 			{3, "John", "john@id.com", "123456", 24, false},
 		}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (?)`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (?)`)
 		ids := []int{2, 3}
 		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), ids)
 		assert.NoError(t, err)
@@ -212,7 +212,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 		expected := []User{
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 		}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 		arg := struct{ Id int }{Id: 2}
 		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), arg)
 		assert.NoError(t, err)
@@ -225,7 +225,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 		expected := []User{
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 		}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 		arg := map[string]any{"id": 2}
 		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), arg)
 		assert.NoError(t, err)
@@ -239,7 +239,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 			{3, "John", "john@id.com", "123456", 24, false},
 		}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 		arg := map[string]any{"ids": []int{2, 3}}
 		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table), arg)
 		assert.NoError(t, err)
@@ -249,7 +249,7 @@ func queryArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 
 	t.Run("query should return length 0 if no result is found", func(t *testing.T) {
 		t.Parallel()
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = 42`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 42`)
 		users, err := Query[User](db, fmt.Sprintf(selectTmpl, table))
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(users))
@@ -274,7 +274,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
-	insertTmpl := testutil.Schema(bind, `
+	insertTmpl := testutil.Rebind(bind, `
 		INSERT INTO %s (id, username, email, password, age, active)
 		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
@@ -304,7 +304,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	t.Run("query row should work with multiple default placeholders", func(t *testing.T) {
 		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ? AND active = ?`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? AND active = ?`)
 		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), 2, true)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
@@ -316,7 +316,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 			t.Skip("skipping because IN clause only supported by '?' placeholders for now")
 		}
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (?)`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (?)`)
 		ids := []int{2}
 		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), ids)
 		assert.NoError(t, err)
@@ -326,7 +326,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	t.Run("query row should work with struct named arg", func(t *testing.T) {
 		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 		arg := struct{ Id int }{Id: 2}
 		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), arg)
 		assert.NoError(t, err)
@@ -336,7 +336,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	t.Run("query row should work with map named arg", func(t *testing.T) {
 		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = :id`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 		arg := map[string]any{"id": 2}
 		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), arg)
 		assert.NoError(t, err)
@@ -346,7 +346,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	t.Run("query row should parse IN clause using named arg", func(t *testing.T) {
 		t.Parallel()
 		expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 		arg := map[string]any{"ids": []int{2}}
 		user, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table), arg)
 		assert.NoError(t, err)
@@ -355,7 +355,7 @@ func queryRowArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 
 	t.Run("query row should return error if no result is found", func(t *testing.T) {
 		t.Parallel()
-		selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = 42`)
+		selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 42`)
 		_, err := QueryRow[User](db, fmt.Sprintf(selectTmpl, table))
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, sql.ErrNoRows)
@@ -380,7 +380,7 @@ func execArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	// these subtests must run sequentially
 
 	t.Run("multiple args should perform a regular exec", func(t *testing.T) {
-		insertTmpl := testutil.Schema(bind, `
+		insertTmpl := testutil.Rebind(bind, `
 			INSERT INTO %s (id, name, age)
 			VALUES (?,?,?),(?,?,?),(?,?,?)`)
 		re, err := Exec(db, fmt.Sprintf(insertTmpl, table),
@@ -418,7 +418,7 @@ func execArgs(t *testing.T, db *sql.DB, bind parser.Bind) {
 	})
 
 	t.Run("1 arg int should perform a regular exec", func(t *testing.T) {
-		deleteStmt := testutil.Schema(bind, "DELETE FROM %s WHERE id = ?")
+		deleteStmt := testutil.Rebind(bind, "DELETE FROM %s WHERE id = ?")
 		arg := 3
 		re, err := Exec(db, fmt.Sprintf(deleteStmt, table), arg)
 		assert.NoError(t, err)

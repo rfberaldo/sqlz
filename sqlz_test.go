@@ -179,7 +179,7 @@ func queryShouldReturnCorrect(t *testing.T, db *sqlz.DB, bind parser.Bind) {
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
-	insertTmpl := testutil.Schema(bind, `
+	insertTmpl := testutil.Rebind(bind, `
 		INSERT INTO %s (id, username, email, password, age, active)
 		VALUES (?,?,?,?,?,?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
@@ -187,7 +187,7 @@ func queryShouldReturnCorrect(t *testing.T, db *sqlz.DB, bind parser.Bind) {
 	)
 	assert.NoError(t, err)
 
-	selectTmpl := testutil.Schema(bind, `SELECT * FROM %s WHERE id = ?`)
+	selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ?`)
 
 	type User struct {
 		Id       int
@@ -352,12 +352,12 @@ func shouldScanBuiltinType(t *testing.T, db *sqlz.DB, bind parser.Bind) {
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
-	insertTmpl := testutil.Schema(bind, `INSERT INTO %s (id, name) VALUES (?, ?)`)
+	insertTmpl := testutil.Rebind(bind, `INSERT INTO %s (id, name) VALUES (?, ?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table), 1, "Alice")
 	assert.NoError(t, err)
 
-	selectTmplId := testutil.Schema(bind, `SELECT id FROM %s WHERE id = ?`)
-	selectTmplName := testutil.Schema(bind, `SELECT name FROM %s WHERE id = ?`)
+	selectTmplId := testutil.Rebind(bind, `SELECT id FROM %s WHERE id = ?`)
+	selectTmplName := testutil.Rebind(bind, `SELECT name FROM %s WHERE id = ?`)
 
 	var id int
 	err = db.QueryRow(&id, fmt.Sprintf(selectTmplId, table), 1)
@@ -379,7 +379,7 @@ func namedQueryShouldParseInClause(t *testing.T, db *sqlz.DB, bind parser.Bind) 
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
-	insertTmpl := testutil.Schema(bind, `
+	insertTmpl := testutil.Rebind(bind, `
 		INSERT INTO %s (id, name) VALUES (?,?),(?,?),(?,?),(?,?),(?,?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
 		1, "Alice", 2, "John", 3, "Carl", 4, "Chad", 5, "Brenda",
@@ -404,14 +404,14 @@ func queryShouldParseInClause(t *testing.T, db *sqlz.DB, bind parser.Bind) {
 	_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 	assert.NoError(t, err)
 
-	insertTmpl := testutil.Schema(bind, `
+	insertTmpl := testutil.Rebind(bind, `
 		INSERT INTO %s (id, name) VALUES (?,?),(?,?),(?,?),(?,?),(?,?)`)
 	_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
 		1, "Alice", 2, "John", 3, "Carl", 4, "Chad", 5, "Brenda",
 	)
 	assert.NoError(t, err)
 
-	selectTmpl := testutil.Schema(bind, `SELECT name FROM %s WHERE id IN (?)`)
+	selectTmpl := testutil.Rebind(bind, `SELECT name FROM %s WHERE id IN (?)`)
 
 	var names []string
 	err = db.Query(&names, fmt.Sprintf(selectTmpl, table), []int{2, 3})
