@@ -50,7 +50,7 @@ func connect(driverName, dataSourceName string) (*sql.DB, error) {
 	return db, nil
 }
 
-// run is a helper to run the test on multiple DB
+// run is a helper to run the test on multiple DB.
 func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binder.Bind)) {
 	t.Parallel()
 	t.Run("MySQL", func(t *testing.T) {

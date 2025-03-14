@@ -35,7 +35,7 @@ func init() {
 	}
 }
 
-// run is a helper to run the test on multiple DB
+// run is a helper to run the test on multiple DB.
 func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 	t.Parallel()
 	t.Run("MySQL", func(t *testing.T) {

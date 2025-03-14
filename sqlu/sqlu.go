@@ -99,6 +99,8 @@ func ExecCtx(ctx context.Context, db core.Querier, query string, args ...any) (s
 // Connect opens a database specified by its database driver name and a
 // driver-specific data source name, then verify the connection with a Ping.
 //
+// Connect will automatically set the package-level default bind.
+//
 // No database drivers are included in the Go standard library.
 // See https://golang.org/s/sqldrivers for a list of third-party drivers.
 //
@@ -106,6 +108,12 @@ func ExecCtx(ctx context.Context, db core.Querier, query string, args ...any) (s
 // and maintains its own pool of idle connections. Thus, the Connect
 // function should be called just once.
 func Connect(driverName, dataSourceName string) (*sql.DB, error) {
+	bind := binder.BindByDriver(driverName)
+	if bind == binder.Unknown {
+		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binder.Register]", driverName)
+	}
+	SetDefaultBind(bind)
+
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("sqlz: unable to open sql connection: %w", err)

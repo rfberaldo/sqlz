@@ -63,13 +63,16 @@ func randStr(length int) []byte {
 
 // Rebind receives a question-bind query and return a rebound query if needed,
 // based on bindTo argument.
-//
-// TODO: add others if needed, currently only Question to Dollar.
 func Rebind(bindTo binder.Bind, query string) string {
-	if bindTo == binder.Dollar {
+	switch bindTo {
+	case binder.Question:
+		return query
+
+	case binder.Dollar:
 		return QuestionToDollar(query)
 	}
-	return query
+
+	panic("Rebind do not support the received bindTo")
 }
 
 // DollarToQuestion replaces all `?` with `$N`.
