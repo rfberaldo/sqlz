@@ -1,36 +1,27 @@
 package sqlz
 
-import (
-	"github.com/rafaberaldo/sqlz/internal/parser"
-)
+import "github.com/rafaberaldo/sqlz/binder"
 
-var bindByDriverName = map[string]parser.Bind{
-	"azuresql":         parser.BindAt,
-	"sqlserver":        parser.BindAt,
-	"godror":           parser.BindColon,
-	"goracle":          parser.BindColon,
-	"oci8":             parser.BindColon,
-	"ora":              parser.BindColon,
-	"cloudsqlpostgres": parser.BindDollar,
-	"cockroach":        parser.BindDollar,
-	"nrpostgres":       parser.BindDollar,
-	"pgx":              parser.BindDollar,
-	"postgres":         parser.BindDollar,
-	"pq-timeouts":      parser.BindDollar,
-	"ql":               parser.BindDollar,
-	"mysql":            parser.BindQuestion,
-	"nrmysql":          parser.BindQuestion,
-	"nrsqlite3":        parser.BindQuestion,
-	"sqlite3":          parser.BindQuestion,
+var bindByDriverName = map[string]binder.Bind{
+	"azuresql":         binder.At,
+	"sqlserver":        binder.At,
+	"godror":           binder.Colon,
+	"goracle":          binder.Colon,
+	"oci8":             binder.Colon,
+	"ora":              binder.Colon,
+	"cloudsqlpostgres": binder.Dollar,
+	"cockroach":        binder.Dollar,
+	"nrpostgres":       binder.Dollar,
+	"pgx":              binder.Dollar,
+	"postgres":         binder.Dollar,
+	"pq-timeouts":      binder.Dollar,
+	"ql":               binder.Dollar,
+	"mysql":            binder.Question,
+	"nrmysql":          binder.Question,
+	"nrsqlite3":        binder.Question,
+	"sqlite3":          binder.Question,
 }
 
-const (
-	BindAt       = parser.BindAt       // BindAt is the placeholder '@p1'
-	BindColon    = parser.BindColon    // BindColon is the placeholder ':name'
-	BindDollar   = parser.BindDollar   // BindDollar is the placeholder '$1'
-	BindQuestion = parser.BindQuestion // BindQuestion is the placeholder '?'
-)
-
-func RegisterDriverName(driverName string, bind parser.Bind) {
+func RegisterDriverName(driverName string, bind binder.Bind) {
 	// TODO
 }

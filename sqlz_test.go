@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rafaberaldo/sqlz/internal/parser"
+	"github.com/rafaberaldo/sqlz/binder"
 	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 
@@ -103,7 +103,7 @@ func TestBasicQueryMethods(t *testing.T) {
 func TestContextCancellation(t *testing.T) {
 	run(t, func(t *testing.T, db *DB) {
 		query := "SELECT SLEEP(1)"
-		if db.bind == parser.BindDollar {
+		if db.bind == binder.Dollar {
 			query = "SELECT PG_SLEEP(1)"
 		}
 
@@ -166,7 +166,7 @@ func TestContextCancellation(t *testing.T) {
 func TestTxContextCancellation(t *testing.T) {
 	run(t, func(t *testing.T, db *DB) {
 		query := "SELECT SLEEP(1)"
-		if db.bind == parser.BindDollar {
+		if db.bind == binder.Dollar {
 			query = "SELECT PG_SLEEP(1)"
 		}
 

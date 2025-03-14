@@ -4,15 +4,15 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/rafaberaldo/sqlz/binder"
 	"github.com/rafaberaldo/sqlz/internal/core"
-	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
 // DB is a database handle representing a pool of zero or more
 // underlying connections. It's safe for concurrent use by multiple
 // goroutines.
 type DB struct {
-	bind parser.Bind
+	bind binder.Bind
 	conn *sql.DB
 }
 
@@ -114,7 +114,7 @@ func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Resul
 // After a call to [Tx.Commit] or [Tx.Rollback], all operations on the
 // transaction fail with [ErrTxDone].
 type Tx struct {
-	bind parser.Bind
+	bind binder.Bind
 	conn *sql.Tx
 }
 

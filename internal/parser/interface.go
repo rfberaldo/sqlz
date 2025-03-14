@@ -4,17 +4,19 @@ package parser
 
 import (
 	"fmt"
+
+	"github.com/rafaberaldo/sqlz/binder"
 )
 
 // ParseNamed return a new query replacing named parameters with binds,
 // and a slice of ordered identifiers.
-func ParseNamed(bind Bind, input string) (string, []string) {
+func ParseNamed(bind binder.Bind, input string) (string, []string) {
 	p := &Parser{bind: bind, input: input}
 	return p.parseNamed(namedOptions{})
 }
 
 // ParseQuery is like [ParseNamed], but only return the query.
-func ParseQuery(bind Bind, input string) string {
+func ParseQuery(bind binder.Bind, input string) string {
 	p := &Parser{bind: bind, input: input}
 	output, _ := p.parseNamed(namedOptions{skipIdents: true})
 	return output
@@ -22,7 +24,7 @@ func ParseQuery(bind Bind, input string) string {
 
 // ParseIdents is like [ParseNamed], but only return a slice of
 // ordered identifiers.
-func ParseIdents(bind Bind, input string) []string {
+func ParseIdents(bind binder.Bind, input string) []string {
 	p := &Parser{bind: bind, input: input}
 	_, idents := p.parseNamed(namedOptions{skipQuery: true})
 	return idents
@@ -36,7 +38,7 @@ var ErrNoSlices = fmt.Errorf("sqlz: no slices to spread")
 // the args are spread if they have slices, which are used within `IN` clause.
 // ParseInNamed return a new query replacing named parameters with binds,
 // and the spreaded args.
-func ParseInNamed(bind Bind, input string, args []any) (string, []any, error) {
+func ParseInNamed(bind binder.Bind, input string, args []any) (string, []any, error) {
 	countByIndex, spreadArgs, err := spreadSliceValues(args...)
 	if err != nil {
 		return "", nil, err
@@ -66,7 +68,7 @@ func ParseInNamed(bind Bind, input string, args []any) (string, []any, error) {
 
 // ParseIn is like [ParseInNamed], but for non-named queries.
 // Only works for [BindQuestion] bindvar.
-func ParseIn(bind Bind, input string, args ...any) (string, []any, error) {
+func ParseIn(bind binder.Bind, input string, args ...any) (string, []any, error) {
 	countByIndex, spreadArgs, err := spreadSliceValues(args...)
 	if err != nil {
 		return "", nil, err
@@ -77,14 +79,10 @@ func ParseIn(bind Bind, input string, args ...any) (string, []any, error) {
 		return input, args, nil
 	}
 
-	if bind != BindQuestion {
-		return "", nil, fmt.Errorf("sqlz: a slice was passed as an argument but the driver doesn't support")
-	}
-
 	p := &Parser{bind: bind, input: input, inClauseCountByIndex: countByIndex}
 	output := p.parseIn()
 
-	if bind == BindQuestion && len(spreadArgs) != p.bindCount {
+	if len(spreadArgs) != p.bindCount {
 		return "", nil, fmt.Errorf(
 			"sqlz: wrong number of arguments (bindvars=%v arguments=%v)",
 			p.bindCount, len(spreadArgs),

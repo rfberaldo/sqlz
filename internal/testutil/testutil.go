@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rafaberaldo/sqlz/internal/parser"
+	"github.com/rafaberaldo/sqlz/binder"
 )
 
 // Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,
@@ -65,15 +65,14 @@ func randStr(length int) []byte {
 // based on bindTo argument.
 //
 // TODO: add others if needed, currently only Question to Dollar.
-func Rebind(bindTo parser.Bind, query string) string {
-	if bindTo == parser.BindDollar {
+func Rebind(bindTo binder.Bind, query string) string {
+	if bindTo == binder.Dollar {
 		return QuestionToDollar(query)
 	}
 	return query
 }
 
 // DollarToQuestion replaces all `?` with `$N`.
-// This replaces all occurrencies of `?`.
 func QuestionToDollar(query string) string {
 	count := 0
 	var sb strings.Builder
@@ -88,4 +87,9 @@ func QuestionToDollar(query string) string {
 		sb.WriteByte(ch)
 	}
 	return sb.String()
+}
+
+// DollarToAt replaces all `$` with `@`.
+func DollarToAt(query string) string {
+	return strings.ReplaceAll(query, "$", "@")
 }

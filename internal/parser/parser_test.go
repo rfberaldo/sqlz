@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -148,36 +150,36 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, idents := ParseNamed(BindAt, tt.input)
+			query, idents := ParseNamed(binder.At, tt.input)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(BindAt, tt.input)
+			query = ParseQuery(binder.At, tt.input)
 			assert.Equal(t, tt.expectedAt, query)
-			idents = ParseIdents(BindAt, tt.input)
+			idents = ParseIdents(binder.At, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
-			query, idents = ParseNamed(BindColon, tt.input)
+			query, idents = ParseNamed(binder.Colon, tt.input)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(BindColon, tt.input)
+			query = ParseQuery(binder.Colon, tt.input)
 			assert.Equal(t, tt.expectedColon, query)
-			idents = ParseIdents(BindColon, tt.input)
+			idents = ParseIdents(binder.Colon, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
-			query, idents = ParseNamed(BindDollar, tt.input)
+			query, idents = ParseNamed(binder.Dollar, tt.input)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(BindDollar, tt.input)
+			query = ParseQuery(binder.Dollar, tt.input)
 			assert.Equal(t, tt.expectedDollar, query)
-			idents = ParseIdents(BindDollar, tt.input)
+			idents = ParseIdents(binder.Dollar, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
-			query, idents = ParseNamed(BindQuestion, tt.input)
+			query, idents = ParseNamed(binder.Question, tt.input)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(BindQuestion, tt.input)
+			query = ParseQuery(binder.Question, tt.input)
 			assert.Equal(t, tt.expectedQuestion, query)
-			idents = ParseIdents(BindQuestion, tt.input)
+			idents = ParseIdents(binder.Question, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 		})
 	}
@@ -263,22 +265,22 @@ func TestParseInClause(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseInNamed(BindAt, tt.input, tt.inputArgs)
+			query, args, err := ParseInNamed(binder.At, tt.input, tt.inputArgs)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = ParseInNamed(BindColon, tt.input, tt.inputArgs)
+			query, args, err = ParseInNamed(binder.Colon, tt.input, tt.inputArgs)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = ParseInNamed(BindDollar, tt.input, tt.inputArgs)
+			query, args, err = ParseInNamed(binder.Dollar, tt.input, tt.inputArgs)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = ParseInNamed(BindQuestion, tt.input, tt.inputArgs)
+			query, args, err = ParseInNamed(binder.Question, tt.input, tt.inputArgs)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -286,15 +288,14 @@ func TestParseInClause(t *testing.T) {
 	}
 }
 
-func TestParseIn(t *testing.T) {
+func TestParseIn_Question(t *testing.T) {
 	tests := []struct {
-		name                 string
-		input                string
-		args                 []any
-		expectedOutput       string
-		expectedArgs         []any
-		expectError          bool
-		expectWrongBindError bool
+		name           string
+		input          string
+		args           []any
+		expectedOutput string
+		expectedArgs   []any
+		expectError    bool
 	}{
 		{
 			name:           "no bind vars and no arg",
@@ -302,14 +303,6 @@ func TestParseIn(t *testing.T) {
 			args:           nil,
 			expectedOutput: "SELECT * FROM user WHERE id = 1",
 			expectedArgs:   nil,
-			expectError:    false,
-		},
-		{
-			name:           "no bind vars and empty arg",
-			input:          "SELECT * FROM user WHERE id = 1",
-			args:           []any{},
-			expectedOutput: "SELECT * FROM user WHERE id = 1",
-			expectedArgs:   []any{},
 			expectError:    false,
 		},
 		{
@@ -321,99 +314,70 @@ func TestParseIn(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:                 "one bind var with slice",
-			input:                "SELECT * FROM user WHERE id IN (?)",
-			args:                 []any{[]int{4, 8, 16}},
-			expectedOutput:       "SELECT * FROM user WHERE id IN (?,?,?)",
-			expectedArgs:         []any{4, 8, 16},
-			expectError:          false,
-			expectWrongBindError: true,
+			name:           "one bind var with slice",
+			input:          "SELECT * FROM user WHERE id IN (?)",
+			args:           []any{[]int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE id IN (?,?,?)",
+			expectedArgs:   []any{4, 8, 16},
+			expectError:    false,
 		},
 		{
-			name:                 "one bind var with 1-len slice",
-			input:                "SELECT * FROM user WHERE id IN (?)",
-			args:                 []any{[]int{4}},
-			expectedOutput:       "SELECT * FROM user WHERE id IN (?)",
-			expectedArgs:         []any{4},
-			expectError:          false,
-			expectWrongBindError: true,
+			name:           "one bind var with 1-len slice",
+			input:          "SELECT * FROM user WHERE id IN (?)",
+			args:           []any{[]int{4}},
+			expectedOutput: "SELECT * FROM user WHERE id IN (?)",
+			expectedArgs:   []any{4},
+			expectError:    false,
 		},
 		{
-			name:                 "two bind var and one slice",
-			input:                "SELECT * FROM user WHERE name = ? AND id IN (?)",
-			args:                 []any{"Alice", []int{4, 8, 16}},
-			expectedOutput:       "SELECT * FROM user WHERE name = ? AND id IN (?,?,?)",
-			expectedArgs:         []any{"Alice", 4, 8, 16},
-			expectError:          false,
-			expectWrongBindError: true,
+			name:           "two bind var and one slice",
+			input:          "SELECT * FROM user WHERE name = ? AND id IN (?)",
+			args:           []any{"Alice", []int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?)",
+			expectedArgs:   []any{"Alice", 4, 8, 16},
+			expectError:    false,
 		},
 		{
-			name:                 "multiple bind var and two slices",
-			input:                "SELECT * FROM user WHERE name = ? AND id IN (?) AND band_id IN (?)",
-			args:                 []any{"Alice", []int{4, 8, 16}, []int{8, 16, 32, 64}},
-			expectedOutput:       "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND band_id IN (?,?,?,?)",
-			expectedArgs:         []any{"Alice", 4, 8, 16, 8, 16, 32, 64},
-			expectError:          false,
-			expectWrongBindError: true,
+			name:           "multiple bind var and two slices",
+			input:          "SELECT * FROM user WHERE name = ? AND id IN (?) AND band_id IN (?)",
+			args:           []any{"Alice", []int{4, 8, 16}, []int{8, 16, 32, 64}},
+			expectedOutput: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND band_id IN (?,?,?,?)",
+			expectedArgs:   []any{"Alice", 4, 8, 16, 8, 16, 32, 64},
+			expectError:    false,
 		},
 		{
-			name:                 "multiple bind var and one escaped",
-			input:                "SELECT * FROM user WHERE name = '??' AND id IN (?) AND band_id IN (?)",
-			args:                 []any{[]int{4, 8, 16}, []int{8, 16, 32, 64}},
-			expectedOutput:       "SELECT * FROM user WHERE name = '?' AND id IN (?,?,?) AND band_id IN (?,?,?,?)",
-			expectedArgs:         []any{4, 8, 16, 8, 16, 32, 64},
-			expectError:          false,
-			expectWrongBindError: true,
+			name:           "multiple bind var and one escaped",
+			input:          "SELECT * FROM user WHERE name = '??' AND id IN (?) AND band_id IN (?)",
+			args:           []any{[]int{4, 8, 16}, []int{8, 16, 32, 64}},
+			expectedOutput: "SELECT * FROM user WHERE name = '?' AND id IN (?,?,?) AND band_id IN (?,?,?,?)",
+			expectedArgs:   []any{4, 8, 16, 8, 16, 32, 64},
+			expectError:    false,
 		},
 		{
-			name:                 "wrong number of placeholders",
-			input:                "SELECT * FROM user WHERE name = ? AND id IN (?)",
-			args:                 []any{4, []int{8, 16, 32, 64}, 8},
-			expectError:          true,
-			expectWrongBindError: true,
+			name:        "wrong number of placeholders",
+			input:       "SELECT * FROM user WHERE name = ? AND id IN (?)",
+			args:        []any{4, []int{8, 16, 32, 64}, 8},
+			expectError: true,
 		},
 		{
-			name:                 "empty slice expects error",
-			input:                "SELECT * FROM user WHERE id IN (?)",
-			args:                 []any{[]int{}},
-			expectError:          true,
-			expectWrongBindError: true,
+			name:        "empty slice expects error",
+			input:       "SELECT * FROM user WHERE id IN (?)",
+			args:        []any{[]int{}},
+			expectError: true,
 		},
 		{
-			name:                 "empty input",
-			input:                "",
-			args:                 nil,
-			expectedOutput:       "",
-			expectedArgs:         nil,
-			expectError:          false,
-			expectWrongBindError: false,
+			name:           "empty input",
+			input:          "",
+			args:           nil,
+			expectedOutput: "",
+			expectedArgs:   nil,
+			expectError:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseIn(BindAt, tt.input, tt.args...)
-			assert.Equal(t, tt.expectWrongBindError, err != nil, err)
-			if !tt.expectWrongBindError {
-				assert.Equal(t, tt.input, query)
-				assert.Equal(t, tt.args, args)
-			}
-
-			query, args, err = ParseIn(BindColon, tt.input, tt.args...)
-			assert.Equal(t, tt.expectWrongBindError, err != nil, err)
-			if !tt.expectWrongBindError {
-				assert.Equal(t, tt.input, query)
-				assert.Equal(t, tt.args, args)
-			}
-
-			query, args, err = ParseIn(BindDollar, tt.input, tt.args...)
-			assert.Equal(t, tt.expectWrongBindError, err != nil, err)
-			if !tt.expectWrongBindError {
-				assert.Equal(t, tt.input, query)
-				assert.Equal(t, tt.args, args)
-			}
-
-			query, args, err = ParseIn(BindQuestion, tt.input, tt.args...)
+			query, args, err := ParseIn(binder.Question, tt.input, tt.args...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
 				assert.Equal(t, tt.expectedOutput, query)
@@ -423,6 +387,132 @@ func TestParseIn(t *testing.T) {
 	}
 }
 
+func TestParseIn_Numbered(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		args           []any
+		expectedOutput string
+		expectedArgs   []any
+		expectError    bool
+	}{
+		{
+			name:           "no bind vars and no arg",
+			input:          "SELECT * FROM user WHERE id = 1",
+			args:           nil,
+			expectedOutput: "SELECT * FROM user WHERE id = 1",
+			expectedArgs:   nil,
+			expectError:    false,
+		},
+		{
+			name:           "one bind var but no slice",
+			input:          "SELECT * FROM user WHERE id = $1",
+			args:           []any{8},
+			expectedOutput: "SELECT * FROM user WHERE id = $1",
+			expectedArgs:   []any{8},
+			expectError:    false,
+		},
+		{
+			name:           "one bind var with slice",
+			input:          "SELECT * FROM user WHERE id IN ($1)",
+			args:           []any{[]int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE id IN ($1,$2,$3)",
+			expectedArgs:   []any{4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:           "one bind var with 1-len slice",
+			input:          "SELECT * FROM user WHERE id IN ($1)",
+			args:           []any{[]int{4}},
+			expectedOutput: "SELECT * FROM user WHERE id IN ($1)",
+			expectedArgs:   []any{4},
+			expectError:    false,
+		},
+		{
+			name:           "two bind var and one slice",
+			input:          "SELECT * FROM user WHERE name = $1 AND id IN ($2)",
+			args:           []any{"Alice", []int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4)",
+			expectedArgs:   []any{"Alice", 4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:           "multiple bind var and two slices",
+			input:          "SELECT * FROM user WHERE name = $1 AND id IN ($2) AND band_id IN ($3)",
+			args:           []any{"Alice", []int{4, 8, 16}, []int{8, 16, 32, 64}},
+			expectedOutput: "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4) AND band_id IN ($5,$6,$7,$8)",
+			expectedArgs:   []any{"Alice", 4, 8, 16, 8, 16, 32, 64},
+			expectError:    false,
+		},
+		{
+			name:           "multiple bind var and one escaped",
+			input:          "SELECT * FROM user WHERE name = '$$' AND id IN ($1) AND band_id IN ($2)",
+			args:           []any{[]int{4, 8, 16}, []int{8, 16, 32, 64}},
+			expectedOutput: "SELECT * FROM user WHERE name = '$' AND id IN ($1,$2,$3) AND band_id IN ($4,$5,$6,$7)",
+			expectedArgs:   []any{4, 8, 16, 8, 16, 32, 64},
+			expectError:    false,
+		},
+		{
+			name:           "big numbers on placeholder",
+			input:          "SELECT * FROM user WHERE name = $999 AND id IN ($1000)",
+			args:           []any{"Alice", []int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4)",
+			expectedArgs:   []any{"Alice", 4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:        "wrong number of placeholders",
+			input:       "SELECT * FROM user WHERE name = $1 AND id IN ($2)",
+			args:        []any{4, []int{8, 16, 32, 64}, 8},
+			expectError: true,
+		},
+		{
+			name:        "empty slice expects error",
+			input:       "SELECT * FROM user WHERE id IN ($1)",
+			args:        []any{[]int{}},
+			expectError: true,
+		},
+		{
+			name:           "empty input",
+			input:          "",
+			args:           nil,
+			expectedOutput: "",
+			expectedArgs:   nil,
+			expectError:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, args, err := ParseIn(binder.Dollar, tt.input, tt.args...)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			if !tt.expectError {
+				assert.Equal(t, tt.expectedOutput, query)
+				assert.Equal(t, tt.expectedArgs, args)
+			}
+
+			query, args, err = ParseIn(binder.At, testutil.DollarToAt(tt.input), tt.args...)
+			assert.Equal(t, tt.expectError, err != nil, err)
+			if !tt.expectError {
+				assert.Equal(t, testutil.DollarToAt(tt.expectedOutput), query)
+				assert.Equal(t, tt.expectedArgs, args)
+			}
+		})
+	}
+}
+
+func TestParseIn_Colon(t *testing.T) {
+	input := "SELECT * FROM user WHERE name = :name AND id IN (:ids)"
+	inputArgs := []any{"Alice", []int{4, 8, 16}}
+	expected := "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids)"
+	expectedArgs := []any{"Alice", 4, 8, 16}
+
+	query, args, err := ParseIn(binder.Colon, input, inputArgs...)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, query)
+	assert.Equal(t, expectedArgs, args)
+}
+
 func TestConcurrency(t *testing.T) {
 	input := "SELECT * FROM user WHERE id = :id"
 	expectedQuery := "SELECT * FROM user WHERE id = ?"
@@ -430,7 +520,7 @@ func TestConcurrency(t *testing.T) {
 
 	for range 1000 {
 		go func() {
-			query, idents := ParseNamed(BindQuestion, input)
+			query, idents := ParseNamed(binder.Question, input)
 			assert.Equal(t, expectedQuery, query)
 			assert.Equal(t, expectedIdents, idents)
 		}()
@@ -452,6 +542,6 @@ func BenchmarkParser(b *testing.B) {
 	input := sb.String()
 
 	for range b.N {
-		ParseNamed(BindQuestion, input)
+		ParseNamed(binder.Question, input)
 	}
 }

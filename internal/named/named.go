@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rafaberaldo/sqlz/binder"
 	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
 type Named struct {
-	bind             parser.Bind
+	bind             binder.Bind
 	cacheIdByKey     map[reflectCache]int
 	cacheLastFullKey string
 }
@@ -20,7 +21,7 @@ type reflectCache struct {
 
 // Compile return a new query replacing named parameters with binds,
 // and a slice of ordered arguments.
-func Compile(bind parser.Bind, query string, arg any) (string, []any, error) {
+func Compile(bind binder.Bind, query string, arg any) (string, []any, error) {
 	n := &Named{bind: bind, cacheIdByKey: make(map[reflectCache]int)}
 	return n.compile(query, arg)
 }

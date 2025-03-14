@@ -6,21 +6,13 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-)
 
-type Bind byte
-
-const (
-	_            Bind = iota
-	BindAt            // BindAt is the placeholder '@p1'
-	BindColon         // BindColon is the placeholder ':name'
-	BindDollar        // BindDollar is the placeholder '$1'
-	BindQuestion      // BindQuestion is the placeholder '?'
+	"github.com/rafaberaldo/sqlz/binder"
 )
 
 type Parser struct {
 	input        string
-	bind         Bind
+	bind         binder.Bind
 	position     int
 	readPosition int
 	ch           byte
@@ -43,9 +35,7 @@ type namedOptions struct {
 func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
 	p.readChar()
 	p.output.skip = opts.skipQuery
-
-	// max will be len(input), can't really compute minimum
-	p.output.Grow(len(p.input))
+	p.output.Grow(len(p.input)) // max will be len(input)
 
 	for {
 		p.skipWhitespace()
@@ -88,12 +78,13 @@ func (p *Parser) readChar() {
 }
 
 func (p *Parser) tryReadIdent(skipIdents bool) {
-	if p.ch != ':' {
+	const placeholder = ':'
+	if p.ch != placeholder {
 		return
 	}
 
-	// escaped colon (::), advance one char
-	if p.peekChar() == ':' {
+	// escaped placeholder, advance one char
+	if p.peekChar() == placeholder {
 		p.readChar()
 		return
 	}
@@ -102,7 +93,7 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 		return
 	}
 
-	ident := p.readIdent()
+	ident := p.readIdent(isIdentChar)
 	if !skipIdents {
 		p.idents = append(p.idents, ident)
 	}
@@ -114,15 +105,15 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 		p.bindCount++
 
 		switch p.bind {
-		case BindQuestion:
+		case binder.Question:
 			p.output.WriteByte('?')
-		case BindColon:
+		case binder.Colon:
 			p.output.WriteByte(':')
 			p.output.WriteString(ident)
-		case BindAt:
+		case binder.At:
 			p.output.WriteString("@p")
 			p.output.WriteString(strconv.Itoa(p.bindCount))
-		case BindDollar:
+		case binder.Dollar:
 			p.output.WriteByte('$')
 			p.output.WriteString(strconv.Itoa(p.bindCount))
 		}
@@ -134,10 +125,11 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 	}
 }
 
-func (p *Parser) readIdent() string {
+// readIdent will readChar while strategy(ch)=true or EOF.
+func (p *Parser) readIdent(strategy func(ch byte) bool) string {
 	p.readChar()
 	position := p.position
-	for isIdentChar(p.ch) {
+	for strategy(p.ch) {
 		if p.eof {
 			break
 		}
@@ -152,13 +144,11 @@ func (p *Parser) peekChar() byte {
 
 func (p *Parser) parseIn() string {
 	p.readChar()
-
-	// max will be len(input), can't really compute minimum
-	p.output.Grow(len(p.input))
+	p.output.Grow(len(p.input) + 2) // min will be len(input)+2
 
 	for {
 		p.skipWhitespace()
-		p.tryReadBind()
+		p.tryReadPlaceholder()
 
 		if p.eof {
 			break
@@ -173,31 +163,79 @@ func (p *Parser) parseIn() string {
 	return output
 }
 
-func (p *Parser) tryReadBind() {
-	if p.ch != '?' {
+func (p *Parser) tryReadPlaceholder() {
+	placeholder, readStrategy, isNumbered := getBindInfo(p.bind)
+
+	if p.ch != placeholder {
 		return
 	}
 
-	// escaped question (??), advance one char
-	if p.peekChar() == '?' {
+	// escaped placeholder, advance one char
+	if p.peekChar() == placeholder {
 		p.readChar()
 		return
 	}
 
-	p.readChar()
-	p.identCount++
-	p.bindCount++
-	count := p.inClauseCountByIndex[p.identCount-1] - 1
-
-	p.output.WriteByte('?')
-	for range count {
-		p.bindCount++
-		p.output.WriteString(",?")
+	var ident string
+	if readStrategy != nil {
+		ident = p.readIdent(readStrategy)
+	} else {
+		p.readChar()
 	}
+	p.identCount++
+	count := p.inClauseCountByIndex[p.identCount-1]
+	count = cmp.Or(count, 1)
+
+	for i := range count {
+		p.bindCount++
+		p.output.WriteByte(placeholder)
+		if p.bind == binder.Colon {
+			p.output.WriteString(ident)
+		}
+		if isNumbered {
+			p.output.WriteString(strconv.Itoa(p.bindCount))
+		}
+
+		isLast := i == count-1
+		if count > 1 && !isLast {
+			p.output.WriteByte(',')
+		}
+	}
+}
+
+func getBindInfo(bind binder.Bind) (byte, func(ch byte) bool, bool) {
+	var placeholder byte
+	var readStrategy func(ch byte) bool
+	var isNumbered bool
+
+	switch bind {
+	case binder.At:
+		placeholder = '@'
+		readStrategy = isNumber
+		isNumbered = true
+
+	case binder.Dollar:
+		placeholder = '$'
+		readStrategy = isNumber
+		isNumbered = true
+
+	case binder.Colon:
+		placeholder = ':'
+		readStrategy = isIdentChar
+
+	case binder.Question:
+		placeholder = '?'
+	}
+
+	return placeholder, readStrategy, isNumbered
 }
 
 func isLetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
+}
+
+func isNumber(ch byte) bool {
+	return '0' <= ch && ch <= '9'
 }
 
 func isIdentChar(ch byte) bool {

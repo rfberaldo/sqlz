@@ -7,30 +7,23 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/rafaberaldo/sqlz/binder"
 	"github.com/rafaberaldo/sqlz/internal/core"
-	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
 var defaultBind atomic.Value
 
 func init() {
-	defaultBind.Store(parser.BindQuestion)
+	defaultBind.Store(binder.Question)
 }
 
 // SetDefaultBind sets the package-level bindvar placeholder.
-func SetDefaultBind(bind parser.Bind) {
+func SetDefaultBind(bind binder.Bind) {
 	defaultBind.Store(bind)
 }
 
-// bind returns the package-level default [parser.Bind].
-func bind() parser.Bind { return defaultBind.Load().(parser.Bind) }
-
-const (
-	BindAt       = parser.BindAt       // BindAt is the placeholder '@p1'
-	BindColon    = parser.BindColon    // BindColon is the placeholder ':name'
-	BindDollar   = parser.BindDollar   // BindDollar is the placeholder '$1'
-	BindQuestion = parser.BindQuestion // BindQuestion is the placeholder '?'
-)
+// bind returns the package-level default [binder.Bind].
+func bind() binder.Bind { return defaultBind.Load().(binder.Bind) }
 
 // Query executes a query that returns rows, typically a SELECT.
 // Returned rows will be scaned to dst.

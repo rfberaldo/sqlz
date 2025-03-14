@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/internal/parser"
+	"github.com/rafaberaldo/sqlz/binder"
 	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 
@@ -34,21 +34,21 @@ func init() {
 }
 
 // run is a helper to run the test on multiple DB
-func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind parser.Bind)) {
+func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binder.Bind)) {
 	t.Parallel()
 	t.Run("MySQL", func(t *testing.T) {
 		t.Parallel()
 		if dbMySQL == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
-		fn(t, dbMySQL, parser.BindQuestion)
+		fn(t, dbMySQL, binder.Question)
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
 		if dbPGS == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
-		fn(t, dbPGS, parser.BindDollar)
+		fn(t, dbPGS, binder.Dollar)
 	})
 }
 
@@ -67,15 +67,15 @@ func TestNotFound(t *testing.T) {
 }
 
 func TestSetDefaultBind(t *testing.T) {
-	assert.Equal(t, parser.BindQuestion, bind())
-	SetDefaultBind(BindDollar)
-	assert.Equal(t, parser.BindDollar, bind())
+	assert.Equal(t, binder.Question, bind())
+	SetDefaultBind(binder.Dollar)
+	assert.Equal(t, binder.Dollar, bind())
 }
 
 // more elaborate tests are done in the internal/core package,
 // just testing if methods are correctly wired.
 func TestBasicMethods(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind parser.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
 		query := "SELECT 'Hello World'"
 		expected := "Hello World"
 		expectedSlice := []string{"Hello World"}
