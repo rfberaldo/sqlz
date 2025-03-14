@@ -41,6 +41,7 @@ type namedOptions struct {
 }
 
 func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
+	p.readChar()
 	p.output.skip = opts.skipQuery
 
 	// max will be len(input), can't really compute minimum
@@ -150,6 +151,8 @@ func (p *Parser) peekChar() byte {
 }
 
 func (p *Parser) parseIn() string {
+	p.readChar()
+
 	// max will be len(input), can't really compute minimum
 	p.output.Grow(len(p.input))
 

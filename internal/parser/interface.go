@@ -10,14 +10,12 @@ import (
 // and a slice of ordered identifiers.
 func ParseNamed(bind Bind, input string) (string, []string) {
 	p := &Parser{bind: bind, input: input}
-	p.readChar()
 	return p.parseNamed(namedOptions{})
 }
 
 // ParseQuery is like [ParseNamed], but only return the query.
 func ParseQuery(bind Bind, input string) string {
 	p := &Parser{bind: bind, input: input}
-	p.readChar()
 	output, _ := p.parseNamed(namedOptions{skipIdents: true})
 	return output
 }
@@ -26,7 +24,6 @@ func ParseQuery(bind Bind, input string) string {
 // ordered identifiers.
 func ParseIdents(bind Bind, input string) []string {
 	p := &Parser{bind: bind, input: input}
-	p.readChar()
 	_, idents := p.parseNamed(namedOptions{skipQuery: true})
 	return idents
 }
@@ -55,7 +52,6 @@ func ParseInNamed(bind Bind, input string, args []any) (string, []any, error) {
 		input:                input,
 		inClauseCountByIndex: countByIndex,
 	}
-	p.readChar()
 	output, _ := p.parseNamed(namedOptions{skipIdents: true})
 
 	if len(spreadArgs) != p.bindCount {
@@ -86,7 +82,6 @@ func ParseIn(bind Bind, input string, args ...any) (string, []any, error) {
 	}
 
 	p := &Parser{bind: bind, input: input, inClauseCountByIndex: countByIndex}
-	p.readChar()
 	output := p.parseIn()
 
 	if bind == BindQuestion && len(spreadArgs) != p.bindCount {
