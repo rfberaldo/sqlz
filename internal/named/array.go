@@ -54,8 +54,7 @@ func (n *Named) namedAnyArray(query string, argValue, elValue reflect.Value) (st
 		return "", nil, err
 	}
 
-	query, _ = parser.ParseNamed(n.bind, q) // TODO: make parser ignore idents
-	return query, args, nil
+	return parser.ParseQuery(n.bind, q), args, nil
 }
 
 func (n *Named) getArrayArgs(idents []string, argValue, elValue reflect.Value) ([]any, error) {

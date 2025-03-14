@@ -11,7 +11,15 @@ import (
 func ParseNamed(bind Bind, input string) (string, []string) {
 	p := &Parser{bind: bind, input: input}
 	p.readChar()
-	return p.parseNamed()
+	return p.parseNamed(namedOptions{})
+}
+
+// ParseQuery is like [ParseNamed], but only return the query.
+func ParseQuery(bind Bind, input string) string {
+	p := &Parser{bind: bind, input: input}
+	p.readChar()
+	output, _ := p.parseNamed(namedOptions{skipIdents: true})
+	return output
 }
 
 // ParseIdents is like [ParseNamed], but only return a slice of
@@ -19,8 +27,7 @@ func ParseNamed(bind Bind, input string) (string, []string) {
 func ParseIdents(bind Bind, input string) []string {
 	p := &Parser{bind: bind, input: input}
 	p.readChar()
-	// TODO: skip processing query
-	_, idents := p.parseNamed()
+	_, idents := p.parseNamed(namedOptions{skipQuery: true})
 	return idents
 }
 
@@ -46,12 +53,10 @@ func ParseInNamed(bind Bind, input string, args []any) (string, []any, error) {
 	p := &Parser{
 		bind:                 bind,
 		input:                input,
-		idents:               make([]string, 0, len(spreadArgs)),
 		inClauseCountByIndex: countByIndex,
 	}
 	p.readChar()
-	// TODO: skip processing idents
-	output, _ := p.parseNamed()
+	output, _ := p.parseNamed(namedOptions{skipIdents: true})
 
 	if len(spreadArgs) != p.bindCount {
 		return "", nil, fmt.Errorf(

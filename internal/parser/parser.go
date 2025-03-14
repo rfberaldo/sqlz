@@ -17,7 +17,7 @@ type Parser struct {
 	idents       []string
 	identCount   int
 	bindCount    int
-	output       strings.Builder // strings.Builder is more performant than string
+	output       stringBuilder
 	eof          bool
 
 	// the slice length by ident index which have an `IN` clause.
@@ -25,10 +25,20 @@ type Parser struct {
 	inClauseCountByIndex map[int]int
 }
 
-func (p *Parser) parseNamed() (string, []string) {
+type namedOptions struct {
+	skipQuery  bool
+	skipIdents bool
+}
+
+func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
+	p.output.skip = opts.skipQuery
+
+	// max will be len(input), can't really compute minimum
+	p.output.Grow(len(p.input))
+
 	for {
 		p.skipWhitespace()
-		p.tryReadIdent()
+		p.tryReadIdent(opts.skipIdents)
 
 		if p.eof {
 			break
@@ -66,7 +76,7 @@ func (p *Parser) readChar() {
 	p.readPosition += 1
 }
 
-func (p *Parser) tryReadIdent() {
+func (p *Parser) tryReadIdent(skipIdents bool) {
 	if p.ch != ':' {
 		return
 	}
@@ -82,10 +92,11 @@ func (p *Parser) tryReadIdent() {
 	}
 
 	ident := p.readIdent()
-	p.idents = append(p.idents, ident)
-	// we use len(idents)-1 instead of bindCount because we need the original index.
-	// if we're running ParseInClause we've already parsed before.
-	count := p.inClauseCountByIndex[len(p.idents)-1]
+	if !skipIdents {
+		p.idents = append(p.idents, ident)
+	}
+	p.identCount++
+	count := p.inClauseCountByIndex[p.identCount-1]
 	count = cmp.Or(count, 1)
 
 	for i := range count {
@@ -148,6 +159,9 @@ func isWhitespace(ch byte) bool {
 }
 
 func (p *Parser) parseIn() string {
+	// max will be len(input), can't really compute minimum
+	p.output.Grow(len(p.input))
+
 	for {
 		p.skipWhitespace()
 		p.tryReadBind()
@@ -215,4 +229,39 @@ func spreadSliceValues(args ...any) (map[int]int, []any, error) {
 	}
 
 	return inClauseCountByIndex, outArgs, nil
+}
+
+// stringBuilder is a wrapper around [strings.Builder] to skip
+// processing when skipQuery=true
+type stringBuilder struct {
+	sb   strings.Builder
+	skip bool
+}
+
+func (sb *stringBuilder) Grow(n int) {
+	if sb.skip {
+		return
+	}
+	sb.sb.Grow(n)
+}
+
+func (sb *stringBuilder) String() string {
+	if sb.skip {
+		return ""
+	}
+	return sb.sb.String()
+}
+
+func (sb *stringBuilder) WriteByte(c byte) error {
+	if sb.skip {
+		return nil
+	}
+	return sb.sb.WriteByte(c)
+}
+
+func (sb *stringBuilder) WriteString(s string) (int, error) {
+	if sb.skip {
+		return 0, nil
+	}
+	return sb.sb.WriteString(s)
 }
