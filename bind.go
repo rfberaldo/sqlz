@@ -23,3 +23,14 @@ var bindByDriverName = map[string]parser.Bind{
 	"nrsqlite3":        parser.BindQuestion,
 	"sqlite3":          parser.BindQuestion,
 }
+
+const (
+	BindAt       = parser.BindAt       // BindAt is the placeholder '@p1'
+	BindColon    = parser.BindColon    // BindColon is the placeholder ':name'
+	BindDollar   = parser.BindDollar   // BindDollar is the placeholder '$1'
+	BindQuestion = parser.BindQuestion // BindQuestion is the placeholder '?'
+)
+
+func RegisterDriverName(driverName string, bind parser.Bind) {
+	// TODO
+}

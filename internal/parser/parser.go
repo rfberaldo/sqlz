@@ -8,6 +8,16 @@ import (
 	"strings"
 )
 
+type Bind byte
+
+const (
+	_            Bind = iota
+	BindAt            // BindAt is the placeholder '@p1'
+	BindColon         // BindColon is the placeholder ':name'
+	BindDollar        // BindDollar is the placeholder '$1'
+	BindQuestion      // BindQuestion is the placeholder '?'
+)
+
 type Parser struct {
 	input        string
 	bind         Bind
@@ -21,7 +31,7 @@ type Parser struct {
 	eof          bool
 
 	// the slice length by ident index which have an `IN` clause.
-	// if there's items in this map we have to duplicate ident by count.
+	// if there's items in this map we have to duplicate placeholder by count.
 	inClauseCountByIndex map[int]int
 }
 
@@ -143,21 +153,6 @@ func (p *Parser) peekChar() byte {
 	}
 }
 
-func isLetter(ch byte) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
-}
-
-func isIdentChar(ch byte) bool {
-	return ch == '_' || ch == '.' ||
-		'a' <= ch && ch <= 'z' ||
-		'A' <= ch && ch <= 'Z' ||
-		'0' <= ch && ch <= '9'
-}
-
-func isWhitespace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
-}
-
 func (p *Parser) parseIn() string {
 	// max will be len(input), can't really compute minimum
 	p.output.Grow(len(p.input))
@@ -204,6 +199,21 @@ func (p *Parser) tryReadBind() {
 		p.bindCount++
 		p.output.WriteString(",?")
 	}
+}
+
+func isLetter(ch byte) bool {
+	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
+}
+
+func isIdentChar(ch byte) bool {
+	return ch == '_' || ch == '.' ||
+		'a' <= ch && ch <= 'z' ||
+		'A' <= ch && ch <= 'Z' ||
+		'0' <= ch && ch <= '9'
+}
+
+func isWhitespace(ch byte) bool {
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
 }
 
 func spreadSliceValues(args ...any) (map[int]int, []any, error) {
