@@ -1,8 +1,7 @@
 package testutil
 
 import (
-	"reflect"
-	"runtime"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -21,67 +20,45 @@ const (
 func PtrTo[T any](v T) *T { return &v }
 
 // TableName dynamically generate a new table name based on the test name.
+// Stops at first slash, then appends a random 3-char string at the end.
 //
 // Example:
 //
-//	TableName(t.Name())
-func TableName(fullName string) string {
+//	table := TableName(t.Name())
+func TableName(name string) string {
 	isValid := func(ch byte) bool {
 		return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 	}
 
 	var sb strings.Builder
-	for i := range fullName {
-		ch := fullName[i]
+	sb.Grow(len(name) + 2)
 
-		switch {
-		case ch == '/':
-			sb.Reset()
-
-		case ch == '.':
-			sb.WriteByte('_')
-
-		case isValid(ch):
-			sb.WriteByte(ch)
-		}
-	}
-
-	return strings.ToLower(sb.String())
-}
-
-// FuncName dynamically get the fn name as snake case.
-func FuncName(fn any) string {
-	name := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
-
-	isValid := func(ch byte) bool {
-		return 'a' <= ch && ch <= 'z' || '0' <= ch && ch <= '9' || ch == '_'
-	}
-
-	isUpperCase := func(ch byte) bool {
-		return 'A' <= ch && ch <= 'Z'
-	}
-
-	var sb strings.Builder
+nameLoop:
 	for i := range name {
 		ch := name[i]
 
 		switch {
 		case ch == '/':
-			sb.Reset()
-
-		case ch == '.':
-			sb.Reset()
-
-		case isUpperCase(ch):
-			sb.WriteByte('_')
-			sb.WriteString(strings.ToLower(string(ch)))
+			break nameLoop
 
 		case isValid(ch):
 			sb.WriteByte(ch)
 		}
 	}
 
+	sb.WriteByte('_')
+	sb.Write(randStr(3))
+
 	return sb.String()
+}
+
+func randStr(length int) []byte {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range length {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return b
 }
 
 // Rebind receives a question-bind query and return a rebound query if needed,

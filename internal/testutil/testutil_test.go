@@ -15,18 +15,10 @@ func TestQuestionToDollar(t *testing.T) {
 }
 
 func TestTableName(t *testing.T) {
-	input := "TestCore/MySQL/Core.one_arg_map_should_perform_ABatchInsert"
-	expected := "core_one_arg_map_should_perform_abatchinsert"
+	input := "TestOneArgMapShouldPerformABatchInsert/MySQL"
+	contains := "TestOneArgMapShouldPerformABatchInsert"
 	got := TableName(input)
-	assert.Equal(t, expected, got)
-}
-
-func thisFuncName() {}
-
-func TestFuncName(t *testing.T) {
-	expected := "this_func_name"
-	got := FuncName(thisFuncName)
-	assert.Equal(t, expected, got)
+	assert.Contains(t, got, contains)
 }
 
 func TestRebind(t *testing.T) {
