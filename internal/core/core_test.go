@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
@@ -25,28 +24,15 @@ var (
 )
 
 func init() {
-	setupMySQL()
-	setupPostgreSQL()
-}
-
-func setupMySQL() {
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
-	db, err := connect("mysql", dsn)
-	if err != nil {
-		log.Printf("Skipping MySQL tests: %v", err)
-		return
+	if db, err := connect("mysql", dsn); err == nil {
+		dbMySQL = db
 	}
-	dbMySQL = db
-}
 
-func setupPostgreSQL() {
-	dsn := cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
-	db, err := connect("pgx", dsn)
-	if err != nil {
-		log.Printf("Skipping PostgreSQL tests: %v", err)
-		return
+	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
+	if db, err := connect("pgx", dsn); err == nil {
+		dbPGS = db
 	}
-	dbPGS = db
 }
 
 func connect(driverName, dataSourceName string) (*sql.DB, error) {
@@ -70,14 +56,14 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind parser.Bind)) {
 	t.Run("MySQL", func(t *testing.T) {
 		t.Parallel()
 		if dbMySQL == nil {
-			t.SkipNow()
+			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
 		fn(t, dbMySQL, parser.BindQuestion)
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
 		if dbPGS == nil {
-			t.SkipNow()
+			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
 		fn(t, dbPGS, parser.BindDollar)
 	})

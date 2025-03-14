@@ -146,11 +146,7 @@ func (p *Parser) readIdent() string {
 }
 
 func (p *Parser) peekChar() byte {
-	if p.readPosition >= len(p.input) {
-		return 0
-	} else {
-		return p.input[p.readPosition]
-	}
+	return p.input[p.readPosition]
 }
 
 func (p *Parser) parseIn() string {
@@ -175,10 +171,6 @@ func (p *Parser) parseIn() string {
 }
 
 func (p *Parser) tryReadBind() {
-	if p.bind != BindQuestion {
-		return
-	}
-
 	if p.ch != '?' {
 		return
 	}

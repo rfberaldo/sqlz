@@ -151,17 +151,33 @@ func TestParse(t *testing.T) {
 			query, idents := ParseNamed(BindAt, tt.input)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedIdents, idents)
+			query = ParseQuery(BindAt, tt.input)
+			assert.Equal(t, tt.expectedAt, query)
+			idents = ParseIdents(BindAt, tt.input)
+			assert.Equal(t, tt.expectedIdents, idents)
 
 			query, idents = ParseNamed(BindColon, tt.input)
 			assert.Equal(t, tt.expectedColon, query)
+			assert.Equal(t, tt.expectedIdents, idents)
+			query = ParseQuery(BindColon, tt.input)
+			assert.Equal(t, tt.expectedColon, query)
+			idents = ParseIdents(BindColon, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
 			query, idents = ParseNamed(BindDollar, tt.input)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedIdents, idents)
+			query = ParseQuery(BindDollar, tt.input)
+			assert.Equal(t, tt.expectedDollar, query)
+			idents = ParseIdents(BindDollar, tt.input)
+			assert.Equal(t, tt.expectedIdents, idents)
 
 			query, idents = ParseNamed(BindQuestion, tt.input)
 			assert.Equal(t, tt.expectedQuestion, query)
+			assert.Equal(t, tt.expectedIdents, idents)
+			query = ParseQuery(BindQuestion, tt.input)
+			assert.Equal(t, tt.expectedQuestion, query)
+			idents = ParseIdents(BindQuestion, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 		})
 	}
@@ -270,7 +286,7 @@ func TestParseInClause(t *testing.T) {
 	}
 }
 
-func TestParseRawIn(t *testing.T) {
+func TestParseIn(t *testing.T) {
 	tests := []struct {
 		name                 string
 		input                string
@@ -347,6 +363,13 @@ func TestParseRawIn(t *testing.T) {
 			expectedOutput:       "SELECT * FROM user WHERE name = '?' AND id IN (?,?,?) AND band_id IN (?,?,?,?)",
 			expectedArgs:         []any{4, 8, 16, 8, 16, 32, 64},
 			expectError:          false,
+			expectWrongBindError: true,
+		},
+		{
+			name:                 "wrong number of placeholders",
+			input:                "SELECT * FROM user WHERE name = ? AND id IN (?)",
+			args:                 []any{4, []int{8, 16, 32, 64}, 8},
+			expectError:          true,
 			expectWrongBindError: true,
 		},
 		{
