@@ -86,7 +86,7 @@ func (n *Named) findStructValue(key string, arg any) (reflect.Value, bool) {
 	return reflect.Value{}, false
 }
 
-// fieldKey extracts the key name for a struct field, prioritizing the `db` tag
+// fieldKey extracts the key name for a struct field, prioritizing tag arg.
 func fieldKey(field reflect.StructField, tag string) string {
 	dbTag := field.Tag.Get(tag)
 
