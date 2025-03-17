@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 )
 
 // Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,
@@ -63,12 +63,12 @@ func randStr(length int) []byte {
 
 // Rebind receives a question-bind query and return a rebound query if needed,
 // based on bindTo argument.
-func Rebind(bindTo binder.Bind, query string) string {
+func Rebind(bindTo binds.Bind, query string) string {
 	switch bindTo {
-	case binder.Question:
+	case binds.Question:
 		return query
 
-	case binder.Dollar:
+	case binds.Dollar:
 		return QuestionToDollar(query)
 	}
 

@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,6 +24,6 @@ func TestTableName(t *testing.T) {
 func TestRebind(t *testing.T) {
 	input := "SELECT * FROM user WHERE id = ? AND age = ?"
 	expected := "SELECT * FROM user WHERE id = $1 AND age = $2"
-	got := Rebind(binder.Dollar, input)
+	got := Rebind(binds.Dollar, input)
 	assert.Equal(t, expected, got)
 }

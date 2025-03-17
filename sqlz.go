@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/rafaberaldo/sqlz/internal/core"
 )
 
@@ -13,7 +13,7 @@ import (
 // goroutines.
 type DB struct {
 	conn      *sql.DB
-	bind      binder.Bind
+	bind      binds.Bind
 	structTag string
 }
 
@@ -121,7 +121,7 @@ func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Resul
 // transaction fail with [ErrTxDone].
 type Tx struct {
 	conn      *sql.Tx
-	bind      binder.Bind
+	bind      binds.Bind
 	structTag string
 }
 

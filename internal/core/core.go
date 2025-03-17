@@ -8,7 +8,7 @@ import (
 	"reflect"
 
 	"github.com/georgysavva/scany/dbscan"
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/rafaberaldo/sqlz/internal/named"
 	"github.com/rafaberaldo/sqlz/internal/parser"
 )
@@ -26,7 +26,7 @@ type Querier interface {
 //	Anything else: parse query for `IN` clause and then query.
 //
 // Query return values will be scanned to dst.
-func Query(ctx context.Context, db Querier, bind binder.Bind, structTag string, dst any, query string, args ...any) error {
+func Query(ctx context.Context, db Querier, bind binds.Bind, structTag string, dst any, query string, args ...any) error {
 	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func Query(ctx context.Context, db Querier, bind binder.Bind, structTag string, 
 
 // QueryRow is like [Query], but will only scan one row,
 // will return error if query result is more than one row.
-func QueryRow(ctx context.Context, db Querier, bind binder.Bind, structTag string, dst any, query string, args ...any) error {
+func QueryRow(ctx context.Context, db Querier, bind binds.Bind, structTag string, dst any, query string, args ...any) error {
 	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func QueryRow(ctx context.Context, db Querier, bind binder.Bind, structTag strin
 	return nil
 }
 
-func queryDecider(ctx context.Context, db Querier, bind binder.Bind, structTag, query string, args ...any) (*sql.Rows, error) {
+func queryDecider(ctx context.Context, db Querier, bind binds.Bind, structTag, query string, args ...any) (*sql.Rows, error) {
 	// no args, just query directly
 	if len(args) == 0 {
 		return db.QueryContext(ctx, query)
@@ -97,7 +97,7 @@ func queryDecider(ctx context.Context, db Querier, bind binder.Bind, structTag, 
 //	1 arg struct/map: perform a named exec.
 //	1 arg slice/array: perform a named batch insert.
 //	Anything else: regular exec.
-func Exec(ctx context.Context, db Querier, bind binder.Bind, structTag, query string, args ...any) (sql.Result, error) {
+func Exec(ctx context.Context, db Querier, bind binds.Bind, structTag, query string, args ...any) (sql.Result, error) {
 	if len(args) == 1 {
 		arg := args[0]
 		kind := reflect.TypeOf(arg).Kind()

@@ -1,6 +1,8 @@
-package binder
+package binds
 
-import "sync"
+import (
+	"sync"
+)
 
 type Bind byte
 

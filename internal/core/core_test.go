@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 
@@ -53,26 +53,26 @@ func connect(driverName, dataSourceName string) (*sql.DB, error) {
 }
 
 // run is a helper to run the test on multiple DB.
-func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binder.Bind)) {
+func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 	t.Parallel()
 	t.Run("MySQL", func(t *testing.T) {
 		t.Parallel()
 		if dbMySQL == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
-		fn(t, dbMySQL, binder.Question)
+		fn(t, dbMySQL, binds.Question)
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
 		if dbPGS == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
-		fn(t, dbPGS, binder.Dollar)
+		fn(t, dbPGS, binds.Dollar)
 	})
 }
 
 func TestBasicQueryMethods(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		var err error
 		var s string
 		var ss []string
@@ -92,7 +92,7 @@ func TestBasicQueryMethods(t *testing.T) {
 }
 
 func TestShouldReturnErrorForWrongQuery(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		var err error
 		var dst any
 		const query = "WRONG QUERY"
@@ -113,7 +113,7 @@ func TestShouldReturnErrorForWrongQuery(t *testing.T) {
 }
 
 func TestShouldReturnNotFoundOnQueryRow(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		table := testutil.TableName(t.Name())
 		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -131,7 +131,7 @@ func TestShouldReturnNotFoundOnQueryRow(t *testing.T) {
 }
 
 func TestQueryArgs(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		table := testutil.TableName(t.Name())
 		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -257,7 +257,7 @@ func TestQueryArgs(t *testing.T) {
 }
 
 func TestQueryRowArgs(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		table := testutil.TableName(t.Name())
 		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -360,7 +360,7 @@ func TestQueryRowArgs(t *testing.T) {
 }
 
 func TestExecArgs(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		table := testutil.TableName(t.Name())
 		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 
@@ -467,7 +467,7 @@ func TestExecArgs(t *testing.T) {
 }
 
 func TestCustomStructTag(t *testing.T) {
-	run(t, func(t *testing.T, db *sql.DB, bind binder.Bind) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
 		table := testutil.TableName(t.Name())
 		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
 

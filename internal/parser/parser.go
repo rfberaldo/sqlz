@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 )
 
 type Parser struct {
 	input        string
-	bind         binder.Bind
+	bind         binds.Bind
 	position     int
 	readPosition int
 	ch           byte
@@ -105,15 +105,15 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 		p.bindCount++
 
 		switch p.bind {
-		case binder.Question:
+		case binds.Question:
 			p.output.WriteByte('?')
-		case binder.Colon:
+		case binds.Colon:
 			p.output.WriteByte(':')
 			p.output.WriteString(ident)
-		case binder.At:
+		case binds.At:
 			p.output.WriteString("@p")
 			p.output.WriteString(strconv.Itoa(p.bindCount))
-		case binder.Dollar:
+		case binds.Dollar:
 			p.output.WriteByte('$')
 			p.output.WriteString(strconv.Itoa(p.bindCount))
 		}
@@ -189,7 +189,7 @@ func (p *Parser) tryReadPlaceholder() {
 	for i := range count {
 		p.bindCount++
 		p.output.WriteByte(placeholder)
-		if p.bind == binder.Colon {
+		if p.bind == binds.Colon {
 			p.output.WriteString(ident)
 		}
 		if isNumbered {
@@ -203,27 +203,27 @@ func (p *Parser) tryReadPlaceholder() {
 	}
 }
 
-func getBindInfo(bind binder.Bind) (byte, func(ch byte) bool, bool) {
+func getBindInfo(bind binds.Bind) (byte, func(ch byte) bool, bool) {
 	var placeholder byte
 	var readStrategy func(ch byte) bool
 	var isNumbered bool
 
 	switch bind {
-	case binder.At:
+	case binds.At:
 		placeholder = '@'
 		readStrategy = isNumber
 		isNumbered = true
 
-	case binder.Dollar:
+	case binds.Dollar:
 		placeholder = '$'
 		readStrategy = isNumber
 		isNumbered = true
 
-	case binder.Colon:
+	case binds.Colon:
 		placeholder = ':'
 		readStrategy = isIdentChar
 
-	case binder.Question:
+	case binds.Question:
 		placeholder = '?'
 	}
 

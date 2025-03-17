@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 )
 
 // New returns a [*DB] instance for a pre-existing [*sql.DB].
@@ -15,9 +15,9 @@ import (
 //	conn, err := sql.Open("mysql", dsn)
 //	db := sqlz.New("mysql", conn)
 func New(driverName string, db *sql.DB) (*DB, error) {
-	bind := binder.BindByDriver(driverName)
-	if bind == binder.Unknown {
-		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binder.Register]", driverName)
+	bind := binds.BindByDriver(driverName)
+	if bind == binds.Unknown {
+		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binds.Register]", driverName)
 	}
 
 	return &DB{db, bind, "db"}, nil
@@ -33,9 +33,9 @@ func New(driverName string, db *sql.DB) (*DB, error) {
 // and maintains its own pool of idle connections. Thus, the Connect
 // function should be called just once.
 func Connect(driverName, dataSourceName string) (*DB, error) {
-	bind := binder.BindByDriver(driverName)
-	if bind == binder.Unknown {
-		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binder.Register]", driverName)
+	bind := binds.BindByDriver(driverName)
+	if bind == binds.Unknown {
+		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binds.Register]", driverName)
 	}
 
 	db, err := sql.Open(driverName, dataSourceName)

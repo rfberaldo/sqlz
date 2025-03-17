@@ -5,18 +5,18 @@ package parser
 import (
 	"fmt"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 )
 
 // ParseNamed return a new query replacing named parameters with binds,
 // and a slice of ordered identifiers.
-func ParseNamed(bind binder.Bind, input string) (string, []string) {
+func ParseNamed(bind binds.Bind, input string) (string, []string) {
 	p := &Parser{bind: bind, input: input}
 	return p.parseNamed(namedOptions{})
 }
 
 // ParseQuery is like [ParseNamed], but only return the query.
-func ParseQuery(bind binder.Bind, input string) string {
+func ParseQuery(bind binds.Bind, input string) string {
 	p := &Parser{bind: bind, input: input}
 	output, _ := p.parseNamed(namedOptions{skipIdents: true})
 	return output
@@ -24,7 +24,7 @@ func ParseQuery(bind binder.Bind, input string) string {
 
 // ParseIdents is like [ParseNamed], but only return a slice of
 // ordered identifiers.
-func ParseIdents(bind binder.Bind, input string) []string {
+func ParseIdents(bind binds.Bind, input string) []string {
 	p := &Parser{bind: bind, input: input}
 	_, idents := p.parseNamed(namedOptions{skipQuery: true})
 	return idents
@@ -38,7 +38,7 @@ var ErrNoSlices = fmt.Errorf("sqlz: no slices to spread")
 // the args are spread if they have slices, which are used within `IN` clause.
 // ParseInNamed return a new query replacing named parameters with binds,
 // and the spreaded args.
-func ParseInNamed(bind binder.Bind, input string, args []any) (string, []any, error) {
+func ParseInNamed(bind binds.Bind, input string, args []any) (string, []any, error) {
 	countByIndex, spreadArgs, err := spreadSliceValues(args...)
 	if err != nil {
 		return "", nil, err
@@ -68,7 +68,7 @@ func ParseInNamed(bind binder.Bind, input string, args []any) (string, []any, er
 
 // ParseIn is like [ParseInNamed], but for non-named queries.
 // Only works for [BindQuestion] bindvar.
-func ParseIn(bind binder.Bind, input string, args ...any) (string, []any, error) {
+func ParseIn(bind binds.Bind, input string, args ...any) (string, []any, error) {
 	countByIndex, spreadArgs, err := spreadSliceValues(args...)
 	if err != nil {
 		return "", nil, err

@@ -3,7 +3,7 @@ package named
 import (
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/rafaberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -320,22 +320,22 @@ func TestNamed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := Compile(binder.At, tt.structTag, tt.inputQuery, tt.inputArg)
+			query, args, err := Compile(binds.At, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = Compile(binder.Colon, tt.structTag, tt.inputQuery, tt.inputArg)
+			query, args, err = Compile(binds.Colon, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = Compile(binder.Dollar, tt.structTag, tt.inputQuery, tt.inputArg)
+			query, args, err = Compile(binds.Dollar, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = Compile(binder.Question, tt.structTag, tt.inputQuery, tt.inputArg)
+			query, args, err = Compile(binds.Question, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -371,7 +371,7 @@ func TestConcurrency(t *testing.T) {
 
 	for range 1000 {
 		go func() {
-			query, args, err := Compile(binder.Question, "db", inputQuery, persons)
+			query, args, err := Compile(binds.Question, "db", inputQuery, persons)
 			assert.Equal(t, expectedQuery, query)
 			assert.Equal(t, expectedArgs, args)
 			assert.NoError(t, err)
@@ -393,7 +393,7 @@ func BenchmarkNamedMap(b *testing.B) {
 	}
 
 	for range b.N {
-		_, _, err := Compile(binder.Question, "db", input, args)
+		_, _, err := Compile(binds.Question, "db", input, args)
 		assert.NoError(b, err)
 	}
 }
@@ -419,7 +419,7 @@ func BenchmarkNamedStruct(b *testing.B) {
 	}
 
 	for range b.N {
-		_, _, err := Compile(binder.Question, "db", input, args)
+		_, _, err := Compile(binds.Question, "db", input, args)
 		assert.NoError(b, err)
 	}
 }

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rafaberaldo/sqlz/binder"
+	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/rafaberaldo/sqlz/internal/parser"
 )
 
 type Named struct {
-	bind      binder.Bind
+	bind      binds.Bind
 	structTag string
 
 	// cache props refers to reflection caching
@@ -24,7 +24,7 @@ type cacheKey struct {
 
 // Compile return a new query replacing named parameters with binds,
 // and a slice of ordered arguments.
-func Compile(bind binder.Bind, structTag, query string, arg any) (string, []any, error) {
+func Compile(bind binds.Bind, structTag, query string, arg any) (string, []any, error) {
 	n := &Named{bind: bind, structTag: structTag, cacheIdByKey: make(map[cacheKey]int)}
 	return n.compile(query, arg)
 }
