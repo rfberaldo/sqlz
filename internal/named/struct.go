@@ -77,7 +77,7 @@ func (n *Named) findStructValue(key string, arg any) (reflect.Value, bool) {
 			continue
 		}
 
-		if strings.EqualFold(key, fieldKey(field)) {
+		if strings.EqualFold(key, fieldKey(field, n.structTag)) {
 			n.saveReflectIndex(key, i)
 			return fieldValue, true
 		}
@@ -87,8 +87,8 @@ func (n *Named) findStructValue(key string, arg any) (reflect.Value, bool) {
 }
 
 // fieldKey extracts the key name for a struct field, prioritizing the `db` tag
-func fieldKey(field reflect.StructField) string {
-	dbTag := field.Tag.Get("db")
+func fieldKey(field reflect.StructField, tag string) string {
+	dbTag := field.Tag.Get(tag)
 
 	if dbTag != "-" && dbTag != "" {
 		// check for possible comma as in "...,omitempty"

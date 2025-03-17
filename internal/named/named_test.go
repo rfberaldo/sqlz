@@ -10,8 +10,13 @@ import (
 
 func TestNamed(t *testing.T) {
 	type basicStruct struct {
-		ID   int    `db:"id"`
-		Name string `db:"name"`
+		Identifier int    `db:"id"`
+		FullName   string `db:"name"`
+	}
+
+	type basicStructJsonTag struct {
+		Identifier int    `json:"id"`
+		FullName   string `json:"name"`
 	}
 
 	type address struct {
@@ -47,6 +52,7 @@ func TestNamed(t *testing.T) {
 		name             string
 		inputQuery       string
 		inputArg         any
+		structTag        string
 		expectedAt       string
 		expectedColon    string
 		expectedDollar   string
@@ -93,7 +99,20 @@ func TestNamed(t *testing.T) {
 		{
 			name:             "struct with named parameters",
 			inputQuery:       "SELECT * FROM user WHERE id = :id AND name = :name",
-			inputArg:         basicStruct{ID: 1, Name: "Alice"},
+			inputArg:         basicStruct{Identifier: 1, FullName: "Alice"},
+			structTag:        "db",
+			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2",
+			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name",
+			expectedDollar:   "SELECT * FROM user WHERE id = $1 AND name = $2",
+			expectedQuestion: "SELECT * FROM user WHERE id = ? AND name = ?",
+			expectedArgs:     []any{1, "Alice"},
+			expectError:      false,
+		},
+		{
+			name:             "struct with named parameters and custom struct tag",
+			inputQuery:       "SELECT * FROM user WHERE id = :id AND name = :name",
+			inputArg:         basicStructJsonTag{Identifier: 1, FullName: "Alice"},
+			structTag:        "json",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name",
 			expectedDollar:   "SELECT * FROM user WHERE id = $1 AND name = $2",
@@ -107,6 +126,7 @@ func TestNamed(t *testing.T) {
 			inputArg: nestedStruct{
 				ID: 1, Name: "Alice", Address: address{City: "Wonderland"},
 			},
+			structTag:        "db",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2 AND address.city = @p3",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address.city",
 			expectedDollar:   "SELECT * FROM user WHERE id = $1 AND name = $2 AND address.city = $3",
@@ -122,6 +142,7 @@ func TestNamed(t *testing.T) {
 				Address:  address{City: "Wonderland"},
 				Address2: address{City: "Not Wonderland"},
 			},
+			structTag:        "db",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2 AND address.city = @p3 OR address2.city = @p4",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address.city OR address2.city = :address2.city",
 			expectedDollar:   "SELECT * FROM user WHERE id = $1 AND name = $2 AND address.city = $3 OR address2.city = $4",
@@ -144,6 +165,7 @@ func TestNamed(t *testing.T) {
 			name:             "nested struct with field pointers",
 			inputQuery:       "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address.city",
 			inputArg:         nestedStructWithPointers{ID: 1, Name: testutil.PtrTo("Alice"), Address: &address{City: "Wonderland"}},
+			structTag:        "db",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2 AND address.city = @p3",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address.city",
 			expectedDollar:   "SELECT * FROM user WHERE id = $1 AND name = $2 AND address.city = $3",
@@ -155,6 +177,7 @@ func TestNamed(t *testing.T) {
 			name:             "nested nil struct",
 			inputQuery:       "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address",
 			inputArg:         nestedStructWithPointers{ID: 1, Name: testutil.PtrTo("Alice")},
+			structTag:        "db",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2 AND address.city = @p3",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address",
 			expectedDollar:   "SELECT * FROM user WHERE id = $1 AND name = $2 AND address.city = $3",
@@ -174,7 +197,7 @@ func TestNamed(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:             "slice with named parameters",
+			name:             "map slice with named parameters",
 			inputQuery:       "INSERT INTO users (id, name) VALUES (:id, :name)",
 			inputArg:         []map[string]any{{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}},
 			expectedAt:       "INSERT INTO users (id, name) VALUES (@p1, @p2),(@p3, @p4)",
@@ -185,12 +208,13 @@ func TestNamed(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:       "slice with named parameters",
+			name:       "struct slice with named parameters",
 			inputQuery: "INSERT INTO users (id, name) VALUES (:id, :name)",
 			inputArg: []basicStruct{
-				{ID: 1, Name: "Alice"},
-				{ID: 2, Name: "Bob"},
+				{Identifier: 1, FullName: "Alice"},
+				{Identifier: 2, FullName: "Bob"},
 			},
+			structTag:        "db",
 			expectedAt:       "INSERT INTO users (id, name) VALUES (@p1, @p2),(@p3, @p4)",
 			expectedColon:    "INSERT INTO users (id, name) VALUES (:id, :name),(:id, :name)",
 			expectedDollar:   "INSERT INTO users (id, name) VALUES ($1, $2),($3, $4)",
@@ -202,9 +226,10 @@ func TestNamed(t *testing.T) {
 			name:       "pointer slice with named parameters",
 			inputQuery: "INSERT INTO users (id, name) VALUES (:id, :name)",
 			inputArg: []*basicStruct{
-				{ID: 1, Name: "Alice"},
-				{ID: 2, Name: "Bob"},
+				{Identifier: 1, FullName: "Alice"},
+				{Identifier: 2, FullName: "Bob"},
 			},
+			structTag:        "db",
 			expectedAt:       "INSERT INTO users (id, name) VALUES (@p1, @p2),(@p3, @p4)",
 			expectedColon:    "INSERT INTO users (id, name) VALUES (:id, :name),(:id, :name)",
 			expectedDollar:   "INSERT INTO users (id, name) VALUES ($1, $2),($3, $4)",
@@ -295,22 +320,22 @@ func TestNamed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := Compile(binder.At, tt.inputQuery, tt.inputArg)
+			query, args, err := Compile(binder.At, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = Compile(binder.Colon, tt.inputQuery, tt.inputArg)
+			query, args, err = Compile(binder.Colon, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = Compile(binder.Dollar, tt.inputQuery, tt.inputArg)
+			query, args, err = Compile(binder.Dollar, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = Compile(binder.Question, tt.inputQuery, tt.inputArg)
+			query, args, err = Compile(binder.Question, tt.structTag, tt.inputQuery, tt.inputArg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -346,7 +371,7 @@ func TestConcurrency(t *testing.T) {
 
 	for range 1000 {
 		go func() {
-			query, args, err := Compile(binder.Question, inputQuery, persons)
+			query, args, err := Compile(binder.Question, "db", inputQuery, persons)
 			assert.Equal(t, expectedQuery, query)
 			assert.Equal(t, expectedArgs, args)
 			assert.NoError(t, err)
@@ -368,7 +393,7 @@ func BenchmarkNamedMap(b *testing.B) {
 	}
 
 	for range b.N {
-		_, _, err := Compile(binder.Question, input, args)
+		_, _, err := Compile(binder.Question, "db", input, args)
 		assert.NoError(b, err)
 	}
 }
@@ -394,7 +419,7 @@ func BenchmarkNamedStruct(b *testing.B) {
 	}
 
 	for range b.N {
-		_, _, err := Compile(binder.Question, input, args)
+		_, _, err := Compile(binder.Question, "db", input, args)
 		assert.NoError(b, err)
 	}
 }

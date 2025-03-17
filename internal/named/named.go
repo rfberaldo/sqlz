@@ -9,20 +9,23 @@ import (
 )
 
 type Named struct {
-	bind             binder.Bind
-	cacheIdByKey     map[reflectCache]int
+	bind      binder.Bind
+	structTag string
+
+	// cache props refers to reflection caching
+	cacheIdByKey     map[cacheKey]int
 	cacheLastFullKey string
 }
 
-type reflectCache struct {
-	fullKey string // the entire key
-	key     string // the current key
+type cacheKey struct {
+	fullKey string
+	currKey string
 }
 
 // Compile return a new query replacing named parameters with binds,
 // and a slice of ordered arguments.
-func Compile(bind binder.Bind, query string, arg any) (string, []any, error) {
-	n := &Named{bind: bind, cacheIdByKey: make(map[reflectCache]int)}
+func Compile(bind binder.Bind, structTag, query string, arg any) (string, []any, error) {
+	n := &Named{bind: bind, structTag: structTag, cacheIdByKey: make(map[cacheKey]int)}
 	return n.compile(query, arg)
 }
 
@@ -82,12 +85,12 @@ func (n *Named) process(query string, arg any, kind reflect.Kind) (string, []any
 }
 
 func (n *Named) saveReflectIndex(key string, i int) {
-	k := reflectCache{n.cacheLastFullKey, key}
+	k := cacheKey{n.cacheLastFullKey, key}
 	n.cacheIdByKey[k] = i
 }
 
 func (n *Named) reflectIndex(key string) (int, bool) {
-	k := reflectCache{n.cacheLastFullKey, key}
+	k := cacheKey{n.cacheLastFullKey, key}
 	i, ok := n.cacheIdByKey[k]
 	return i, ok
 }
