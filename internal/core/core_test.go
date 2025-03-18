@@ -60,9 +60,11 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 	t.Run("MySQL", func(t *testing.T) {
 		t.Parallel()
 		if dbMySQL == nil {
-			t.Skip("Skipping test, unable to connect to DB:", t.Name())
+			msg := "Skipping test, unable to connect to DB:" + t.Name()
 			if os.Getenv("CI") == "true" {
-				t.FailNow()
+				t.Fatal(msg)
+			} else {
+				t.Skip(msg)
 			}
 		}
 		fn(t, dbMySQL, binds.Question)
@@ -70,9 +72,11 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
 		if dbPGS == nil {
-			t.Skip("Skipping test, unable to connect to DB:", t.Name())
+			msg := "Skipping test, unable to connect to DB:" + t.Name()
 			if os.Getenv("CI") == "true" {
-				t.FailNow()
+				t.Fatal(msg)
+			} else {
+				t.Skip(msg)
 			}
 		}
 		fn(t, dbPGS, binds.Dollar)
