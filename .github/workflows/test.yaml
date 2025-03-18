@@ -51,6 +51,9 @@ jobs:
     - name: Vet
       run: go vet ./...
 
+    - name: Install dependencies
+      run: go get .
+
     - name: Test
       env:
         MYSQL_DSN: root:root@tcp(localhost:3306)/mysql?parseTime=True
