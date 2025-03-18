@@ -63,8 +63,7 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
-		db, _ := New("mysql", dbMySQL)
-		fn(t, db)
+		fn(t, New("mysql", dbMySQL))
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
@@ -75,8 +74,7 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
-		db, _ := New("pgx", dbPGSQL)
-		fn(t, db)
+		fn(t, New("pgx", dbPGSQL))
 	})
 }
 

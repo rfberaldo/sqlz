@@ -23,18 +23,19 @@ func newScanner(tag string) *dbscan.API {
 }
 
 // New returns a [*DB] instance for a pre-existing [*sql.DB].
+// New panics if the driverName is not registered.
 //
 // Example:
 //
-//	conn, err := sql.Open("mysql", dsn)
-//	db := sqlz.New("mysql", conn)
-func New(driverName string, db *sql.DB) (*DB, error) {
+//	conn, err := sql.Open("sqlite3", ":memory:")
+//	db := sqlz.New("sqlite3", conn)
+func New(driverName string, db *sql.DB) *DB {
 	bind := binds.BindByDriver(driverName)
 	if bind == binds.Unknown {
-		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binds.Register]", driverName)
+		panic("sqlz: unable to find bind for driver '" + driverName + "', register using [binds.Register]")
 	}
 
-	return &DB{db, bind, structTag, newScanner(structTag)}, nil
+	return &DB{db, bind, structTag, newScanner(structTag)}
 }
 
 // Connect opens a database specified by its database driver name and a
