@@ -61,6 +61,9 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 		t.Parallel()
 		if dbMySQL == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
+			if os.Getenv("CI") == "true" {
+				t.FailNow()
+			}
 		}
 		fn(t, dbMySQL, binds.Question)
 	})
@@ -68,6 +71,9 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 		t.Parallel()
 		if dbPGS == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
+			if os.Getenv("CI") == "true" {
+				t.FailNow()
+			}
 		}
 		fn(t, dbPGS, binds.Dollar)
 	})
