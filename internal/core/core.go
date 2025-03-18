@@ -18,6 +18,11 @@ type Querier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
+type Scanner interface {
+	ScanOne(dst any, rows dbscan.Rows) error
+	ScanAll(dst any, rows dbscan.Rows) error
+}
+
 // Query will adapt depending on args:
 //
 //	No args: perform a regular query.
@@ -25,13 +30,22 @@ type Querier interface {
 //	Anything else: parse query for `IN` clause and then query.
 //
 // Query return values will be scanned to dst.
-func Query(ctx context.Context, db Querier, bind binds.Bind, structTag string, dst any, query string, args ...any) error {
+func Query(
+	ctx context.Context,
+	db Querier,
+	bind binds.Bind,
+	scanner Scanner,
+	structTag string,
+	dst any,
+	query string,
+	args ...any,
+) error {
 	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
 	if err != nil {
 		return err
 	}
 
-	if err := scanner(structTag).ScanAll(dst, rows); err != nil {
+	if err := scanner.ScanAll(dst, rows); err != nil {
 		return err
 	}
 
@@ -40,20 +54,36 @@ func Query(ctx context.Context, db Querier, bind binds.Bind, structTag string, d
 
 // QueryRow is like [Query], but will only scan one row,
 // will return error if query result is more than one row.
-func QueryRow(ctx context.Context, db Querier, bind binds.Bind, structTag string, dst any, query string, args ...any) error {
+func QueryRow(
+	ctx context.Context,
+	db Querier,
+	bind binds.Bind,
+	scanner Scanner,
+	structTag string,
+	dst any,
+	query string,
+	args ...any,
+) error {
 	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
 	if err != nil {
 		return err
 	}
 
-	if err := scanner(structTag).ScanOne(dst, rows); err != nil {
+	if err := scanner.ScanOne(dst, rows); err != nil {
 		return errors.Join(sql.ErrNoRows, err)
 	}
 
 	return nil
 }
 
-func queryDecider(ctx context.Context, db Querier, bind binds.Bind, structTag, query string, args ...any) (*sql.Rows, error) {
+func queryDecider(
+	ctx context.Context,
+	db Querier,
+	bind binds.Bind,
+	structTag,
+	query string,
+	args ...any,
+) (*sql.Rows, error) {
 	// no args, just query directly
 	if len(args) == 0 {
 		return db.QueryContext(ctx, query)
@@ -85,8 +115,15 @@ func queryDecider(ctx context.Context, db Querier, bind binds.Bind, structTag, q
 //
 //	1 arg struct/map: perform a named exec.
 //	1 arg slice/array: perform a named batch insert.
-//	Anything else: regular exec.
-func Exec(ctx context.Context, db Querier, bind binds.Bind, structTag, query string, args ...any) (sql.Result, error) {
+//	Anything else: parse query for `IN` clause and then exec.
+func Exec(
+	ctx context.Context,
+	db Querier,
+	bind binds.Bind,
+	structTag,
+	query string,
+	args ...any,
+) (sql.Result, error) {
 	if len(args) == 1 {
 		arg := args[0]
 		kind := reflect.TypeOf(arg).Kind()
@@ -108,26 +145,4 @@ func Exec(ctx context.Context, db Querier, bind binds.Bind, structTag, query str
 	}
 
 	return db.ExecContext(ctx, q, args...)
-}
-
-const defaultStructTag = "db"
-
-var defaultScanner = newScanner(defaultStructTag)
-
-func newScanner(tag string) *dbscan.API {
-	api, err := dbscan.NewAPI(
-		dbscan.WithStructTagKey(tag),
-		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
-	)
-	if err != nil {
-		panic("sqlz: creating scanner: " + err.Error())
-	}
-	return api
-}
-
-func scanner(tag string) *dbscan.API {
-	if tag == defaultStructTag {
-		return defaultScanner
-	}
-	return newScanner(tag)
 }

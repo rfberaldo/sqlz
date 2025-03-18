@@ -15,14 +15,16 @@ type DB struct {
 	conn      *sql.DB
 	bind      binds.Bind
 	structTag string
+	scanner   core.Scanner
 }
 
 // Conn return the underlying [*sql.DB].
 func (db *DB) Conn() *sql.DB { return db.conn }
 
-// SetStructTag changes the default struct tag. Default is `db`.
+// SetStructTag changes the default struct tag. Default is "db".
 func (db *DB) SetStructTag(tag string) {
 	db.structTag = tag
+	db.scanner = newScanner(tag)
 }
 
 // Begin starts a transaction. The default isolation level is dependent on
@@ -49,7 +51,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		return nil, err
 	}
 
-	return &Tx{tx, db.bind, db.structTag}, nil
+	return &Tx{tx, db.bind, db.structTag, db.scanner}, nil
 }
 
 // Query executes a query that returns rows, typically a SELECT.
@@ -64,12 +66,12 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // Query uses [context.Background] internally;
 // to specify the context, use [DB.QueryCtx].
 func (db *DB) Query(dst any, query string, args ...any) error {
-	return core.Query(context.Background(), db.conn, db.bind, db.structTag, dst, query, args...)
+	return core.Query(context.Background(), db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // QueryCtx is like [DB.Query], with context.
 func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, db.conn, db.bind, db.structTag, dst, query, args...)
+	return core.Query(ctx, db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -86,12 +88,12 @@ func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [DB.QueryRowCtx].
 func (db *DB) QueryRow(dst any, query string, args ...any) error {
-	return core.QueryRow(context.Background(), db.conn, db.bind, db.structTag, dst, query, args...)
+	return core.QueryRow(context.Background(), db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // QueryRowCtx is like [DB.QueryRow], with context.
 func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, db.conn, db.bind, db.structTag, dst, query, args...)
+	return core.QueryRow(ctx, db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -123,6 +125,7 @@ type Tx struct {
 	conn      *sql.Tx
 	bind      binds.Bind
 	structTag string
+	scanner   core.Scanner
 }
 
 // Conn return the underlying [*sql.Tx].
@@ -146,12 +149,12 @@ func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 // Query uses [context.Background] internally;
 // to specify the context, use [Tx.QueryCtx].
 func (tx *Tx) Query(dst any, query string, args ...any) error {
-	return core.Query(context.Background(), tx.conn, tx.bind, tx.structTag, dst, query, args...)
+	return core.Query(context.Background(), tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
 }
 
 // QueryCtx is like [Tx.Query], with context.
 func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
+	return core.Query(ctx, tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -168,12 +171,12 @@ func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [Tx.QueryRowCtx].
 func (tx *Tx) QueryRow(dst any, query string, args ...any) error {
-	return core.QueryRow(context.Background(), tx.conn, tx.bind, tx.structTag, dst, query, args...)
+	return core.QueryRow(context.Background(), tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
 }
 
 // QueryRowCtx is like [Tx.QueryRow], with context.
 func (tx *Tx) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
+	return core.QueryRow(ctx, tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.

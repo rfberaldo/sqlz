@@ -5,8 +5,22 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rafaberaldo/sqlz/binds"
 )
+
+const structTag = "db"
+
+func newScanner(tag string) *dbscan.API {
+	scanner, err := dbscan.NewAPI(
+		dbscan.WithStructTagKey(tag),
+		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
+	)
+	if err != nil {
+		panic("sqlz: creating scanner: " + err.Error())
+	}
+	return scanner
+}
 
 // New returns a [*DB] instance for a pre-existing [*sql.DB].
 //
@@ -20,7 +34,7 @@ func New(driverName string, db *sql.DB) (*DB, error) {
 		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binds.Register]", driverName)
 	}
 
-	return &DB{db, bind, "db"}, nil
+	return &DB{db, bind, structTag, newScanner(structTag)}, nil
 }
 
 // Connect opens a database specified by its database driver name and a
@@ -49,7 +63,7 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("sqlz: unable to ping: %w", err)
 	}
 
-	return &DB{db, bind, "db"}, nil
+	return &DB{db, bind, structTag, newScanner(structTag)}, nil
 }
 
 // MustConnect is like [Connect], but panics on error.
