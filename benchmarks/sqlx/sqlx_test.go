@@ -1,9 +1,11 @@
 package benchmark
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -236,6 +238,52 @@ func BenchmarkNativeInClause(b *testing.B) {
 		Email    string
 		Password string
 		Age      int
+	}
+	var args []user
+	for range 1000 {
+		args = append(args, user{0, "user123", "user@example.com", "abc123", 18})
+	}
+	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
+		VALUES (:username, :email, :password, :age)`
+	_, err = db.NamedExec(insertTmpl, args)
+	noError(b, err)
+
+	input := "SELECT * FROM benchmark WHERE id IN (?)"
+	arg := []int{15, 732, 489, 256, 843, 127, 964,
+		378, 591, 204, 876, 345, 689, 432, 517, 923, 671, 308, 754, 192,
+		546, 819, 263, 947, 605, 134, 782, 421, 853, 397}
+
+	for range b.N {
+		q, args, err := sqlx.In(input, arg)
+		noError(b, err)
+		q = db.Rebind(q)
+		var users []user
+		err = db.Select(&users, q, args...)
+		noError(b, err)
+	}
+}
+
+func BenchmarkCustomStructTag(b *testing.B) {
+	db := sqlx.MustConnect("sqlite3", ":memory:")
+	db.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
+
+	createTmpl := `
+		CREATE TABLE IF NOT EXISTS benchmark (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL,
+			email TEXT,
+			password TEXT,
+			age INTEGER
+		)`
+	_, err := db.Exec(createTmpl)
+	noError(b, err)
+
+	type user struct {
+		A int    `json:"id"`
+		B string `json:"username"`
+		C string `json:"email"`
+		D string `json:"password"`
+		E int    `json:"age"`
 	}
 	var args []user
 	for range 1000 {
