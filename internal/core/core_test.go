@@ -31,6 +31,13 @@ func init() {
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
 	if db, err := connect("mysql", dsn); err == nil {
 		dbMySQL = db
+	} else {
+		log.Print(err)
+		log.Print(err)
+		log.Print(err)
+		log.Print(err)
+		log.Print(err)
+		log.Print(err)
 	}
 
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
