@@ -16,22 +16,27 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
-	dbMySQL *DB
-	dbPGS   *DB
+	dbMySQL *sql.DB
+	dbPGSQL *sql.DB
 )
 
 func init() {
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
-	if db, err := Connect("mysql", dsn); err == nil {
-		dbMySQL = db
+	if db, err := sql.Open("mysql", dsn); err == nil {
+		if db.Ping() != nil {
+			dbMySQL = db
+		}
 	}
 
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
-	if db, err := Connect("pgx", dsn); err == nil {
-		dbPGS = db
+	if db, err := sql.Open("pgx", dsn); err == nil {
+		if db.Ping() != nil {
+			dbPGSQL = db
+		}
 	}
 }
 
@@ -43,14 +48,22 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 		if dbMySQL == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
-		fn(t, dbMySQL)
+		db, err := New("mysql", dbMySQL)
+		if err != nil {
+			t.FailNow()
+		}
+		fn(t, db)
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
-		if dbPGS == nil {
+		if dbPGSQL == nil {
 			t.Skip("Skipping test, unable to connect to DB:", t.Name())
 		}
-		fn(t, dbPGS)
+		db, err := New("pgx", dbPGSQL)
+		if err != nil {
+			t.FailNow()
+		}
+		fn(t, db)
 	})
 }
 
