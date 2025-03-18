@@ -31,7 +31,7 @@ func Query(ctx context.Context, db Querier, bind binds.Bind, structTag string, d
 		return err
 	}
 
-	if err := newScanner(structTag).ScanAll(dst, rows); err != nil {
+	if err := scanner(structTag).ScanAll(dst, rows); err != nil {
 		return err
 	}
 
@@ -46,7 +46,7 @@ func QueryRow(ctx context.Context, db Querier, bind binds.Bind, structTag string
 		return err
 	}
 
-	if err := newScanner(structTag).ScanOne(dst, rows); err != nil {
+	if err := scanner(structTag).ScanOne(dst, rows); err != nil {
 		return errors.Join(sql.ErrNoRows, err)
 	}
 
@@ -110,6 +110,10 @@ func Exec(ctx context.Context, db Querier, bind binds.Bind, structTag, query str
 	return db.ExecContext(ctx, q, args...)
 }
 
+const defaultStructTag = "db"
+
+var defaultScanner = newScanner(defaultStructTag)
+
 func newScanner(tag string) *dbscan.API {
 	api, err := dbscan.NewAPI(
 		dbscan.WithStructTagKey(tag),
@@ -119,4 +123,11 @@ func newScanner(tag string) *dbscan.API {
 		panic("sqlz: creating scanner: " + err.Error())
 	}
 	return api
+}
+
+func scanner(tag string) *dbscan.API {
+	if tag == defaultStructTag {
+		return defaultScanner
+	}
+	return newScanner(tag)
 }
