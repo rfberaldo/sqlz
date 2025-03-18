@@ -46,11 +46,10 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 	t.Run("MySQL", func(t *testing.T) {
 		t.Parallel()
 		if dbMySQL == nil {
-			msg := "Skipping test, unable to connect to DB:" + t.Name()
 			if os.Getenv("CI") == "true" {
-				t.Fatal(msg)
+				t.Fatal("Fail, unable to connect to DB:" + t.Name())
 			} else {
-				t.Skip(msg)
+				t.Skip("Skipping, unable to connect to DB:" + t.Name())
 			}
 		}
 		db, err := New("mysql", dbMySQL)
@@ -62,11 +61,10 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
 		if dbPGSQL == nil {
-			msg := "Skipping test, unable to connect to DB:" + t.Name()
 			if os.Getenv("CI") == "true" {
-				t.Fatal(msg)
+				t.Fatal("Fail, unable to connect to DB:" + t.Name())
 			} else {
-				t.Skip(msg)
+				t.Skip("Skipping, unable to connect to DB:" + t.Name())
 			}
 		}
 		db, err := New("pgx", dbPGSQL)
