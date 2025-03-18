@@ -26,18 +26,29 @@ var (
 
 func init() {
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
-	if db, err := sql.Open("mysql", dsn); err == nil {
-		if db.Ping() != nil {
-			dbMySQL = db
-		}
+	if db, err := connect("mysql", dsn); err == nil {
+		dbMySQL = db
 	}
 
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
-	if db, err := sql.Open("pgx", dsn); err == nil {
-		if db.Ping() != nil {
-			dbPGSQL = db
-		}
+	if db, err := connect("pgx", dsn); err == nil {
+		dbPGSQL = db
 	}
+}
+
+func connect(driverName, dataSourceName string) (*sql.DB, error) {
+	db, err := sql.Open(driverName, dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
 }
 
 // run is a helper to run the test on multiple DB.
@@ -46,23 +57,25 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 	t.Run("MySQL", func(t *testing.T) {
 		t.Parallel()
 		if dbMySQL == nil {
-			t.Skip("Skipping test, unable to connect to DB:", t.Name())
+			if os.Getenv("CI") == "true" {
+				t.Fatal("Fail, unable to connect to DB:", t.Name())
+			} else {
+				t.Skip("Skipping, unable to connect to DB:", t.Name())
+			}
 		}
-		db, err := New("mysql", dbMySQL)
-		if err != nil {
-			t.FailNow()
-		}
+		db, _ := New("mysql", dbMySQL)
 		fn(t, db)
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
 		if dbPGSQL == nil {
-			t.Skip("Skipping test, unable to connect to DB:", t.Name())
+			if os.Getenv("CI") == "true" {
+				t.Fatal("Fail, unable to connect to DB:", t.Name())
+			} else {
+				t.Skip("Skipping, unable to connect to DB:", t.Name())
+			}
 		}
-		db, err := New("pgx", dbPGSQL)
-		if err != nil {
-			t.FailNow()
-		}
+		db, _ := New("pgx", dbPGSQL)
 		fn(t, db)
 	})
 }
