@@ -53,6 +53,6 @@ jobs:
 
     - name: Test
       env:
-        MYSQL_DSN: root:root@tcp(:3306)/mysql?parseTime=True
-        POSTGRES_DSN: postgres://postgres:root@:5432/postgres?sslmode=disable
+        MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=True
+        POSTGRES_DSN: postgres://postgres:root@127.0.0.1:5432/postgres?sslmode=disable
       run: go test -v -race ./...
