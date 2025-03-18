@@ -4,6 +4,7 @@ on:
   push:
     branches: [ "master" ]
   pull_request:
+    branches: [ "master" ]
 
 jobs:
   test:
@@ -12,10 +13,6 @@ jobs:
     strategy:
       matrix:
         go-version: [1.23.x, 1.24.x]
-
-    env:
-      MYSQL_DSN: root:root@tcp(localhost:3306)/mysql?parseTime=True
-      POSTGRES_DSN: postgres://postgres:root@localhost:5432/postgres?sslmode=disable
 
     services:
       mysql:
@@ -55,4 +52,7 @@ jobs:
       run: go vet ./...
 
     - name: Test
+      env:
+        MYSQL_DSN: root:root@tcp(localhost:3306)/mysql?parseTime=True
+        POSTGRES_DSN: postgres://postgres:root@localhost:5432/postgres?sslmode=disable
       run: go test -v -race ./...
