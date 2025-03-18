@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
@@ -32,13 +31,6 @@ func init() {
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
 	if db, err := connect("mysql", dsn); err == nil {
 		dbMySQL = db
-	} else {
-		log.Print(err)
-		log.Print(err)
-		log.Print(err)
-		log.Print(err)
-		log.Print(err)
-		log.Print(err)
 	}
 
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
@@ -69,9 +61,9 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 		t.Parallel()
 		if dbMySQL == nil {
 			if os.Getenv("CI") == "true" {
-				t.Fatal("Fail, unable to connect to DB:" + t.Name())
+				t.Fatal("Fail, unable to connect to DB:", t.Name())
 			} else {
-				t.Skip("Skipping, unable to connect to DB:" + t.Name())
+				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
 		fn(t, dbMySQL, binds.Question)
@@ -80,9 +72,9 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 		t.Parallel()
 		if dbPGS == nil {
 			if os.Getenv("CI") == "true" {
-				t.Fatal("Fail, unable to connect to DB:" + t.Name())
+				t.Fatal("Fail, unable to connect to DB:", t.Name())
 			} else {
-				t.Skip("Skipping, unable to connect to DB:" + t.Name())
+				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
 		fn(t, dbPGS, binds.Dollar)
