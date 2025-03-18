@@ -9,15 +9,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const SQLITE_DSN = "file:test.db?cache=shared&mode=memory"
-
 // goos: linux
 // goarch: amd64
 // pkg: github.com/rafaberaldo/sqlz
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
 // BenchmarkExec-12    	  312122	      3772 ns/op	     456 B/op	      15 allocs/op
 func BenchmarkExec(b *testing.B) {
-	db := sqlz.MustConnect("sqlite3", SQLITE_DSN)
+	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
@@ -36,13 +34,8 @@ func BenchmarkExec(b *testing.B) {
 	}
 }
 
-// goos: linux
-// goarch: amd64
-// pkg: github.com/rafaberaldo/sqlz
-// cpu: AMD Ryzen 5 5600X 6-Core Processor
-// BenchmarkQueryNamed-12    	  211056	      5766 ns/op	    1184 B/op	      30 allocs/op
-func BenchmarkQueryNamed(b *testing.B) {
-	db := sqlz.MustConnect("sqlite3", SQLITE_DSN)
+func BenchmarkQueryRowNamed(b *testing.B) {
+	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
@@ -52,16 +45,18 @@ func BenchmarkQueryNamed(b *testing.B) {
 	_, err := db.Exec(createTmpl)
 	assert.NoError(b, err)
 
-	input := "SELECT * FROM benchmark WHERE id = :id AND name = :name"
-	arg := map[string]any{"id": 1, "name": "Alice"}
+	db.Exec("INSERT INTO benchmark (name) VALUES (?)", "Alice")
 
-	var users []struct {
+	input := "SELECT * FROM benchmark WHERE id = :id"
+	arg := map[string]any{"id": 1}
+
+	var user struct {
 		Id   int
 		Name string
 	}
 
 	for range b.N {
-		err := db.Query(&users, input, arg)
+		err := db.QueryRow(&user, input, arg)
 		assert.NoError(b, err)
 	}
 }
@@ -72,7 +67,7 @@ func BenchmarkQueryNamed(b *testing.B) {
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
 // BenchmarkBatchInsertStruct-12    	     801	   1495043 ns/op	 1179408 B/op	    6087 allocs/op
 func BenchmarkBatchInsertStruct(b *testing.B) {
-	db := sqlz.MustConnect("sqlite3", SQLITE_DSN)
+	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
@@ -109,9 +104,9 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 // goarch: amd64
 // pkg: github.com/rafaberaldo/sqlz
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
-// BenchmarkQueryBulk-12    	     403	   4476157 ns/op	 1115058 B/op	   23726 allocs/op
-func BenchmarkQueryBulk(b *testing.B) {
-	db := sqlz.MustConnect("sqlite3", SQLITE_DSN)
+// BenchmarkStructScan-12    	     403	   4476157 ns/op	 1115058 B/op	   23726 allocs/op
+func BenchmarkStructScan(b *testing.B) {
+	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
@@ -149,13 +144,45 @@ func BenchmarkQueryBulk(b *testing.B) {
 	}
 }
 
+func BenchmarkQueryNativeScan(b *testing.B) {
+	db := sqlz.MustConnect("sqlite3", ":memory:")
+
+	createTmpl := `
+		CREATE TABLE IF NOT EXISTS benchmark (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL
+		)`
+	_, err := db.Exec(createTmpl)
+	assert.NoError(b, err)
+
+	type user struct {
+		Id   int
+		Name string
+	}
+	var args []user
+	for range 1000 {
+		args = append(args, user{0, "Alice"})
+	}
+	insertTmpl := `INSERT INTO benchmark (name)	VALUES (:name)`
+	_, err = db.Exec(insertTmpl, args)
+	assert.NoError(b, err)
+
+	input := "SELECT name FROM benchmark"
+
+	for range b.N {
+		var names []string
+		err := db.Query(&names, input)
+		assert.NoError(b, err)
+	}
+}
+
 // goos: linux
 // goarch: amd64
 // pkg: github.com/rafaberaldo/sqlz
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
 // BenchmarkInClause-12    	   17372	     70964 ns/op	   13936 B/op	     357 allocs/op
 func BenchmarkInClause(b *testing.B) {
-	db := sqlz.MustConnect("sqlite3", SQLITE_DSN)
+	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
