@@ -120,9 +120,17 @@ db.SetStructTag("json")
 ## Comparison with [sqlx](https://github.com/jmoiron/sqlx)
 
 - sqlz has a smaller scope, it doesn't support prepared statements.
-- It was designed with a simpler API for everyday use.
+- It was designed with a simpler API for everyday use, less verbose.
 - All the scanning work is done by [scany](https://github.com/georgysavva/scany).
 
 ### Performance
 
-TODO
+Take a look at [benchmarks](benchmarks) for more info.
+
+In summary, sqlz has better speed/alloc when scanning in general,
+specially scanning native types (e.g. string, int).
+
+It has also better alloc with 'IN' clause queries.
+
+Although it has worst speed/alloc when running batch inserts,
+and higher alloc running Exec in general.
