@@ -4,10 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"reflect"
 
-	"github.com/georgysavva/scany/dbscan"
+	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rafaberaldo/sqlz/binds"
 	"github.com/rafaberaldo/sqlz/internal/named"
 	"github.com/rafaberaldo/sqlz/internal/parser"
@@ -32,12 +31,7 @@ func Query(ctx context.Context, db Querier, bind binds.Bind, structTag string, d
 		return err
 	}
 
-	scanner, err := newScanner(structTag)
-	if err != nil {
-		return fmt.Errorf("sqlz: error creating scanner API: %w", err)
-	}
-
-	if err := scanner.ScanAll(dst, rows); err != nil {
+	if err := newScanner(structTag).ScanAll(dst, rows); err != nil {
 		return err
 	}
 
@@ -52,12 +46,7 @@ func QueryRow(ctx context.Context, db Querier, bind binds.Bind, structTag string
 		return err
 	}
 
-	scanner, err := newScanner(structTag)
-	if err != nil {
-		return fmt.Errorf("sqlz: error creating scanner API: %w", err)
-	}
-
-	if err := scanner.ScanOne(dst, rows); err != nil {
+	if err := newScanner(structTag).ScanOne(dst, rows); err != nil {
 		return errors.Join(sql.ErrNoRows, err)
 	}
 
@@ -112,13 +101,22 @@ func Exec(ctx context.Context, db Querier, bind binds.Bind, structTag, query str
 		}
 	}
 
-	// otherwise it's a regular exec
-	return db.ExecContext(ctx, query, args...)
+	// otherwise it's a regular exec with `IN` clause parsing
+	q, args, err := parser.ParseIn(bind, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.ExecContext(ctx, q, args...)
 }
 
-func newScanner(tag string) (*dbscan.API, error) {
-	return dbscan.NewAPI(
+func newScanner(tag string) *dbscan.API {
+	api, err := dbscan.NewAPI(
 		dbscan.WithStructTagKey(tag),
 		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
 	)
+	if err != nil {
+		panic("sqlz: creating scanner: " + err.Error())
+	}
+	return api
 }
