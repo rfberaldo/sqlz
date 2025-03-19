@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rafaberaldo/sqlz/binds"
@@ -22,7 +24,7 @@ const structTag = "db"
 
 var (
 	dbMySQL *sql.DB
-	dbPGS   *sql.DB
+	dbPGSQL *sql.DB
 	ctx     = context.Background()
 	scanner = newScanner(structTag)
 )
@@ -35,18 +37,20 @@ func init() {
 
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), testutil.POSTGRES_DSN)
 	if db, err := connect("pgx", dsn); err == nil {
-		dbPGS = db
+		dbPGSQL = db
 	}
 }
 
 func connect(driverName, dataSourceName string) (*sql.DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
+		log.Printf("error connecting to %v: %v", driverName, err)
 		return nil, err
 	}
 
 	err = db.Ping()
 	if err != nil {
+		log.Printf("error pinging to %v: %v", driverName, err)
 		db.Close()
 		return nil, err
 	}
@@ -70,14 +74,14 @@ func run(t *testing.T, fn func(t *testing.T, db *sql.DB, bind binds.Bind)) {
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
-		if dbPGS == nil {
+		if dbPGSQL == nil {
 			if os.Getenv("CI") == "true" {
 				t.Fatal("Fail, unable to connect to DB:", t.Name())
 			} else {
 				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
-		fn(t, dbPGS, binds.Dollar)
+		fn(t, dbPGSQL, binds.Dollar)
 	})
 }
 
@@ -160,38 +164,38 @@ func TestQueryArgs(t *testing.T) {
 		CREATE TABLE %s (
 			id INT PRIMARY KEY,
 			username VARCHAR(255),
-			email VARCHAR(255),
-			password VARCHAR(255),
 			age INT,
-			active BOOL
+			active BOOL,
+			created_at TIMESTAMP
 		)`
 		_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 		assert.NoError(t, err)
 
+		ts := time.Now().UTC().Truncate(time.Second)
+
 		insertTmpl := testutil.Rebind(bind, `
-		INSERT INTO %s (id, username, email, password, age, active)
-		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
+		INSERT INTO %s (id, username, age, active, created_at)
+		VALUES (?,?,?,?,?),(?,?,?,?,?),(?,?,?,?,?)`)
 		_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
-			1, "Alice", "alice@wonderland.com", "123456", 18, true,
-			2, "Rob", "rob@google.com", "123456", 38, true,
-			3, "John", "john@id.com", "123456", 24, false,
+			1, "Alice", 18, true, ts,
+			2, "Rob", 38, true, ts,
+			3, "John", 24, false, ts,
 		)
 		assert.NoError(t, err)
 
 		type User struct {
-			Id       int
-			Username string
-			Email    string
-			Pw       string `db:"password"`
-			Age      int
-			Active   bool
+			Id       int       `db:"id"`
+			Username string    `db:"username"`
+			Age      int       `db:"age"`
+			Active   bool      `db:"active"`
+			Created  time.Time `db:"created_at"`
 		}
 
 		t.Run("query without args should perform a regular query", func(t *testing.T) {
 			expected := []User{
-				{1, "Alice", "alice@wonderland.com", "123456", 18, true},
-				{2, "Rob", "rob@google.com", "123456", 38, true},
-				{3, "John", "john@id.com", "123456", 24, false},
+				{1, "Alice", 18, true, ts},
+				{2, "Rob", 38, true, ts},
+				{3, "John", 24, false, ts},
 			}
 			var users []User
 			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf("SELECT * FROM %s", table))
@@ -202,8 +206,8 @@ func TestQueryArgs(t *testing.T) {
 
 		t.Run("query should work with multiple default placeholders", func(t *testing.T) {
 			expected := []User{
-				{2, "Rob", "rob@google.com", "123456", 38, true},
-				{3, "John", "john@id.com", "123456", 24, false},
+				{2, "Rob", 38, true, ts},
+				{3, "John", 24, false, ts},
 			}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? OR id = ?`)
 			var users []User
@@ -215,8 +219,8 @@ func TestQueryArgs(t *testing.T) {
 
 		t.Run("query should parse IN clause using default placeholder", func(t *testing.T) {
 			expected := []User{
-				{2, "Rob", "rob@google.com", "123456", 38, true},
-				{3, "John", "john@id.com", "123456", 24, false},
+				{2, "Rob", 38, true, ts},
+				{3, "John", 24, false, ts},
 			}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (?)`)
 			var users []User
@@ -229,7 +233,7 @@ func TestQueryArgs(t *testing.T) {
 
 		t.Run("query should work with struct named arg", func(t *testing.T) {
 			expected := []User{
-				{2, "Rob", "rob@google.com", "123456", 38, true},
+				{2, "Rob", 38, true, ts},
 			}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var users []User
@@ -242,7 +246,7 @@ func TestQueryArgs(t *testing.T) {
 
 		t.Run("query should work with map named arg", func(t *testing.T) {
 			expected := []User{
-				{2, "Rob", "rob@google.com", "123456", 38, true},
+				{2, "Rob", 38, true, ts},
 			}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var users []User
@@ -255,8 +259,8 @@ func TestQueryArgs(t *testing.T) {
 
 		t.Run("query should parse IN clause using named arg", func(t *testing.T) {
 			expected := []User{
-				{2, "Rob", "rob@google.com", "123456", 38, true},
-				{3, "John", "john@id.com", "123456", 24, false},
+				{2, "Rob", 38, true, ts},
+				{3, "John", 24, false, ts},
 			}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 			var users []User
@@ -286,35 +290,35 @@ func TestQueryRowArgs(t *testing.T) {
 		CREATE TABLE %s (
 			id INT PRIMARY KEY,
 			username VARCHAR(255),
-			email VARCHAR(255),
-			password VARCHAR(255),
 			age INT,
-			active BOOL
+			active BOOL,
+			created_at TIMESTAMP
 		)`
 		_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 		assert.NoError(t, err)
 
+		ts := time.Now().UTC().Truncate(time.Second)
+
 		insertTmpl := testutil.Rebind(bind, `
-		INSERT INTO %s (id, username, email, password, age, active)
-		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
+		INSERT INTO %s (id, username, age, active, created_at)
+		VALUES (?,?,?,?,?),(?,?,?,?,?),(?,?,?,?,?)`)
 		_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
-			1, "Alice", "alice@wonderland.com", "123456", 18, true,
-			2, "Rob", "rob@google.com", "123456", 38, true,
-			3, "John", "john@id.com", "123456", 24, false,
+			1, "Alice", 18, true, ts,
+			2, "Rob", 38, true, ts,
+			3, "John", 24, false, ts,
 		)
 		assert.NoError(t, err)
 
 		type User struct {
-			Id       int
-			Username string
-			Email    string
-			Pw       string `db:"password"`
-			Age      int
-			Active   bool
+			Id       int       `db:"id"`
+			Username string    `db:"username"`
+			Age      int       `db:"age"`
+			Active   bool      `db:"active"`
+			Created  time.Time `db:"created_at"`
 		}
 
 		t.Run("query row without args should perform a regular query", func(t *testing.T) {
-			expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
+			expected := User{1, "Alice", 18, true, ts}
 			var user User
 			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
 			assert.NoError(t, err)
@@ -322,7 +326,7 @@ func TestQueryRowArgs(t *testing.T) {
 		})
 
 		t.Run("query row should work with multiple default placeholders", func(t *testing.T) {
-			expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+			expected := User{2, "Rob", 38, true, ts}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? AND active = ?`)
 			var user User
 			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table), 2, true)
@@ -331,7 +335,7 @@ func TestQueryRowArgs(t *testing.T) {
 		})
 
 		t.Run("query row should parse IN clause using default placeholder", func(t *testing.T) {
-			expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+			expected := User{2, "Rob", 38, true, ts}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (?)`)
 			var user User
 			ids := []int{2}
@@ -341,7 +345,7 @@ func TestQueryRowArgs(t *testing.T) {
 		})
 
 		t.Run("query row should work with struct named arg", func(t *testing.T) {
-			expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+			expected := User{2, "Rob", 38, true, ts}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := struct{ Id int }{Id: 2}
@@ -351,7 +355,7 @@ func TestQueryRowArgs(t *testing.T) {
 		})
 
 		t.Run("query row should work with map named arg", func(t *testing.T) {
-			expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+			expected := User{2, "Rob", 38, true, ts}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := map[string]any{"id": 2}
@@ -361,7 +365,7 @@ func TestQueryRowArgs(t *testing.T) {
 		})
 
 		t.Run("query row should parse IN clause using named arg", func(t *testing.T) {
-			expected := User{2, "Rob", "rob@google.com", "123456", 38, true}
+			expected := User{2, "Rob", 38, true, ts}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 			var user User
 			arg := map[string]any{"ids": []int{2}}

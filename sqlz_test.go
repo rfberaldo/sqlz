@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -39,11 +40,13 @@ func init() {
 func connect(driverName, dataSourceName string) (*sql.DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
+		log.Printf("error connecting to %v: %v", driverName, err)
 		return nil, err
 	}
 
 	err = db.Ping()
 	if err != nil {
+		log.Printf("error pinging to %v: %v", driverName, err)
 		db.Close()
 		return nil, err
 	}
