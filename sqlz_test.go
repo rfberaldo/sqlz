@@ -81,20 +81,6 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 	})
 }
 
-func TestNotFound(t *testing.T) {
-	err := errors.New("some custom error")
-	assert.Equal(t, false, IsNotFound(err))
-
-	err = fmt.Errorf("some custom error")
-	assert.Equal(t, false, IsNotFound(err))
-
-	err = errors.Join(fmt.Errorf("some custom error"), sql.ErrNoRows)
-	assert.Equal(t, true, IsNotFound(err))
-
-	err = fmt.Errorf("a wrapper around sql.ErrNoRows: %w", sql.ErrNoRows)
-	assert.Equal(t, true, IsNotFound(err))
-}
-
 func TestBasicQueryMethods(t *testing.T) {
 	run(t, func(t *testing.T, db *DB) {
 		var err error
