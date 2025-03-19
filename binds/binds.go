@@ -42,7 +42,7 @@ func init() {
 }
 
 // Register adds a new driver name and its bind to be
-// availble to [BindByDriver].
+// available to [BindByDriver].
 func Register(name string, bind Bind) {
 	bindByDriverName.Store(name, bind)
 }

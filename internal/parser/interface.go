@@ -37,7 +37,7 @@ var ErrNoSlices = fmt.Errorf("sqlz: no slices to spread")
 // ParseInNamed is like [ParseNamed], but also receives a slice of ordered args,
 // the args are spread if they have slices, which are used within `IN` clause.
 // ParseInNamed return a new query replacing named parameters with binds,
-// and the spreaded args.
+// and the spread args.
 func ParseInNamed(bind binds.Bind, input string, args []any) (string, []any, error) {
 	countByIndex, spreadArgs, err := spreadSliceValues(args...)
 	if err != nil {
