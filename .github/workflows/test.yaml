@@ -2,9 +2,11 @@ name: Test
 
 on:
   push:
-    branches: [ "master" ]
+    paths-ignore: [benchmarks/**]
+    branches: [master]
   pull_request:
-    branches: [ "master" ]
+    paths-ignore: [benchmarks/**]
+    branches: [master]
 
 jobs:
   test:
