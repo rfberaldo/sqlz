@@ -15,19 +15,20 @@ func noError(tb testing.TB, err error) {
 	}
 }
 
-func BenchmarkNativeExec(b *testing.B) {
+func BenchmarkBindExec(b *testing.B) {
 	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL
+			name TEXT NOT NULL,
+			age INT
 		)`
 	_, err := db.Exec(createTmpl)
 	noError(b, err)
 
-	input := "INSERT INTO benchmark (name) VALUES (?)"
-	args := []any{"Alice"}
+	input := "INSERT INTO benchmark (name, age) VALUES (?, ?)"
+	args := []any{"Alice", 32}
 
 	for range b.N {
 		_, err := db.Exec(input, args...)
@@ -85,7 +86,7 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 	}
 	var args []user
 	for range 1000 {
-		args = append(args, user{0, "user123", "user@example.com", "abc123", 18})
+		args = append(args, user{0, "john", "john@id.com", "doom", 42})
 	}
 	input := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
@@ -119,7 +120,7 @@ func BenchmarkStructScan(b *testing.B) {
 	}
 	var args []user
 	for range 1000 {
-		args = append(args, user{0, "user123", "user@example.com", "abc123", 18})
+		args = append(args, user{0, "john", "john@id.com", "doom", 42})
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
@@ -135,7 +136,7 @@ func BenchmarkStructScan(b *testing.B) {
 	}
 }
 
-func BenchmarkQueryNativeScan(b *testing.B) {
+func BenchmarkStringScan(b *testing.B) {
 	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
@@ -190,7 +191,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 	}
 	var args []user
 	for range 1000 {
-		args = append(args, user{0, "user123", "user@example.com", "abc123", 18})
+		args = append(args, user{0, "john", "john@id.com", "doom", 42})
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
@@ -209,7 +210,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 	}
 }
 
-func BenchmarkNativeInClause(b *testing.B) {
+func BenchmarkBindInClause(b *testing.B) {
 	db := sqlz.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
@@ -232,7 +233,7 @@ func BenchmarkNativeInClause(b *testing.B) {
 	}
 	var args []user
 	for range 1000 {
-		args = append(args, user{0, "user123", "user@example.com", "abc123", 18})
+		args = append(args, user{0, "john", "john@id.com", "doom", 42})
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
@@ -275,7 +276,7 @@ func BenchmarkCustomStructTag(b *testing.B) {
 	}
 	var args []user
 	for range 1000 {
-		args = append(args, user{0, "user123", "user@example.com", "abc123", 18})
+		args = append(args, user{0, "john", "john@id.com", "doom", 42})
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
