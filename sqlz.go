@@ -14,14 +14,14 @@ import (
 // underlying connections. It's safe for concurrent use by multiple
 // goroutines.
 type DB struct {
-	conn      *sql.DB
+	pool      *sql.DB
 	bind      binds.Bind
 	structTag string
 	scanner   core.Scanner
 }
 
-// Conn return the underlying [*sql.DB].
-func (db *DB) Conn() *sql.DB { return db.conn }
+// Pool return the underlying [*sql.DB].
+func (db *DB) Pool() *sql.DB { return db.pool }
 
 // SetStructTag changes the default struct tag. Default is "db".
 func (db *DB) SetStructTag(tag string) {
@@ -48,7 +48,7 @@ func (db *DB) Begin() (*Tx, error) {
 // If a non-default isolation level is used that the driver doesn't support,
 // an error will be returned.
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	tx, err := db.conn.BeginTx(ctx, opts)
+	tx, err := db.pool.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -68,12 +68,12 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // Query uses [context.Background] internally;
 // to specify the context, use [DB.QueryCtx].
 func (db *DB) Query(dst any, query string, args ...any) error {
-	return core.Query(context.Background(), db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.Query(context.Background(), db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // QueryCtx is like [DB.Query], with context.
 func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.Query(ctx, db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -90,12 +90,12 @@ func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [DB.QueryRowCtx].
 func (db *DB) QueryRow(dst any, query string, args ...any) error {
-	return core.QueryRow(context.Background(), db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.QueryRow(context.Background(), db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // QueryRowCtx is like [DB.QueryRow], with context.
 func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, db.conn, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.QueryRow(ctx, db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -109,20 +109,21 @@ func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // Exec uses [context.Background] internally;
 // to specify the context, use [DB.ExecCtx].
 func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
-	return core.Exec(context.Background(), db.conn, db.bind, db.structTag, query, args...)
+	return core.Exec(context.Background(), db.pool, db.bind, db.structTag, query, args...)
 }
 
 // ExecCtx is like [DB.Exec], with context.
 func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return core.Exec(ctx, db.conn, db.bind, db.structTag, query, args...)
+	return core.Exec(ctx, db.pool, db.bind, db.structTag, query, args...)
 }
 
-// Tx is an in-progress database transaction.
+// Tx is an in-progress database transaction, representing a single connection.
 //
-// A transaction must end with a call to [Tx.Commit] or [Tx.Rollback].
+// A transaction must end with a call to [Tx.Commit] or [Tx.Rollback], or else
+// the connection will be locked.
 //
 // After a call to [Tx.Commit] or [Tx.Rollback], all operations on the
-// transaction fail with [ErrTxDone].
+// transaction fail with [sql.ErrTxDone].
 type Tx struct {
 	conn      *sql.Tx
 	bind      binds.Bind
@@ -134,9 +135,15 @@ type Tx struct {
 func (tx *Tx) Conn() *sql.Tx { return tx.conn }
 
 // Commit commits the transaction.
+//
+// If Commit fails, then all the results from Query and Exec
+// on the Tx should be discarded as invalid.
 func (tx *Tx) Commit() error { return tx.conn.Commit() }
 
 // Rollback aborts the transaction.
+//
+// Even if Rollback fails, the transaction will no longer be valid,
+// nor will it have been committed to the database.
 func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 
 // Query executes a query that returns rows, typically a SELECT.

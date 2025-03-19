@@ -20,8 +20,8 @@ go get github.com/rafaberaldo/sqlz
 db, err := sqlz.Connect("sqlite3", ":memory:")
 
 // 2. using [sql.Open] and [sqlz.New]
-conn, err := sql.Open("sqlite3", ":memory:")
-db := sqlz.New("sqlite3", conn)
+pool, err := sql.Open("sqlite3", ":memory:")
+db := sqlz.New("sqlite3", pool)
 ```
 
 ## Querying

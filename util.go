@@ -14,8 +14,8 @@ import (
 //
 // Example:
 //
-//	conn, err := sql.Open("sqlite3", ":memory:")
-//	db := sqlz.New("sqlite3", conn)
+//	pool, err := sql.Open("sqlite3", ":memory:")
+//	db := sqlz.New("sqlite3", pool)
 func New(driverName string, db *sql.DB) *DB {
 	bind := binds.BindByDriver(driverName)
 	if bind == binds.Unknown {

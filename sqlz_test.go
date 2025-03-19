@@ -429,9 +429,12 @@ func TestCustomStructTag(t *testing.T) {
 	})
 }
 
-func TestConn(t *testing.T) {
+func TestPool(t *testing.T) {
 	run(t, func(t *testing.T, db *DB) {
-		assert.IsType(t, &sql.DB{}, db.Conn())
+		assert.IsType(t, &sql.DB{}, db.Pool())
+		db.Pool().SetMaxOpenConns(42)
+		assert.Equal(t, 42, db.pool.Stats().MaxOpenConnections)
+
 		tx, err := db.Begin()
 		assert.NoError(t, err)
 		assert.IsType(t, &sql.Tx{}, tx.Conn())

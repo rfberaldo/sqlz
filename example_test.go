@@ -147,3 +147,8 @@ func ExampleDB_BeginTx() {
 		log.Fatalf("unable to commit: %v", err)
 	}
 }
+
+func ExampleDB_Pool() {
+	db.Pool().SetMaxOpenConns(10)
+	db.Pool().SetMaxIdleConns(4)
+}
