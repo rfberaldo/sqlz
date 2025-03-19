@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/binds"
-	"github.com/rafaberaldo/sqlz/internal/testutil"
+	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -529,7 +529,7 @@ func TestConcurrency(t *testing.T) {
 
 // goos: linux
 // goarch: amd64
-// pkg: github.com/rafaberaldo/sqlz/named-parser
+// pkg: github.com/rfberaldo/sqlz/named-parser
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
 // BenchmarkParser-12    	    7802	    144034 ns/op	  302981 B/op	      32 allocs/op
 func BenchmarkParser(b *testing.B) {

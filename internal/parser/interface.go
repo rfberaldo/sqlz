@@ -5,7 +5,7 @@ package parser
 import (
 	"fmt"
 
-	"github.com/rafaberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/binds"
 )
 
 // ParseNamed return a new query replacing named parameters with binds,

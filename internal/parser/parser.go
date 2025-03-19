@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rafaberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/binds"
 )
 
 type Parser struct {

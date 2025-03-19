@@ -6,8 +6,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/rafaberaldo/sqlz/binds"
-	"github.com/rafaberaldo/sqlz/internal/core"
+	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/core"
 )
 
 // DB is a database handle representing a pool of zero or more

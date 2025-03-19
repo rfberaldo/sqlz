@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rafaberaldo/sqlz/binds"
-	"github.com/rafaberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 type Named struct {

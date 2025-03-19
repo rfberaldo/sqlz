@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rafaberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 var (

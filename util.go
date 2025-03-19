@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/georgysavva/scany/v2/dbscan"
-	"github.com/rafaberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/binds"
 )
 
 // New returns a [*DB] instance using an existing [*sql.DB].

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rafaberaldo/sqlz/binds"
-	"github.com/rafaberaldo/sqlz/internal/testutil"
+	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/go-sql-driver/mysql"

@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/binds"
 	"github.com/stretchr/testify/assert"
 )
 

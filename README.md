@@ -8,7 +8,7 @@ It aims to be lightweight and easy to use, with a much smaller API. Scanning is 
 ### Install
 
 ```bash
-go get github.com/rafaberaldo/sqlz
+go get github.com/rfberaldo/sqlz
 ```
 
 ### Connect to database

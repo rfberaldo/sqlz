@@ -3,8 +3,8 @@ package named
 import (
 	"testing"
 
-	"github.com/rafaberaldo/sqlz/binds"
-	"github.com/rafaberaldo/sqlz/internal/testutil"
+	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -381,7 +381,7 @@ func TestConcurrency(t *testing.T) {
 
 // goos: linux
 // goarch: amd64
-// pkg: github.com/rafaberaldo/sqlz/named
+// pkg: github.com/rfberaldo/sqlz/named
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
 // BenchmarkNamedMap-12    	    2404	    493504 ns/op	 1008546 B/op	    4075 allocs/op
 func BenchmarkNamedMap(b *testing.B) {
@@ -400,7 +400,7 @@ func BenchmarkNamedMap(b *testing.B) {
 
 // goos: linux
 // goarch: amd64
-// pkg: github.com/rafaberaldo/sqlz/named
+// pkg: github.com/rfberaldo/sqlz/named
 // cpu: AMD Ryzen 5 5600X 6-Core Processor
 // BenchmarkNamedStruct-12    	    2025	    592866 ns/op	 1071677 B/op	    5106 allocs/op
 func BenchmarkNamedStruct(b *testing.B) {

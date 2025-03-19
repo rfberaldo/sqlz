@@ -7,9 +7,9 @@ import (
 	"reflect"
 
 	"github.com/georgysavva/scany/v2/dbscan"
-	"github.com/rafaberaldo/sqlz/binds"
-	"github.com/rafaberaldo/sqlz/internal/named"
-	"github.com/rafaberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/named"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 // Querier can be [sql.DB], [sql.Tx] or [sql.Conn]

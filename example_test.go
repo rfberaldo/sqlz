@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/rafaberaldo/sqlz"
+	"github.com/rfberaldo/sqlz"
 )
 
 var (

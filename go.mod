@@ -1,4 +1,4 @@
-module github.com/rafaberaldo/sqlz
+module github.com/rfberaldo/sqlz
 
 go 1.23.0
 
