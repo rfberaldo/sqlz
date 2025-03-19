@@ -22,7 +22,7 @@ func New(driverName string, db *sql.DB) *DB {
 		panic(fmt.Sprintf("sqlz: unable to find bind for %#v, register with [binds.Register]", driverName))
 	}
 
-	return &DB{db, bind, structTag, newScanner(structTag)}
+	return &DB{db, bind, newScanner(structTag)}
 }
 
 // Connect opens a database specified by its database driver name and a
@@ -51,7 +51,7 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("sqlz: unable to ping: %w", err)
 	}
 
-	return &DB{db, bind, structTag, newScanner(structTag)}, nil
+	return &DB{db, bind, newScanner(structTag)}, nil
 }
 
 // MustConnect is like [Connect], but panics on error.

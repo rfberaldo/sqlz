@@ -21,6 +21,7 @@ type Querier interface {
 type Scanner interface {
 	ScanOne(dst any, rows dbscan.Rows) error
 	ScanAll(dst any, rows dbscan.Rows) error
+	StructTagKey() string
 }
 
 // Query will adapt depending on args:
@@ -35,12 +36,11 @@ func Query(
 	db Querier,
 	bind binds.Bind,
 	scanner Scanner,
-	structTag string,
 	dst any,
 	query string,
 	args ...any,
 ) error {
-	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
+	rows, err := queryDecider(ctx, db, bind, scanner.StructTagKey(), query, args...)
 	if err != nil {
 		return err
 	}
@@ -59,12 +59,11 @@ func QueryRow(
 	db Querier,
 	bind binds.Bind,
 	scanner Scanner,
-	structTag string,
 	dst any,
 	query string,
 	args ...any,
 ) error {
-	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
+	rows, err := queryDecider(ctx, db, bind, scanner.StructTagKey(), query, args...)
 	if err != nil {
 		return err
 	}
@@ -80,7 +79,7 @@ func queryDecider(
 	ctx context.Context,
 	db Querier,
 	bind binds.Bind,
-	structTag,
+	structTag string,
 	query string,
 	args ...any,
 ) (*sql.Rows, error) {
@@ -120,7 +119,7 @@ func Exec(
 	ctx context.Context,
 	db Querier,
 	bind binds.Bind,
-	structTag,
+	structTag string,
 	query string,
 	args ...any,
 ) (sql.Result, error) {

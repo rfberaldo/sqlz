@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/georgysavva/scany/v2/dbscan"
 )
 
 // structValues return all the values from arg, following the idents order.
@@ -101,5 +103,5 @@ func fieldKey(field reflect.StructField, tag string) string {
 		return dbTag[:commaIdx]
 	}
 
-	return field.Name
+	return dbscan.SnakeCaseMapper(field.Name)
 }

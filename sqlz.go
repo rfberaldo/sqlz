@@ -14,10 +14,9 @@ import (
 // underlying connections. It's safe for concurrent use by multiple
 // goroutines.
 type DB struct {
-	pool      *sql.DB
-	bind      binds.Bind
-	structTag string
-	scanner   core.Scanner
+	pool    *sql.DB
+	bind    binds.Bind
+	scanner core.Scanner
 }
 
 // Pool return the underlying [*sql.DB].
@@ -25,7 +24,6 @@ func (db *DB) Pool() *sql.DB { return db.pool }
 
 // SetStructTag changes the default struct tag. Default is "db".
 func (db *DB) SetStructTag(tag string) {
-	db.structTag = tag
 	db.scanner = newScanner(tag)
 }
 
@@ -53,7 +51,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		return nil, err
 	}
 
-	return &Tx{tx, db.bind, db.structTag, db.scanner}, nil
+	return &Tx{tx, db.bind, db.scanner}, nil
 }
 
 // Query executes a query that returns rows, typically a SELECT.
@@ -68,12 +66,12 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // Query uses [context.Background] internally;
 // to specify the context, use [DB.QueryCtx].
 func (db *DB) Query(dst any, query string, args ...any) error {
-	return core.Query(context.Background(), db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.Query(context.Background(), db.pool, db.bind, db.scanner, dst, query, args...)
 }
 
 // QueryCtx is like [DB.Query], with context.
 func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.Query(ctx, db.pool, db.bind, db.scanner, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -90,12 +88,12 @@ func (db *DB) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [DB.QueryRowCtx].
 func (db *DB) QueryRow(dst any, query string, args ...any) error {
-	return core.QueryRow(context.Background(), db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.QueryRow(context.Background(), db.pool, db.bind, db.scanner, dst, query, args...)
 }
 
 // QueryRowCtx is like [DB.QueryRow], with context.
 func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, db.pool, db.bind, db.scanner, db.structTag, dst, query, args...)
+	return core.QueryRow(ctx, db.pool, db.bind, db.scanner, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -109,12 +107,12 @@ func (db *DB) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // Exec uses [context.Background] internally;
 // to specify the context, use [DB.ExecCtx].
 func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
-	return core.Exec(context.Background(), db.pool, db.bind, db.structTag, query, args...)
+	return core.Exec(context.Background(), db.pool, db.bind, db.scanner.StructTagKey(), query, args...)
 }
 
 // ExecCtx is like [DB.Exec], with context.
 func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return core.Exec(ctx, db.pool, db.bind, db.structTag, query, args...)
+	return core.Exec(ctx, db.pool, db.bind, db.scanner.StructTagKey(), query, args...)
 }
 
 // Tx is an in-progress database transaction, representing a single connection.
@@ -125,10 +123,9 @@ func (db *DB) ExecCtx(ctx context.Context, query string, args ...any) (sql.Resul
 // After a call to [Tx.Commit] or [Tx.Rollback], all operations on the
 // transaction fail with [sql.ErrTxDone].
 type Tx struct {
-	conn      *sql.Tx
-	bind      binds.Bind
-	structTag string
-	scanner   core.Scanner
+	conn    *sql.Tx
+	bind    binds.Bind
+	scanner core.Scanner
 }
 
 // Conn return the underlying [*sql.Tx].
@@ -158,12 +155,12 @@ func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 // Query uses [context.Background] internally;
 // to specify the context, use [Tx.QueryCtx].
 func (tx *Tx) Query(dst any, query string, args ...any) error {
-	return core.Query(context.Background(), tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
+	return core.Query(context.Background(), tx.conn, tx.bind, tx.scanner, dst, query, args...)
 }
 
 // QueryCtx is like [Tx.Query], with context.
 func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
+	return core.Query(ctx, tx.conn, tx.bind, tx.scanner, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -180,12 +177,12 @@ func (tx *Tx) QueryCtx(ctx context.Context, dst any, query string, args ...any) 
 // QueryRow uses [context.Background] internally;
 // to specify the context, use [Tx.QueryRowCtx].
 func (tx *Tx) QueryRow(dst any, query string, args ...any) error {
-	return core.QueryRow(context.Background(), tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
+	return core.QueryRow(context.Background(), tx.conn, tx.bind, tx.scanner, dst, query, args...)
 }
 
 // QueryRowCtx is like [Tx.QueryRow], with context.
 func (tx *Tx) QueryRowCtx(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, tx.conn, tx.bind, tx.scanner, tx.structTag, dst, query, args...)
+	return core.QueryRow(ctx, tx.conn, tx.bind, tx.scanner, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -200,10 +197,10 @@ func (tx *Tx) QueryRowCtx(ctx context.Context, dst any, query string, args ...an
 // Exec uses [context.Background] internally;
 // to specify the context, use [Tx.ExecCtx].
 func (tx *Tx) Exec(query string, args ...any) (sql.Result, error) {
-	return core.Exec(context.Background(), tx.conn, tx.bind, tx.structTag, query, args...)
+	return core.Exec(context.Background(), tx.conn, tx.bind, tx.scanner.StructTagKey(), query, args...)
 }
 
 // ExecCtx is like [Tx.Exec], with context.
 func (tx *Tx) ExecCtx(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return core.Exec(ctx, tx.conn, tx.bind, tx.structTag, query, args...)
+	return core.Exec(ctx, tx.conn, tx.bind, tx.scanner.StructTagKey(), query, args...)
 }

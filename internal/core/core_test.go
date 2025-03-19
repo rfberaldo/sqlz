@@ -106,11 +106,11 @@ func TestBasicQueryMethods(t *testing.T) {
 		expected := "Hello World"
 		expectedSlice := []string{"Hello World"}
 
-		err = Query(ctx, db, bind, scanner, structTag, &ss, query)
+		err = Query(ctx, db, bind, scanner, &ss, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = QueryRow(ctx, db, bind, scanner, structTag, &s, query)
+		err = QueryRow(ctx, db, bind, scanner, &s, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 	})
@@ -127,11 +127,11 @@ func TestShouldReturnErrorForWrongQuery(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, shouldContain)
 
-		err = Query(ctx, db, bind, scanner, structTag, &dst, query)
+		err = Query(ctx, db, bind, scanner, &dst, query)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, shouldContain)
 
-		err = QueryRow(ctx, db, bind, scanner, structTag, &dst, query)
+		err = QueryRow(ctx, db, bind, scanner, &dst, query)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, shouldContain)
 	})
@@ -149,7 +149,7 @@ func TestShouldReturnNotFoundOnQueryRow(t *testing.T) {
 		query := fmt.Sprintf("SELECT * FROM %s", table)
 
 		var s any
-		err = QueryRow(ctx, db, bind, scanner, structTag, &s, query)
+		err = QueryRow(ctx, db, bind, scanner, &s, query)
 		assert.Error(t, err)
 		assert.Equal(t, true, errors.Is(err, sql.ErrNoRows), err)
 	})
@@ -184,11 +184,11 @@ func TestQueryArgs(t *testing.T) {
 		assert.NoError(t, err)
 
 		type User struct {
-			Id       int       `db:"id"`
-			Username string    `db:"username"`
-			Age      int       `db:"age"`
-			Active   bool      `db:"active"`
-			Created  time.Time `db:"created_at"`
+			Id        int
+			Username  string
+			Age       int
+			Active    bool
+			CreatedAt time.Time
 		}
 
 		t.Run("query without args should perform a regular query", func(t *testing.T) {
@@ -198,7 +198,7 @@ func TestQueryArgs(t *testing.T) {
 				{3, "John", 24, false, ts},
 			}
 			var users []User
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf("SELECT * FROM %s", table))
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf("SELECT * FROM %s", table))
 			assert.NoError(t, err)
 			assert.Equal(t, 3, len(users))
 			assert.Equal(t, expected, users)
@@ -211,7 +211,7 @@ func TestQueryArgs(t *testing.T) {
 			}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? OR id = ?`)
 			var users []User
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf(selectTmpl, table), 2, 3)
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf(selectTmpl, table), 2, 3)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -225,7 +225,7 @@ func TestQueryArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (?)`)
 			var users []User
 			ids := []int{2, 3}
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf(selectTmpl, table), ids)
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf(selectTmpl, table), ids)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -238,7 +238,7 @@ func TestQueryArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var users []User
 			arg := struct{ Id int }{Id: 2}
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf(selectTmpl, table), arg)
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf(selectTmpl, table), arg)
 			assert.NoError(t, err)
 			assert.Equal(t, 1, len(users))
 			assert.Equal(t, expected, users)
@@ -251,7 +251,7 @@ func TestQueryArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var users []User
 			arg := map[string]any{"id": 2}
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf(selectTmpl, table), arg)
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf(selectTmpl, table), arg)
 			assert.NoError(t, err)
 			assert.Equal(t, 1, len(users))
 			assert.Equal(t, expected, users)
@@ -265,7 +265,7 @@ func TestQueryArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 			var users []User
 			arg := map[string]any{"ids": []int{2, 3}}
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf(selectTmpl, table), arg)
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf(selectTmpl, table), arg)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -274,7 +274,7 @@ func TestQueryArgs(t *testing.T) {
 		t.Run("query should return length 0 if no result is found", func(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 42`)
 			var users []User
-			err = Query(ctx, db, bind, scanner, structTag, &users, fmt.Sprintf(selectTmpl, table))
+			err = Query(ctx, db, bind, scanner, &users, fmt.Sprintf(selectTmpl, table))
 			assert.NoError(t, err)
 			assert.Equal(t, 0, len(users))
 		})
@@ -320,7 +320,7 @@ func TestQueryRowArgs(t *testing.T) {
 		t.Run("query row without args should perform a regular query", func(t *testing.T) {
 			expected := User{1, "Alice", 18, true, ts}
 			var user User
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -329,7 +329,7 @@ func TestQueryRowArgs(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = ? AND active = ?`)
 			var user User
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table), 2, true)
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table), 2, true)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -339,7 +339,7 @@ func TestQueryRowArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (?)`)
 			var user User
 			ids := []int{2}
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table), ids)
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table), ids)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -349,7 +349,7 @@ func TestQueryRowArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := struct{ Id int }{Id: 2}
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table), arg)
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table), arg)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -359,7 +359,7 @@ func TestQueryRowArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := map[string]any{"id": 2}
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table), arg)
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table), arg)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -369,7 +369,7 @@ func TestQueryRowArgs(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id IN (:ids)`)
 			var user User
 			arg := map[string]any{"ids": []int{2}}
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table), arg)
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table), arg)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -377,7 +377,7 @@ func TestQueryRowArgs(t *testing.T) {
 		t.Run("query row should return error if no result is found", func(t *testing.T) {
 			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 42`)
 			var user User
-			err = QueryRow(ctx, db, bind, scanner, structTag, &user, fmt.Sprintf(selectTmpl, table))
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table))
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, sql.ErrNoRows)
 		})
@@ -393,7 +393,8 @@ func TestExecArgs(t *testing.T) {
 		CREATE TABLE %s (
 			id INT PRIMARY KEY,
 			name VARCHAR(255),
-			age INT
+			age INT,
+			created_at TIMESTAMP
 		)`
 		_, err := db.Exec(fmt.Sprintf(createTmpl, table))
 		assert.NoError(t, err)
@@ -449,16 +450,17 @@ func TestExecArgs(t *testing.T) {
 
 		t.Run("1 arg []struct should perform a named batch insert", func(t *testing.T) {
 			type Person struct {
-				Id   int
-				Name string
-				Age  int
+				Id        int
+				Name      string
+				Age       int
+				CreatedAt time.Time
 			}
 			const COUNT = 100
 			args := make([]Person, COUNT)
 			for i := range COUNT {
-				args[i] = Person{i + 1, "Name", 20}
+				args[i] = Person{i + 1, "Name", 20, time.Now()}
 			}
-			insertTmpl := `INSERT INTO %s (id, name, age) VALUES (:id, :name, :age)`
+			insertTmpl := `INSERT INTO %s (id, name, age, created_at) VALUES (:id, :name, :age, :created_at)`
 			re, err := Exec(ctx, db, bind, structTag, fmt.Sprintf(insertTmpl, table), args)
 			assert.NoError(t, err)
 
@@ -531,7 +533,7 @@ func TestCustomStructTag(t *testing.T) {
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
-		err = QueryRow(ctx, db, bind, scanner, "json", &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
+		err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})
