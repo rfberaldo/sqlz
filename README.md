@@ -1,5 +1,9 @@
 # sqlz
 
+[![Tests Status](https://github.com/rfberaldo/sqlz/actions/workflows/test.yaml/badge.svg?branch=master)](https://github.com/rfberaldo/sqlz/actions/workflows/test.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rfberaldo/sqlz)](https://goreportcard.com/report/github.com/rfberaldo/sqlz)
+[![Go Reference](https://pkg.go.dev/badge/github.com/rfberaldo/sqlz.svg)](https://pkg.go.dev/github.com/rfberaldo/sqlz)
+
 sqlz is a thin wrapper around standard lib's `database/sql`, specifically `sql.DB` and `sql.Tx`.
 It aims to be lightweight and easy to use, with a much smaller API. Scanning is powered by [scany](https://github.com/georgysavva/scany).
 
@@ -104,19 +108,32 @@ _, err := tx.Exec("DELETE FROM user_permission WHERE user_id = :id", arg)
 tx.Commit()
 ```
 
-### Using custom struct tag for named queries and/or scanning
+### Struct tags
+
+To find the key of a struct property, sqlz first try to find the `db` tag,
+if it's not present, it then converts the property name to snake case.
 
 ```go
-// e.g you have all your structs like this
 type User struct {
-  Identifier int `json:"id"`
-  Name       int `json:"name"`
-  Password   int `json:"pw"`
+  Id        int `db:"user_id"` // will look for 'user_id'
+  Name      string             // will look for 'name'
+  CreatedAt time.Time          // will look for 'created_at'
 }
+```
 
-// just set a custom struct tag
+#### Custom struct tag
+
+To set a custom struct tag, use the method `SetStructTag`:
+
+```go
+db, err := sqlz.Connect("sqlite3", ":memory:")
 db.SetStructTag("json")
 ```
+
+## Dependencies
+
+The only dependency of sqlz is [scany](https://github.com/georgysavva/scany).
+All the others listed in [go.mod](go.mod) are testing/dev dependencies.
 
 ## Comparison with [sqlx](https://github.com/jmoiron/sqlx)
 

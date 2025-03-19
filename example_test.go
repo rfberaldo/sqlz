@@ -10,15 +10,12 @@ import (
 	"github.com/rfberaldo/sqlz"
 )
 
-var (
-	ctx context.Context
-	db  *sqlz.DB
-)
+var db *sqlz.DB
 
 func ExampleDB_Query() {
 	var names []string
 	age := 27
-	err := db.Query(&names, "SELECT name FROM users WHERE age = ?", age)
+	err := db.Query(&names, "SELECT name FROM user WHERE age = ?", age)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -29,7 +26,7 @@ func ExampleDB_Query() {
 func ExampleDB_Query_named() {
 	var names []string
 	arg := struct{ Age int }{Age: 27} // or map[string]any{"age": 27}
-	err := db.Query(&names, "SELECT name FROM users WHERE age = :age", arg)
+	err := db.Query(&names, "SELECT name FROM user WHERE age = :age", arg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,7 +37,7 @@ func ExampleDB_Query_named() {
 func ExampleDB_Query_in_clause() {
 	var names []string
 	ages := []int{27, 28, 29} // also works with named query
-	err := db.Query(&names, "SELECT name FROM users WHERE age IN (?)", ages)
+	err := db.Query(&names, "SELECT name FROM user WHERE age IN (?)", ages)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -55,7 +52,7 @@ func ExampleDB_QueryRow() {
 	}
 	id := 123
 	var user User
-	err := db.QueryRow(&user, "SELECT username, created_at FROM users WHERE id = ?", id)
+	err := db.QueryRow(&user, "SELECT username, created_at FROM user WHERE id = ?", id)
 	switch {
 	case sqlz.IsNotFound(err):
 		log.Printf("no user with id %d\n", id)
@@ -113,7 +110,7 @@ func ExampleDB_Begin() {
 	defer tx.Rollback()
 
 	args := map[string]any{"status": "paid", "id": 37}
-	_, err = tx.Exec("UPDATE users SET status = :status WHERE id = :id", args)
+	_, err = tx.Exec("UPDATE user SET status = :status WHERE id = :id", args)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -123,6 +120,7 @@ func ExampleDB_Begin() {
 }
 
 func ExampleDB_BeginTx() {
+	ctx := context.Background()
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		log.Fatal(err)
@@ -137,7 +135,7 @@ func ExampleDB_BeginTx() {
 	}()
 
 	args := map[string]any{"status": "paid", "id": 37}
-	_, err = tx.Exec("UPDATE users SET status = :status WHERE id = :id", args)
+	_, err = tx.Exec("UPDATE user SET status = :status WHERE id = :id", args)
 	if err != nil {
 		log.Fatal(err)
 		return
