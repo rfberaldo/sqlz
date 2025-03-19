@@ -3,7 +3,7 @@ package benchmark
 import (
 	"testing"
 
-	"github.com/rafaberaldo/sqlz"
+	"github.com/rfberaldo/sqlz"
 
 	_ "github.com/mattn/go-sqlite3"
 )
