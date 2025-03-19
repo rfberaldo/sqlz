@@ -1,3 +1,5 @@
+// Package binds contains the Bind type that is used to represent the
+// placeholder used by different drivers.
 package binds
 
 import (
@@ -8,10 +10,10 @@ type Bind byte
 
 const (
 	Unknown  Bind = iota
-	At            // BindAt is the placeholder '@p1'
-	Colon         // BindColon is the placeholder ':name'
-	Dollar        // BindDollar is the placeholder '$1'
-	Question      // BindQuestion is the placeholder '?'
+	At            // placeholder '@p1'
+	Colon         // placeholder ':name'
+	Dollar        // placeholder '$1'
+	Question      // placeholder '?'
 )
 
 var bindByDriverName sync.Map

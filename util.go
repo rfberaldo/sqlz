@@ -9,20 +9,7 @@ import (
 	"github.com/rafaberaldo/sqlz/binds"
 )
 
-const structTag = "db"
-
-func newScanner(tag string) *dbscan.API {
-	scanner, err := dbscan.NewAPI(
-		dbscan.WithStructTagKey(tag),
-		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
-	)
-	if err != nil {
-		panic("sqlz: creating scanner: " + err.Error())
-	}
-	return scanner
-}
-
-// New returns a [*DB] instance for a pre-existing [*sql.DB].
+// New returns a [*DB] instance using an existing [*sql.DB].
 // New panics if the driverName is not registered.
 //
 // Example:
@@ -32,7 +19,7 @@ func newScanner(tag string) *dbscan.API {
 func New(driverName string, db *sql.DB) *DB {
 	bind := binds.BindByDriver(driverName)
 	if bind == binds.Unknown {
-		panic("sqlz: unable to find bind for driver '" + driverName + "', register using [binds.Register]")
+		panic(fmt.Sprintf("sqlz: unable to find bind for %#v, register with [binds.Register]", driverName))
 	}
 
 	return &DB{db, bind, structTag, newScanner(structTag)}
@@ -50,7 +37,7 @@ func New(driverName string, db *sql.DB) *DB {
 func Connect(driverName, dataSourceName string) (*DB, error) {
 	bind := binds.BindByDriver(driverName)
 	if bind == binds.Unknown {
-		return nil, fmt.Errorf("sqlz: unable to find bind for driver '%v', register using [binds.Register]", driverName)
+		return nil, fmt.Errorf("sqlz: unable to find bind for %#v, register with [binds.Register]", driverName)
 	}
 
 	db, err := sql.Open(driverName, dataSourceName)
@@ -79,4 +66,17 @@ func MustConnect(driverName, dataSourceName string) *DB {
 // IsNotFound is a helper to check if err contains [sql.ErrNoRows].
 func IsNotFound(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
+}
+
+const structTag = "db"
+
+func newScanner(tag string) *dbscan.API {
+	scanner, err := dbscan.NewAPI(
+		dbscan.WithStructTagKey(tag),
+		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
+	)
+	if err != nil {
+		panic("sqlz: creating scanner: " + err.Error())
+	}
+	return scanner
 }

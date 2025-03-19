@@ -1,3 +1,5 @@
+// Package sqlz is a thin wrapper around the standard [database/sql] package.
+// It provides a less verbose API for working with SQL databases.
 package sqlz
 
 import (

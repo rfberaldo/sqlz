@@ -20,9 +20,8 @@ go get github.com/rafaberaldo/sqlz
 db, err := sqlz.Connect("sqlite3", ":memory:")
 
 // 2. using [sql.Open] and [sqlz.New]
-sqldb, err := sql.Open("sqlite3", ":memory:")
-...
-db, err := sqlz.New("sqlite3", sqldb)
+conn, err := sql.Open("sqlite3", ":memory:")
+db := sqlz.New("sqlite3", conn)
 ```
 
 ## Querying
@@ -95,7 +94,9 @@ arg := map[string]any{"id": 42}
 // very similar to standard library
 tx, err := db.Begin()
 ...
-defer tx.Rollback() // defer works if you return earlier than Commit
+// Rollback will be ignored if tx has been committed later in the function
+// remember to return early if there is an error
+defer tx.Rollback()
 _, err := tx.Exec("DELETE FROM user WHERE id = :id", arg)
 ...
 _, err := tx.Exec("DELETE FROM user_permission WHERE user_id = :id", arg)
@@ -103,7 +104,7 @@ _, err := tx.Exec("DELETE FROM user_permission WHERE user_id = :id", arg)
 tx.Commit()
 ```
 
-### Using custom struct tag for named queries
+### Using custom struct tag for named queries and/or scanning
 
 ```go
 // e.g you have all your structs like this
@@ -119,18 +120,10 @@ db.SetStructTag("json")
 
 ## Comparison with [sqlx](https://github.com/jmoiron/sqlx)
 
-- sqlz has a smaller scope, it doesn't support prepared statements.
-- It was designed with a simpler API for everyday use, less verbose.
-- All the scanning work is done by [scany](https://github.com/georgysavva/scany).
+- sqlz has a smaller scope, it doesn't support prepared statements and all the
+scanning work is done by [scany](https://github.com/georgysavva/scany).
+- It was designed with a simpler API for everyday use, with fewer concepts and less verbose.
 
 ### Performance
 
 Take a look at [benchmarks](benchmarks) for more info.
-
-In summary, sqlz has better speed/alloc when scanning in general,
-specially scanning native types (e.g. string, int).
-
-It has also better alloc with 'IN' clause queries.
-
-Although it has worst speed/alloc when running batch inserts,
-and higher alloc running Exec in general.
