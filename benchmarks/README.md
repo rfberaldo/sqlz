@@ -10,7 +10,7 @@ Install [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat), then:
 go test -benchmem -count=20 -bench . benchmark/sqlx > sqlx.txt
 go test -benchmem -count=20 -bench . benchmark/sqlz > sqlz.txt
 
-# renaming sqlx to sqlz, otherwise benchstat won't compare
+# rename sqlx to sqlz, otherwise benchstat won't compare
 sed -i 's/sqlx/sqlz/g' sqlx.txt
 
 benchstat sqlx.txt sqlz.txt > results.txt
