@@ -22,11 +22,6 @@ type DB struct {
 // Pool return the underlying [*sql.DB].
 func (db *DB) Pool() *sql.DB { return db.pool }
 
-// SetStructTag changes the default struct tag. Default is "db".
-func (db *DB) SetStructTag(tag string) {
-	db.scanner = newScanner(tag)
-}
-
 // Begin starts a transaction. The default isolation level is dependent on
 // the driver.
 //

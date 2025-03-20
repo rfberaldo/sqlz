@@ -66,7 +66,7 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
-		fn(t, New("mysql", dbMySQL))
+		fn(t, New("mysql", dbMySQL, nil))
 	})
 	t.Run("PostgreSQL", func(t *testing.T) {
 		t.Parallel()
@@ -77,7 +77,7 @@ func run(t *testing.T, fn func(t *testing.T, db *DB)) {
 				t.Skip("Skipping, unable to connect to DB:", t.Name())
 			}
 		}
-		fn(t, New("pgx", dbPGSQL))
+		fn(t, New("pgx", dbPGSQL, nil))
 	})
 }
 
@@ -409,6 +409,8 @@ func TestCustomStructTag(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
+		db.scanner = newScanner("json")
+
 		type User struct {
 			Identifier int    `json:"id"`
 			User       string `json:"username"`
@@ -417,8 +419,6 @@ func TestCustomStructTag(t *testing.T) {
 			Age        int
 			Active     bool
 		}
-
-		db.SetStructTag("json")
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		arg := User{Identifier: 1}

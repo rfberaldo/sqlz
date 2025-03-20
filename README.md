@@ -25,7 +25,7 @@ db, err := sqlz.Connect("sqlite3", ":memory:")
 
 // 2. using [sql.Open] and [sqlz.New]
 pool, err := sql.Open("sqlite3", ":memory:")
-db := sqlz.New("sqlite3", pool)
+db := sqlz.New("sqlite3", pool, nil)
 ```
 
 ## Querying
@@ -123,11 +123,11 @@ type User struct {
 
 #### Custom struct tag
 
-To set a custom struct tag, use the method `SetStructTag`:
+To set a custom struct tag, use `Options`:
 
 ```go
-db, err := sqlz.Connect("sqlite3", ":memory:")
-db.SetStructTag("json")
+pool, err := sql.Open("sqlite3", ":memory:")
+db := sqlz.New("sqlite3", pool,  &Options{StructTag: "json"})
 ```
 
 ## Dependencies

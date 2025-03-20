@@ -12,9 +12,20 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	db := New("sqlite3", &sql.DB{})
+	db := New("sqlite3", &sql.DB{}, nil)
 	assert.NotNil(t, db)
 	assert.IsType(t, &DB{}, db)
+	assert.Equal(t, "db", db.scanner.StructTagKey())
+
+	db = New("sqlite3", &sql.DB{}, &Options{})
+	assert.NotNil(t, db)
+	assert.IsType(t, &DB{}, db)
+	assert.Equal(t, "db", db.scanner.StructTagKey())
+
+	db = New("sqlite3", &sql.DB{}, &Options{StructTag: "json"})
+	assert.NotNil(t, db)
+	assert.IsType(t, &DB{}, db)
+	assert.Equal(t, "json", db.scanner.StructTagKey())
 }
 
 func TestNew_panic(t *testing.T) {
@@ -22,7 +33,7 @@ func TestNew_panic(t *testing.T) {
 		assert.Contains(t, recover(), "unable to find bind")
 	}()
 
-	New("wrongdriver", &sql.DB{})
+	New("wrongdriver", &sql.DB{}, nil)
 }
 
 func TestConnect(t *testing.T) {
@@ -35,7 +46,7 @@ func TestConnect(t *testing.T) {
 func TestConnect_wrong_driver(t *testing.T) {
 	_, err := Connect("wrongdriver", ":memory:")
 	assert.Error(t, err)
-	assert.ErrorContains(t, err, "unable to find bind")
+	assert.ErrorContains(t, err, "unknown driver")
 }
 
 func TestMustConnect(t *testing.T) {
