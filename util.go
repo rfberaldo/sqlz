@@ -21,6 +21,8 @@ type Options struct {
 // New returns a [DB] instance using an existing [sql.DB].
 // If driverName is not registered in [binds], it panics.
 //
+// The opts parameter can be set to nil for defaults.
+//
 // Example:
 //
 //	pool, err := sql.Open("sqlite3", ":memory:")

@@ -23,6 +23,7 @@ import (
 var (
 	dbMySQL *sql.DB
 	dbPGSQL *sql.DB
+	ctx     = context.Background()
 )
 
 func init() {
@@ -91,23 +92,23 @@ func TestBasicQueryMethods(t *testing.T) {
 		expected := "Hello World"
 		expectedSlice := []string{"Hello World"}
 
-		err = db.Query(&ss, query)
+		err = db.Query(ctx, &ss, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = db.QueryRow(&s, query)
+		err = db.QueryRow(ctx, &s, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 
-		tx, err := db.Begin()
+		tx, err := db.Begin(ctx)
 		assert.NoError(t, err)
 		defer tx.Rollback()
 
-		err = tx.Query(&ss, query)
+		err = tx.Query(ctx, &ss, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = tx.QueryRow(&s, query)
+		err = tx.QueryRow(ctx, &s, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 	})
@@ -125,7 +126,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			_, err := db.ExecCtx(ctx, query)
+			_, err := db.Exec(ctx, query)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -134,7 +135,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			_, err := db.ExecCtx(ctx, query)
+			_, err := db.Exec(ctx, query)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
@@ -143,7 +144,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err := db.QueryCtx(ctx, new([]int), query)
+			err := db.Query(ctx, new([]int), query)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -152,7 +153,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := db.QueryCtx(ctx, new([]int), query)
+			err := db.Query(ctx, new([]int), query)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
@@ -161,7 +162,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err := db.QueryRowCtx(ctx, new(int), query)
+			err := db.QueryRow(ctx, new(int), query)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -170,7 +171,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := db.QueryRowCtx(ctx, new(int), query)
+			err := db.QueryRow(ctx, new(int), query)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 	})
@@ -185,79 +186,79 @@ func TestTxContextCancellation(t *testing.T) {
 
 		t.Run("exec context should timeout", func(t *testing.T) {
 			t.Parallel()
-			tx, err := db.Begin()
+			tx, err := db.Begin(ctx)
 			assert.NoError(t, err)
 			defer tx.Rollback()
 
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			_, err = tx.ExecCtx(ctx, query)
+			_, err = tx.Exec(ctx, query)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
 		t.Run("exec context should cancel", func(t *testing.T) {
 			t.Parallel()
-			tx, err := db.Begin()
+			tx, err := db.Begin(ctx)
 			assert.NoError(t, err)
 			defer tx.Rollback()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			_, err = tx.ExecCtx(ctx, query)
+			_, err = tx.Exec(ctx, query)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
 		t.Run("query context should timeout", func(t *testing.T) {
 			t.Parallel()
-			tx, err := db.Begin()
+			tx, err := db.Begin(ctx)
 			assert.NoError(t, err)
 			defer tx.Rollback()
 
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err = tx.QueryCtx(ctx, new([]int), query)
+			err = tx.Query(ctx, new([]int), query)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
 		t.Run("query context should cancel", func(t *testing.T) {
 			t.Parallel()
-			tx, err := db.Begin()
+			tx, err := db.Begin(ctx)
 			assert.NoError(t, err)
 			defer tx.Rollback()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err = tx.QueryCtx(ctx, new([]int), query)
+			err = tx.Query(ctx, new([]int), query)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
 		t.Run("query row context should timeout", func(t *testing.T) {
 			t.Parallel()
-			tx, err := db.Begin()
+			tx, err := db.Begin(ctx)
 			assert.NoError(t, err)
 			defer tx.Rollback()
 
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err = tx.QueryRowCtx(ctx, new(int), query)
+			err = tx.QueryRow(ctx, new(int), query)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
 		t.Run("query row context should cancel", func(t *testing.T) {
 			t.Parallel()
-			tx, err := db.Begin()
+			tx, err := db.Begin(ctx)
 			assert.NoError(t, err)
 			defer tx.Rollback()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err = tx.QueryRowCtx(ctx, new(int), query)
+			err = tx.QueryRow(ctx, new(int), query)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 	})
@@ -266,7 +267,7 @@ func TestTxContextCancellation(t *testing.T) {
 func TestTransaction(t *testing.T) {
 	run(t, func(t *testing.T, db *DB) {
 		table := testutil.TableName(t.Name())
-		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
+		t.Cleanup(func() { db.Exec(ctx, "DROP TABLE "+table) })
 
 		createTmpl := `
 		CREATE TABLE %s (
@@ -274,7 +275,7 @@ func TestTransaction(t *testing.T) {
 			name VARCHAR(255),
 			age INT
 		)`
-		_, err := db.Exec(fmt.Sprintf(createTmpl, table))
+		_, err := db.Exec(ctx, fmt.Sprintf(createTmpl, table))
 		assert.NoError(t, err)
 
 		t.Run("tx should commit", func(t *testing.T) {
@@ -283,11 +284,11 @@ func TestTransaction(t *testing.T) {
 			VALUES (?,?,?),(?,?,?),(?,?,?)`)
 
 			func() {
-				tx, err := db.Begin()
+				tx, err := db.Begin(ctx)
 				assert.NoError(t, err)
 				defer tx.Rollback()
 
-				re, err := tx.Exec(fmt.Sprintf(insertTmpl, table),
+				re, err := tx.Exec(ctx, fmt.Sprintf(insertTmpl, table),
 					1, "Alice", 18,
 					2, "Rob", 38,
 					3, "John", 4,
@@ -302,11 +303,11 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.QueryRow(&count, "SELECT count(1) FROM "+table))
+			assert.NoError(t, db.QueryRow(ctx, &count, "SELECT count(1) FROM "+table))
 			assert.Equal(t, 3, count)
 
 			// clean up
-			_, err := db.Exec("DELETE FROM " + table)
+			_, err := db.Exec(ctx, "DELETE FROM "+table)
 			assert.NoError(t, err)
 		})
 
@@ -316,11 +317,11 @@ func TestTransaction(t *testing.T) {
 			VALUES (?,?,?),(?,?,?),(?,?,?)`)
 
 			func() {
-				tx, err := db.Begin()
+				tx, err := db.Begin(ctx)
 				assert.NoError(t, err)
 				defer tx.Rollback()
 
-				re, err := tx.Exec(fmt.Sprintf(insertTmpl, table),
+				re, err := tx.Exec(ctx, fmt.Sprintf(insertTmpl, table),
 					1, "Alice", 18,
 					2, "Rob", 38,
 					3, "John", 4,
@@ -340,7 +341,7 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.QueryRow(&count, "SELECT count(1) FROM "+table))
+			assert.NoError(t, db.QueryRow(ctx, &count, "SELECT count(1) FROM "+table))
 			assert.Equal(t, 0, count)
 		})
 
@@ -356,7 +357,7 @@ func TestTransaction(t *testing.T) {
 				assert.NoError(t, err)
 				defer tx.Rollback()
 
-				re, err := tx.ExecCtx(ctx, fmt.Sprintf(insertTmpl, table),
+				re, err := tx.Exec(ctx, fmt.Sprintf(insertTmpl, table),
 					1, "Alice", 18,
 					2, "Rob", 38,
 					3, "John", 4,
@@ -376,7 +377,7 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.QueryRow(&count, "SELECT count(1) FROM "+table))
+			assert.NoError(t, db.QueryRow(ctx, &count, "SELECT count(1) FROM "+table))
 			assert.Equal(t, 0, count)
 		})
 	})
@@ -385,7 +386,7 @@ func TestTransaction(t *testing.T) {
 func TestCustomStructTag(t *testing.T) {
 	run(t, func(t *testing.T, db *DB) {
 		table := testutil.TableName(t.Name())
-		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
+		t.Cleanup(func() { db.Exec(ctx, "DROP TABLE "+table) })
 
 		createTmpl := `
 		CREATE TABLE %s (
@@ -396,13 +397,13 @@ func TestCustomStructTag(t *testing.T) {
 			age INT,
 			active BOOL
 		)`
-		_, err := db.Exec(fmt.Sprintf(createTmpl, table))
+		_, err := db.Exec(ctx, fmt.Sprintf(createTmpl, table))
 		assert.NoError(t, err)
 
 		insertTmpl := testutil.Rebind(db.bind, `
 		INSERT INTO %s (id, username, email, password, age, active)
 		VALUES (?,?,?,?,?,?),(?,?,?,?,?,?),(?,?,?,?,?,?)`)
-		_, err = db.Exec(fmt.Sprintf(insertTmpl, table),
+		_, err = db.Exec(ctx, fmt.Sprintf(insertTmpl, table),
 			1, "Alice", "alice@wonderland.com", "123456", 18, true,
 			2, "Rob", "rob@google.com", "123456", 38, true,
 			3, "John", "john@id.com", "123456", 24, false,
@@ -423,7 +424,7 @@ func TestCustomStructTag(t *testing.T) {
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		arg := User{Identifier: 1}
 		var user User
-		err = db.QueryRow(&user, fmt.Sprintf("SELECT * FROM %s WHERE id = :id", table), arg)
+		err = db.QueryRow(ctx, &user, fmt.Sprintf("SELECT * FROM %s WHERE id = :id", table), arg)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})
@@ -435,7 +436,7 @@ func TestPool(t *testing.T) {
 		db.Pool().SetMaxOpenConns(42)
 		assert.Equal(t, 42, db.pool.Stats().MaxOpenConnections)
 
-		tx, err := db.Begin()
+		tx, err := db.Begin(ctx)
 		assert.NoError(t, err)
 		assert.IsType(t, &sql.Tx{}, tx.Conn())
 	})
