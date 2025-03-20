@@ -8,6 +8,7 @@ import (
 
 	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/named"
 )
 
 const defaultStructTag = "db"
@@ -80,6 +81,7 @@ func IsNotFound(err error) bool {
 func newScanner(tag string) *dbscan.API {
 	scanner, err := dbscan.NewAPI(
 		dbscan.WithStructTagKey(tag),
+		dbscan.WithFieldNameMapper(named.SnakeCaseMapper),
 		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
 	)
 	if err != nil {

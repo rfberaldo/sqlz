@@ -379,6 +379,44 @@ func TestConcurrency(t *testing.T) {
 	}
 }
 
+func TestSnakeCaseMapper(t *testing.T) {
+	got := SnakeCaseMapper("Id")
+	assert.Equal(t, "id", got)
+
+	got = SnakeCaseMapper("ID")
+	assert.Equal(t, "id", got)
+
+	got = SnakeCaseMapper("UserID")
+	assert.Equal(t, "user_id", got)
+
+	got = SnakeCaseMapper("CreatedAt")
+	assert.Equal(t, "created_at", got)
+
+	got = SnakeCaseMapper("Created_At")
+	assert.Equal(t, "created_at", got)
+
+	got = SnakeCaseMapper("_createdAt")
+	assert.Equal(t, "_created_at", got)
+
+	got = SnakeCaseMapper("__createdAt")
+	assert.Equal(t, "__created_at", got)
+
+	got = SnakeCaseMapper("Created42At")
+	assert.Equal(t, "created42_at", got)
+
+	got = SnakeCaseMapper("あcreated42At")
+	assert.Equal(t, "あcreated42_at", got)
+
+	got = SnakeCaseMapper("Createdあ42At")
+	assert.Equal(t, "createdあ42_at", got)
+}
+
+func BenchmarkTemp(b *testing.B) {
+	for range b.N {
+		_ = SnakeCaseMapper("CreatedAt")
+	}
+}
+
 // goos: linux
 // goarch: amd64
 // pkg: github.com/rfberaldo/sqlz/named

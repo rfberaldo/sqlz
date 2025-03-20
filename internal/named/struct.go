@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-
-	"github.com/georgysavva/scany/v2/dbscan"
+	"unicode"
 )
 
 // structValues return all the values from arg, following the idents order.
@@ -103,5 +102,23 @@ func fieldKey(field reflect.StructField, tag string) string {
 		return dbTag[:commaIdx]
 	}
 
-	return dbscan.SnakeCaseMapper(field.Name)
+	return SnakeCaseMapper(field.Name)
+}
+
+func SnakeCaseMapper(str string) string {
+	var sb strings.Builder
+	sb.Grow(len(str) + 2)
+
+	var lastCh rune
+	for i, ch := range str {
+		isValidLastCh := unicode.IsLower(lastCh) || unicode.IsNumber(lastCh)
+		if i > 0 && isValidLastCh && unicode.IsUpper(ch) {
+			sb.WriteByte('_')
+		}
+
+		sb.WriteRune(unicode.ToLower(ch))
+		lastCh = ch
+	}
+
+	return sb.String()
 }
