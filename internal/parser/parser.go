@@ -59,6 +59,9 @@ func (p *Parser) skipWhitespace() {
 
 	for isWhitespace(p.ch) {
 		p.readChar()
+		if p.eof {
+			break
+		}
 	}
 
 	if p.readPosition > pos {

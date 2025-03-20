@@ -128,6 +128,15 @@ func TestParse(t *testing.T) {
 			expectedIdents:   []string{"id", "name"},
 		},
 		{
+			name:             "whitespace at start and end",
+			input:            " SELET * FROM user ",
+			expectedAt:       " SELET * FROM user ",
+			expectedColon:    " SELET * FROM user ",
+			expectedDollar:   " SELET * FROM user ",
+			expectedQuestion: " SELET * FROM user ",
+			expectedIdents:   nil,
+		},
+		{
 			name:             "empty input",
 			input:            "",
 			expectedAt:       "",
