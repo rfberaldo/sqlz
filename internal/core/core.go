@@ -27,7 +27,7 @@ type Scanner interface {
 // Query will adapt depending on args:
 //
 //	No args: perform a regular query.
-//	1 arg struct/map: perform a named query.
+//	1 arg map/struct: perform a named query.
 //	Anything else: parse query for `IN` clause and then query.
 //
 // Query return values will be scanned to dst.
@@ -112,8 +112,8 @@ func queryDecider(
 
 // Exec will adapt depending on args:
 //
-//	1 arg struct/map: perform a named exec.
-//	1 arg slice/array: perform a named batch insert.
+//	1 arg map/struct: perform a named exec.
+//	1 arg array/slice with map/struct items: perform a named batch insert.
 //	Anything else: parse query for `IN` clause and then exec.
 func Exec(
 	ctx context.Context,
@@ -123,18 +123,12 @@ func Exec(
 	query string,
 	args ...any,
 ) (sql.Result, error) {
-	if len(args) == 1 {
-		arg := args[0]
-		kind := reflect.TypeOf(arg).Kind()
-		switch kind {
-		// 1 arg map/struct/array/slice is a named exec
-		case reflect.Map, reflect.Struct, reflect.Array, reflect.Slice:
-			q, args, err := named.Compile(bind, structTag, query, arg)
-			if err != nil {
-				return nil, err
-			}
-			return db.ExecContext(ctx, q, args...)
+	if isNamedExec(args) {
+		q, args, err := named.Compile(bind, structTag, query, args[0])
+		if err != nil {
+			return nil, err
 		}
+		return db.ExecContext(ctx, q, args...)
 	}
 
 	// otherwise it's a regular exec with `IN` clause parsing
@@ -144,4 +138,32 @@ func Exec(
 	}
 
 	return db.ExecContext(ctx, q, args...)
+}
+
+func isNamedExec(args []any) bool {
+	if len(args) != 1 {
+		return false
+	}
+
+	arg := args[0]
+	kind := reflect.TypeOf(arg).Kind()
+
+	// 1 arg map/struct is a named exec
+	if kind == reflect.Map || kind == reflect.Struct {
+		return true
+	}
+
+	// 1 arg array/slice is a batch insert if items are map/struct
+	if kind == reflect.Array || kind == reflect.Slice {
+		elValue := reflect.ValueOf(arg).Index(0)
+		elKind := elValue.Kind()
+
+		if elKind == reflect.Ptr {
+			elKind = elValue.Elem().Kind()
+		}
+
+		return elKind == reflect.Map || elKind == reflect.Struct
+	}
+
+	return false
 }

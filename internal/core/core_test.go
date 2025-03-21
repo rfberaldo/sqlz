@@ -476,6 +476,34 @@ func TestExecArgs(t *testing.T) {
 			assert.Equal(t, COUNT, int(rows))
 		})
 
+		t.Run("1 arg []*struct should perform a named batch insert", func(t *testing.T) {
+			type Person struct {
+				Id        int
+				Name      string
+				Age       int
+				CreatedAt time.Time
+			}
+			const COUNT = 100
+			args := make([]*Person, COUNT)
+			for i := range COUNT {
+				args[i] = &Person{i + 1, "Name", 20, time.Now()}
+			}
+			insertTmpl := `INSERT INTO %s (id, name, age, created_at) VALUES (:id, :name, :age, :created_at)`
+			re, err := Exec(ctx, db, bind, structTag, fmt.Sprintf(insertTmpl, table), args)
+			assert.NoError(t, err)
+
+			rows, err := re.RowsAffected()
+			assert.NoError(t, err)
+			assert.Equal(t, COUNT, int(rows))
+
+			re, err = Exec(ctx, db, bind, structTag, "DELETE FROM "+table)
+			assert.NoError(t, err)
+
+			rows, err = re.RowsAffected()
+			assert.NoError(t, err)
+			assert.Equal(t, COUNT, int(rows))
+		})
+
 		t.Run("1 arg []map should perform a named batch insert", func(t *testing.T) {
 			const COUNT = 100
 			args := make([]map[string]any, COUNT)
@@ -489,6 +517,28 @@ func TestExecArgs(t *testing.T) {
 			rows, err := re.RowsAffected()
 			assert.NoError(t, err)
 			assert.Equal(t, COUNT, int(rows))
+		})
+
+		t.Run("should be able to perform in clause using named args", func(t *testing.T) {
+			args := map[string]any{"ids": []int{10, 11, 12}}
+			insertTmpl := `DELETE FROM %s WHERE id IN (:ids)`
+			re, err := Exec(ctx, db, bind, structTag, fmt.Sprintf(insertTmpl, table), args)
+			assert.NoError(t, err)
+
+			rows, err := re.RowsAffected()
+			assert.NoError(t, err)
+			assert.Equal(t, 3, int(rows))
+		})
+
+		t.Run("should be able to perform in clause using placeholder", func(t *testing.T) {
+			args := []int{20, 21, 22}
+			insertTmpl := testutil.Rebind(bind, `DELETE FROM %s WHERE id IN (?)`)
+			re, err := Exec(ctx, db, bind, structTag, fmt.Sprintf(insertTmpl, table), args)
+			assert.NoError(t, err)
+
+			rows, err := re.RowsAffected()
+			assert.NoError(t, err)
+			assert.Equal(t, len(args), int(rows))
 		})
 	})
 }
