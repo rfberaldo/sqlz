@@ -30,7 +30,7 @@ type Scanner interface {
 //	1 arg map/struct: perform a named query.
 //	Anything else: parse query for `IN` clause and then query.
 //
-// Query return values will be scanned to dst.
+// Query rows will be scanned to dst.
 func Query(
 	ctx context.Context,
 	db Querier,
@@ -89,12 +89,10 @@ func queryDecider(
 	}
 
 	if len(args) == 1 {
-		arg := args[0]
-		kind := reflect.TypeOf(arg).Kind()
-		switch kind {
+		kind := reflect.TypeOf(args[0]).Kind()
 		// 1 arg map/struct is a named query
-		case reflect.Map, reflect.Struct:
-			q, args, err := named.Compile(bind, structTag, query, arg)
+		if kind == reflect.Map || kind == reflect.Struct {
+			q, args, err := named.Compile(bind, structTag, query, args[0])
 			if err != nil {
 				return nil, err
 			}
@@ -112,6 +110,7 @@ func queryDecider(
 
 // Exec will adapt depending on args:
 //
+//	No args: perform a regular exec.
 //	1 arg map/struct: perform a named exec.
 //	1 arg array/slice with map/struct items: perform a named batch insert.
 //	Anything else: parse query for `IN` clause and then exec.
@@ -123,6 +122,11 @@ func Exec(
 	query string,
 	args ...any,
 ) (sql.Result, error) {
+	// no args, just exec directly
+	if len(args) == 0 {
+		return db.ExecContext(ctx, query)
+	}
+
 	if len(args) == 1 && isNamedExec(args[0]) {
 		q, args, err := named.Compile(bind, structTag, query, args[0])
 		if err != nil {
