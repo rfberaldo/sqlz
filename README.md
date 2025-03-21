@@ -57,7 +57,7 @@ err := db.QueryRow(ctx, &name, "SELECT name FROM user WHERE id = ?", 42)
 ```
 
 ```go
-// also works with `IN` clause out of the box
+// also works with 'IN' clause out of the box
 args := []int{4, 8, 16}
 var users []struct{Id int; Name string; Age int}
 err := db.Query(ctx, &users, "SELECT * FROM user WHERE id IN (?)", args)
@@ -114,9 +114,9 @@ if it's not present, it then converts the property name to snake case.
 
 ```go
 type User struct {
-  Id        int `db:"user_id"` // will look for 'user_id'
-  Name      string             // will look for 'name'
-  CreatedAt time.Time          // will look for 'created_at'
+  Id        int `db:"user_id"` // mapped as 'user_id'
+  Name      string             // mapped as 'name'
+  CreatedAt time.Time          // mapped as 'created_at'
 }
 ```
 
@@ -139,6 +139,7 @@ All the others listed in [go.mod](go.mod) are testing/dev dependencies.
 - sqlz has a smaller scope, it doesn't support prepared statements and all the
 scanning work is done by [scany](https://github.com/georgysavva/scany).
 - It was designed with a simpler API for everyday use, with fewer concepts and less verbose.
+- It supports non-english utf-8 characters in named queries.
 
 ### Performance
 
