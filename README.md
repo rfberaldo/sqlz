@@ -126,7 +126,7 @@ To set a custom struct tag, use `Options`:
 
 ```go
 pool, err := sql.Open("sqlite3", ":memory:")
-db := sqlz.New("sqlite3", pool, &Options{StructTag: "json"})
+db := sqlz.New("sqlite3", pool, &sqlz.Options{StructTag: "json"})
 ```
 
 ## Dependencies
