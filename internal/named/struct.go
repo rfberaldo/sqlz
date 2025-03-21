@@ -65,7 +65,7 @@ func (n *Named) structValue(key string, arg any) (any, bool) {
 func (n *Named) findStructValue(key string, arg any) (reflect.Value, bool) {
 	argValue := reflect.ValueOf(arg)
 
-	if i, ok := n.reflectIndex(key); ok {
+	if i, ok := n.getCachedIndexByKey(key); ok {
 		return argValue.Field(i), true
 	}
 
@@ -79,7 +79,7 @@ func (n *Named) findStructValue(key string, arg any) (reflect.Value, bool) {
 		}
 
 		if strings.EqualFold(key, fieldKey(field, n.structTag)) {
-			n.saveReflectIndex(key, i)
+			n.cacheIndexByKey(key, i)
 			return fieldValue, true
 		}
 	}
