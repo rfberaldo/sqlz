@@ -49,9 +49,7 @@ func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
 		p.readChar()
 	}
 
-	output := strings.TrimSuffix(p.output.String(), ";")
-
-	return output, p.idents
+	return p.output.String(), p.idents
 }
 
 func (p *Parser) skipWhitespace() {
@@ -161,9 +159,7 @@ func (p *Parser) parseIn() string {
 		p.readChar()
 	}
 
-	output := strings.TrimSuffix(p.output.String(), ";")
-
-	return output
+	return p.output.String()
 }
 
 func (p *Parser) tryReadPlaceholder() {

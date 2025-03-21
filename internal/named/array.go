@@ -9,17 +9,13 @@ import (
 	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
-var (
-	regValues = regexp.MustCompile(`(?i)\)\s*VALUES\s*\(`)
-)
-
 func (n *Named) processArray(query string, arg any) (string, []any, error) {
 	argValue := reflect.ValueOf(arg)
 	if argValue.Len() == 0 {
 		return "", nil, fmt.Errorf("sqlz: slice is length 0: %#v", arg)
 	}
 
-	// get the type of the first element, rest should be same
+	// get the type of the first element, rest must be the same
 	elValue := argValue.Index(0)
 	elKind := elValue.Kind()
 
@@ -31,25 +27,25 @@ func (n *Named) processArray(query string, arg any) (string, []any, error) {
 	switch elKind {
 	case reflect.Map:
 		if !canCastToMap(elValue.Interface()) {
-			return "", nil, fmt.Errorf("sqlz: unsupported map type: %T", arg)
+			return "", nil, fmt.Errorf("sqlz: unsupported map type: %T", elValue.Interface())
 		}
-		return n.namedAnyArray(query, argValue, elValue)
+		return n.arrayValues(query, argValue, elValue)
 
 	case reflect.Struct:
-		return n.namedAnyArray(query, argValue, elValue)
+		return n.arrayValues(query, argValue, elValue)
 
 	default:
 		return "", nil, fmt.Errorf("sqlz: unsupported array type: %T", arg)
 	}
 }
 
-func (n *Named) namedAnyArray(query string, argValue, elValue reflect.Value) (string, []any, error) {
-	args, err := n.getArrayArgs(parser.ParseIdents(n.bind, query), argValue, elValue)
+func (n *Named) arrayValues(query string, argValue, elValue reflect.Value) (string, []any, error) {
+	args, err := n.arrayArgs(parser.ParseIdents(n.bind, query), argValue, elValue)
 	if err != nil {
 		return "", nil, err
 	}
 
-	q, err := fixInsertSyntax(query, argValue.Len()-1)
+	q, err := expandInsertSyntax(query, argValue.Len())
 	if err != nil {
 		return "", nil, err
 	}
@@ -57,7 +53,7 @@ func (n *Named) namedAnyArray(query string, argValue, elValue reflect.Value) (st
 	return parser.ParseQuery(n.bind, q), args, nil
 }
 
-func (n *Named) getArrayArgs(idents []string, argValue, elValue reflect.Value) ([]any, error) {
+func (n *Named) arrayArgs(idents []string, argValue, elValue reflect.Value) ([]any, error) {
 	outArgs := make([]any, 0, len(idents)*argValue.Len())
 
 	for i := range argValue.Len() {
@@ -81,20 +77,40 @@ func (n *Named) getArrayArgs(idents []string, argValue, elValue reflect.Value) (
 	return outArgs, nil
 }
 
-// fixInsertSyntax multiply the last part of a INSERT query by length
-func fixInsertSyntax(query string, length int) (string, error) {
-	query = strings.TrimSuffix(query, ";")
+var regValues = regexp.MustCompile(`(?i)\)\s*VALUES\s*\(`)
+
+// expandInsertSyntax multiply the last part of a INSERT query by length
+func expandInsertSyntax(query string, length int) (string, error) {
 	loc := regValues.FindStringIndex(query)
 	if loc == nil {
-		return "", fmt.Errorf("sqlz: slice is only supported in INSERT query")
+		return "", fmt.Errorf("sqlz: slice is only supported in INSERT query with \"VALUES\" clause")
 	}
 
-	var sb strings.Builder
-	sb.WriteString(query)
-	values := query[loc[1]-1:]
+	startPos := loc[1] - 1 // position of '(' after 'VALUES'
+	endPos := 0            // position of last ')'
 
-	for range length {
-		sb.WriteByte(',')
+	// this is done because the ending might have semicolon, tabs, spaces etc
+	for i, ch := range query[startPos:] {
+		if ch == ')' {
+			endPos = startPos + i + 1
+		}
+	}
+
+	if endPos == 0 {
+		return "", fmt.Errorf("sqlz: could not parse batch INSERT, missing ending parenthesis")
+	}
+
+	values := query[startPos:endPos]
+	queryWithoutValues := query[:startPos]
+
+	var sb strings.Builder
+	sb.Grow(len(queryWithoutValues) + (len(values)+1)*length)
+	sb.WriteString(queryWithoutValues)
+
+	for i := range length {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
 		sb.WriteString(values)
 	}
 

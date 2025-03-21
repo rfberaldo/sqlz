@@ -238,6 +238,17 @@ func TestNamed(t *testing.T) {
 			expectError:      false,
 		},
 		{
+			name:             "slice with named parameters and multiple parenthesis",
+			inputQuery:       "INSERT INTO users (id, name, created_at, updated_at) VALUES (:id, :name, NOW(), NOW()) ; ",
+			inputArg:         []map[string]any{{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}},
+			expectedAt:       "INSERT INTO users (id, name, created_at, updated_at) VALUES (@p1, @p2, NOW(), NOW()),(@p3, @p4, NOW(), NOW())",
+			expectedColon:    "INSERT INTO users (id, name, created_at, updated_at) VALUES (:id, :name, NOW(), NOW()),(:id, :name, NOW(), NOW())",
+			expectedDollar:   "INSERT INTO users (id, name, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()),($3, $4, NOW(), NOW())",
+			expectedQuestion: "INSERT INTO users (id, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW()),(?, ?, NOW(), NOW())",
+			expectedArgs:     []any{1, "Alice", 2, "Bob"},
+			expectError:      false,
+		},
+		{
 			name:             "in clause with named map",
 			inputQuery:       "SELECT * FROM user WHERE id IN (:ids)",
 			inputArg:         map[string]any{"ids": []int{4, 5, 6}},

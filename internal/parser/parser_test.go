@@ -56,15 +56,6 @@ func TestParse(t *testing.T) {
 			expectedIdents:   []string{"id", "username1", "email2", "pass3word", "age"},
 		},
 		{
-			name:             "insert parameters with trailing semicolon",
-			input:            `INSERT INTO user (id, username) VALUES (:id, :username);`,
-			expectedAt:       `INSERT INTO user (id, username) VALUES (@p1, @p2)`,
-			expectedColon:    `INSERT INTO user (id, username) VALUES (:id, :username)`,
-			expectedDollar:   `INSERT INTO user (id, username) VALUES ($1, $2)`,
-			expectedQuestion: `INSERT INTO user (id, username) VALUES (?, ?)`,
-			expectedIdents:   []string{"id", "username"},
-		},
-		{
 			name:             "escaped colon",
 			input:            `SELECT "::foo" FROM user WHERE id = :id AND name = '::name'`,
 			expectedAt:       `SELECT ":foo" FROM user WHERE id = @p1 AND name = ':name'`,
