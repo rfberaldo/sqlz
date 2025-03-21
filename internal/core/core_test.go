@@ -588,3 +588,48 @@ func TestCustomStructTag(t *testing.T) {
 		assert.Equal(t, expected, user)
 	})
 }
+
+func TestNonEnglishCharacters(t *testing.T) {
+	run(t, func(t *testing.T, db *sql.DB, bind binds.Bind) {
+		table := testutil.TableName(t.Name())
+		t.Cleanup(func() { db.Exec("DROP TABLE " + table) })
+
+		createTmpl := `
+		CREATE TABLE %s (
+			id INT PRIMARY KEY,
+			名前 VARCHAR(255),
+			email VARCHAR(255),
+			password VARCHAR(255),
+			age INT,
+			active BOOL
+		)`
+		_, err := db.Exec(fmt.Sprintf(createTmpl, table))
+		assert.NoError(t, err)
+
+		type User struct {
+			Id       int
+			Name     string `db:"名前"`
+			Email    string
+			Password string
+			Age      int
+			Active   bool
+		}
+
+		insertTmpl := `
+		INSERT INTO %s (id, 名前, email, password, age, active)
+		VALUES (:id,:名前,:email,:password,:age,:active)`
+		args := []User{
+			{1, "Alice", "alice@wonderland.com", "123456", 18, true},
+			{2, "Rob", "rob@google.com", "123456", 38, true},
+			{3, "John", "john@id.com", "123456", 24, false},
+		}
+		_, err = Exec(ctx, db, bind, structTag, fmt.Sprintf(insertTmpl, table), args)
+		assert.NoError(t, err)
+
+		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
+		var user User
+		err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf("SELECT * FROM %s LIMIT 1", table))
+		assert.NoError(t, err)
+		assert.Equal(t, expected, user)
+	})
+}

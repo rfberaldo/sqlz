@@ -136,16 +136,15 @@ func TestParse(t *testing.T) {
 			expectedQuestion: "",
 			expectedIdents:   nil,
 		},
-		// TODO: add an option to parse using runes instead of bytes
-		// {
-		// 	name:             "non english characters",
-		// 	input:            "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
-		// 	expectedAt:       "INSERT INTO foo (a, b, c) VALUES (@p1, @p2, @p3)",
-		// 	expectedColon:    "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
-		// 	expectedDollar:   "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3)",
-		// 	expectedQuestion: "INSERT INTO foo (a, b, c) VALUES (?, ?, ?)",
-		// 	expectedIdents:   []string{"あ", "b", "名前"},
-		// },
+		{
+			name:             "non english characters",
+			input:            "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
+			expectedAt:       "INSERT INTO foo (a, b, c) VALUES (@p1, @p2, @p3)",
+			expectedColon:    "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
+			expectedDollar:   "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3)",
+			expectedQuestion: "INSERT INTO foo (a, b, c) VALUES (?, ?, ?)",
+			expectedIdents:   []string{"あ", "b", "名前"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -527,11 +526,6 @@ func TestConcurrency(t *testing.T) {
 	}
 }
 
-// goos: linux
-// goarch: amd64
-// pkg: github.com/rfberaldo/sqlz/named-parser
-// cpu: AMD Ryzen 5 5600X 6-Core Processor
-// BenchmarkParser-12    	    7802	    144034 ns/op	  302981 B/op	      32 allocs/op
 func BenchmarkParser(b *testing.B) {
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)
