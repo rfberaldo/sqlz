@@ -123,7 +123,7 @@ func Exec(
 	query string,
 	args ...any,
 ) (sql.Result, error) {
-	if isNamedExec(args) {
+	if len(args) == 1 && isNamedExec(args[0]) {
 		q, args, err := named.Compile(bind, structTag, query, args[0])
 		if err != nil {
 			return nil, err
@@ -140,12 +140,7 @@ func Exec(
 	return db.ExecContext(ctx, q, args...)
 }
 
-func isNamedExec(args []any) bool {
-	if len(args) != 1 {
-		return false
-	}
-
-	arg := args[0]
+func isNamedExec(arg any) bool {
 	kind := reflect.TypeOf(arg).Kind()
 
 	// 1 arg map/struct is a named exec
