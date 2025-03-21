@@ -5,7 +5,7 @@ go 1.23.7
 require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.24
-	github.com/rfberaldo/sqlz v0.1.0
+	github.com/rfberaldo/sqlz v0.1.1
 )
 
 require (

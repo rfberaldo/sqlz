@@ -17,7 +17,7 @@ func noError(tb testing.TB, err error) {
 	}
 }
 
-func BenchmarkBindExec(b *testing.B) {
+func BenchmarkPlaceholderExec(b *testing.B) {
 	db := sqlx.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
@@ -38,6 +38,28 @@ func BenchmarkBindExec(b *testing.B) {
 	}
 }
 
+func BenchmarkPlaceholderQueryRow(b *testing.B) {
+	db := sqlx.MustConnect("sqlite3", ":memory:")
+
+	createTmpl := `
+		CREATE TABLE IF NOT EXISTS benchmark (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL
+		)`
+	_, err := db.Exec(createTmpl)
+	noError(b, err)
+
+	db.Exec("INSERT INTO benchmark (name) VALUES (?)", "Alice")
+
+	input := "SELECT name FROM benchmark WHERE id = ?"
+
+	var name string
+	for range b.N {
+		err = db.Get(&name, input, 1)
+		noError(b, err)
+	}
+}
+
 func BenchmarkNamedQueryRow(b *testing.B) {
 	db := sqlx.MustConnect("sqlite3", ":memory:")
 
@@ -51,18 +73,14 @@ func BenchmarkNamedQueryRow(b *testing.B) {
 
 	db.Exec("INSERT INTO benchmark (name) VALUES (?)", "Alice")
 
-	input := "SELECT * FROM benchmark WHERE id = :id"
+	input := "SELECT name FROM benchmark WHERE id = :id"
 	arg := map[string]any{"id": 1}
 
-	var user struct {
-		Id   int
-		Name string
-	}
-
+	var name string
 	for range b.N {
 		q, args, err := sqlx.Named(input, arg)
 		noError(b, err)
-		err = db.Get(&user, q, args...)
+		err = db.Get(&name, q, args...)
 		noError(b, err)
 	}
 }
@@ -91,6 +109,38 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 	var args []user
 	for range 1000 {
 		args = append(args, user{0, "john", "john@id.com", "doom", 42})
+	}
+	input := `INSERT INTO benchmark (username, email, password, age)
+		VALUES (:username, :email, :password, :age)`
+
+	for range b.N {
+		_, err := db.NamedExec(input, args)
+		noError(b, err)
+	}
+}
+
+func BenchmarkBatchInsertMap(b *testing.B) {
+	db := sqlx.MustConnect("sqlite3", ":memory:")
+
+	createTmpl := `
+		CREATE TABLE IF NOT EXISTS benchmark (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL,
+			email TEXT,
+			password TEXT,
+			age INTEGER
+		)`
+	_, err := db.Exec(createTmpl)
+	noError(b, err)
+
+	var args []map[string]any
+	for range 1000 {
+		args = append(args, map[string]any{
+			"username": "john",
+			"email":    "john@id.com",
+			"password": "doom",
+			"age":      42,
+		})
 	}
 	input := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
@@ -219,7 +269,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 	}
 }
 
-func BenchmarkBindInClause(b *testing.B) {
+func BenchmarkPlaceholderInClause(b *testing.B) {
 	db := sqlx.MustConnect("sqlite3", ":memory:")
 
 	createTmpl := `
