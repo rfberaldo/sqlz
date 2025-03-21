@@ -6,8 +6,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rfberaldo/sqlz/binds"
 	"github.com/rfberaldo/sqlz/internal/parser"
 )
+
+type mapperFn = func(idents []string, arg any) ([]any, error)
 
 func (n *Named) processArray(query string, arg any) (string, []any, error) {
 	argValue := reflect.ValueOf(arg)
@@ -26,51 +29,45 @@ func (n *Named) processArray(query string, arg any) (string, []any, error) {
 
 	switch elKind {
 	case reflect.Map:
-		if !canCastToMap(elValue.Interface()) {
-			return "", nil, fmt.Errorf("sqlz: unsupported map type: %T", elValue.Interface())
+		elAny := elValue.Interface()
+		if !canCastToMap(elAny) {
+			return "", nil, fmt.Errorf("sqlz: unsupported map type: %T", elAny)
 		}
-		return n.arrayValues(query, argValue, elValue)
+		return n.arrayValues(query, argValue, n.mapValues)
 
 	case reflect.Struct:
-		return n.arrayValues(query, argValue, elValue)
+		return n.arrayValues(query, argValue, n.structValues)
 
 	default:
 		return "", nil, fmt.Errorf("sqlz: unsupported array type: %T", arg)
 	}
 }
 
-func (n *Named) arrayValues(query string, argValue, elValue reflect.Value) (string, []any, error) {
-	args, err := n.arrayArgs(parser.ParseIdents(n.bind, query), argValue, elValue)
+func (n *Named) arrayValues(query string, argValue reflect.Value, mapper mapperFn) (string, []any, error) {
+	args, err := n.arrayArgs(parser.ParseIdents(n.bind, query), argValue, mapper)
 	if err != nil {
 		return "", nil, err
+	}
+
+	// if bind is '?', parse query before expanding for performance reasons
+	if n.bind == binds.Question {
+		q := parser.ParseQuery(n.bind, query)
+		q, err := expandInsertSyntax(q, argValue.Len())
+		return q, args, err
 	}
 
 	q, err := expandInsertSyntax(query, argValue.Len())
-	if err != nil {
-		return "", nil, err
-	}
-
-	return parser.ParseQuery(n.bind, q), args, nil
+	return parser.ParseQuery(n.bind, q), args, err
 }
 
-func (n *Named) arrayArgs(idents []string, argValue, elValue reflect.Value) ([]any, error) {
+func (n *Named) arrayArgs(idents []string, argValue reflect.Value, mapper mapperFn) ([]any, error) {
 	outArgs := make([]any, 0, len(idents)*argValue.Len())
-
 	for i := range argValue.Len() {
-		args := make([]any, 0, len(idents))
-		var err error
-
-		switch elValue.Kind() {
-		case reflect.Map:
-			args, err = n.mapValues(idents, argValue.Index(i).Interface().(map[string]any))
-
-		case reflect.Struct:
-			args, err = n.structValues(idents, argValue.Index(i).Interface())
-		}
-
+		args, err := mapper(idents, argValue.Index(i).Interface())
 		if err != nil {
 			return nil, err
 		}
+
 		outArgs = append(outArgs, args...)
 	}
 

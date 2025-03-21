@@ -59,7 +59,7 @@ func (n *Named) process(query string, arg any, kind reflect.Kind) (string, []any
 		if !canCastToMap(arg) {
 			return "", nil, fmt.Errorf("sqlz: unsupported map type: %T", arg)
 		}
-		args, err = n.mapValues(idents, arg.(map[string]any))
+		args, err = n.mapValues(idents, arg)
 
 	case reflect.Struct:
 		args, err = n.structValues(idents, arg)

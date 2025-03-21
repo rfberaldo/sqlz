@@ -9,10 +9,10 @@ import (
 // mapValues return all the values from arg, following the idents order.
 // Returned values can be used in a query if they do not have `IN` clause,
 // in other words, values can not be slices.
-func (n *Named) mapValues(idents []string, arg map[string]any) ([]any, error) {
+func (n *Named) mapValues(idents []string, arg any) ([]any, error) {
 	outArgs := make([]any, 0, len(idents))
 	for _, ident := range idents {
-		value, ok := n.mapValue(ident, arg)
+		value, ok := n.mapValue(ident, arg.(map[string]any))
 		if !ok {
 			return nil, fmt.Errorf("sqlz: could not find name `%s` in %+v", ident, arg)
 		}
