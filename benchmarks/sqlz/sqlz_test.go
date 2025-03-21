@@ -1,12 +1,16 @@
 package benchmark
 
 import (
+	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/rfberaldo/sqlz"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var ctx = context.Background()
 
 func noError(tb testing.TB, err error) {
 	tb.Helper()
@@ -24,14 +28,14 @@ func BenchmarkBindExec(b *testing.B) {
 			name TEXT NOT NULL,
 			age INT
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	input := "INSERT INTO benchmark (name, age) VALUES (?, ?)"
 	args := []any{"Alice", 32}
 
 	for range b.N {
-		_, err := db.Exec(input, args...)
+		_, err := db.Exec(ctx, input, args...)
 		noError(b, err)
 	}
 }
@@ -44,10 +48,10 @@ func BenchmarkNamedQueryRow(b *testing.B) {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
-	db.Exec("INSERT INTO benchmark (name) VALUES (?)", "Alice")
+	db.Exec(ctx, "INSERT INTO benchmark (name) VALUES (?)", "Alice")
 
 	input := "SELECT * FROM benchmark WHERE id = :id"
 	arg := map[string]any{"id": 1}
@@ -58,7 +62,7 @@ func BenchmarkNamedQueryRow(b *testing.B) {
 	}
 
 	for range b.N {
-		err := db.QueryRow(&user, input, arg)
+		err := db.QueryRow(ctx, &user, input, arg)
 		noError(b, err)
 	}
 }
@@ -74,7 +78,7 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 			password TEXT,
 			age INTEGER
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	type user struct {
@@ -92,7 +96,7 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 		VALUES (:username, :email, :password, :age)`
 
 	for range b.N {
-		_, err := db.Exec(input, args)
+		_, err := db.Exec(ctx, input, args)
 		noError(b, err)
 	}
 }
@@ -108,7 +112,7 @@ func BenchmarkStructScan(b *testing.B) {
 			password TEXT,
 			age INTEGER
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	type user struct {
@@ -124,14 +128,14 @@ func BenchmarkStructScan(b *testing.B) {
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
-	_, err = db.Exec(insertTmpl, args)
+	_, err = db.Exec(ctx, insertTmpl, args)
 	noError(b, err)
 
 	input := "SELECT * FROM benchmark"
 
 	for range b.N {
 		var users []user
-		err := db.Query(&users, input)
+		err := db.Query(ctx, &users, input)
 		noError(b, err)
 	}
 }
@@ -144,7 +148,7 @@ func BenchmarkStringScan(b *testing.B) {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	type user struct {
@@ -156,14 +160,14 @@ func BenchmarkStringScan(b *testing.B) {
 		args = append(args, user{0, "Alice"})
 	}
 	insertTmpl := `INSERT INTO benchmark (name)	VALUES (:name)`
-	_, err = db.Exec(insertTmpl, args)
+	_, err = db.Exec(ctx, insertTmpl, args)
 	noError(b, err)
 
 	input := "SELECT name FROM benchmark"
 
 	for range b.N {
 		var names []string
-		err := db.Query(&names, input)
+		err := db.Query(ctx, &names, input)
 		noError(b, err)
 	}
 }
@@ -179,7 +183,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 			password TEXT,
 			age INTEGER
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	type user struct {
@@ -195,7 +199,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
-	_, err = db.Exec(insertTmpl, args)
+	_, err = db.Exec(ctx, insertTmpl, args)
 	noError(b, err)
 
 	input := "SELECT * FROM benchmark WHERE id IN (:ids)"
@@ -205,7 +209,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 
 	for range b.N {
 		var users []user
-		err := db.Query(&users, input, arg)
+		err := db.Query(ctx, &users, input, arg)
 		noError(b, err)
 	}
 }
@@ -221,7 +225,7 @@ func BenchmarkBindInClause(b *testing.B) {
 			password TEXT,
 			age INTEGER
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err := db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	type user struct {
@@ -237,7 +241,7 @@ func BenchmarkBindInClause(b *testing.B) {
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
-	_, err = db.Exec(insertTmpl, args)
+	_, err = db.Exec(ctx, insertTmpl, args)
 	noError(b, err)
 
 	input := "SELECT * FROM benchmark WHERE id IN (?)"
@@ -247,14 +251,17 @@ func BenchmarkBindInClause(b *testing.B) {
 
 	for range b.N {
 		var users []user
-		err := db.Query(&users, input, arg)
+		err := db.Query(ctx, &users, input, arg)
 		noError(b, err)
 	}
 }
 
 func BenchmarkCustomStructTag(b *testing.B) {
-	db := sqlz.MustConnect("sqlite3", ":memory:")
-	db.SetStructTag("json")
+	pool, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		b.Fatal(err)
+	}
+	db := sqlz.New("sqlite3", pool, &sqlz.Options{StructTag: "json"})
 
 	createTmpl := `
 		CREATE TABLE IF NOT EXISTS benchmark (
@@ -264,7 +271,7 @@ func BenchmarkCustomStructTag(b *testing.B) {
 			password TEXT,
 			age INTEGER
 		)`
-	_, err := db.Exec(createTmpl)
+	_, err = db.Exec(ctx, createTmpl)
 	noError(b, err)
 
 	type user struct {
@@ -280,7 +287,7 @@ func BenchmarkCustomStructTag(b *testing.B) {
 	}
 	insertTmpl := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
-	_, err = db.Exec(insertTmpl, args)
+	_, err = db.Exec(ctx, insertTmpl, args)
 	noError(b, err)
 
 	input := "SELECT * FROM benchmark WHERE id IN (?)"
@@ -290,7 +297,7 @@ func BenchmarkCustomStructTag(b *testing.B) {
 
 	for range b.N {
 		var users []user
-		err := db.Query(&users, input, arg)
+		err := db.Query(ctx, &users, input, arg)
 		noError(b, err)
 	}
 }
