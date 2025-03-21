@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/rfberaldo/sqlz/binds"
 )
@@ -17,7 +19,7 @@ type Parser struct {
 	bind         binds.Bind
 	position     int
 	readPosition int
-	ch           byte
+	ch           rune
 	idents       []string
 	identCount   int
 	bindCount    int
@@ -34,7 +36,7 @@ type namedOptions struct {
 }
 
 func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
-	p.readChar()
+	p.read()
 	p.output.skip = opts.skipQuery
 	p.output.Grow(len(p.input)) // max will be len(input)
 
@@ -46,8 +48,8 @@ func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
 			break
 		}
 
-		p.output.WriteByte(p.ch)
-		p.readChar()
+		p.output.WriteRune(p.ch)
+		p.read()
 	}
 
 	return p.output.String(), p.idents
@@ -56,24 +58,26 @@ func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
 func (p *Parser) skipWhitespace() {
 	pos := p.readPosition
 
-	for isWhitespace(p.ch) {
-		p.readChar()
+	for unicode.IsSpace(p.ch) {
+		p.read()
 	}
 
 	if p.readPosition > pos {
-		p.output.WriteByte(' ')
+		p.output.WriteRune(' ')
 	}
 }
 
-func (p *Parser) readChar() {
+func (p *Parser) read() {
 	if p.readPosition >= len(p.input) {
 		p.ch = EOF
+		p.position = p.readPosition
+		p.readPosition += 1
 	} else {
-		p.ch = p.input[p.readPosition]
+		r, size := utf8.DecodeRuneInString(p.input[p.readPosition:])
+		p.ch = r
+		p.position = p.readPosition
+		p.readPosition += size
 	}
-
-	p.position = p.readPosition
-	p.readPosition += 1
 }
 
 func (p *Parser) tryReadIdent(skipIdents bool) {
@@ -82,13 +86,13 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 		return
 	}
 
-	// escaped placeholder, advance one char
-	if p.peekChar() == placeholder {
-		p.readChar()
+	// escaped placeholder, read next
+	if p.peek() == placeholder {
+		p.read()
 		return
 	}
 
-	if !isLetter(p.peekChar()) {
+	if !unicode.IsLetter(p.peek()) {
 		return
 	}
 
@@ -105,41 +109,42 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 
 		switch p.bind {
 		case binds.Question:
-			p.output.WriteByte('?')
+			p.output.WriteRune('?')
 		case binds.Colon:
-			p.output.WriteByte(':')
+			p.output.WriteRune(':')
 			p.output.WriteString(ident)
 		case binds.At:
 			p.output.WriteString("@p")
 			p.output.WriteString(strconv.Itoa(p.bindCount))
 		case binds.Dollar:
-			p.output.WriteByte('$')
+			p.output.WriteRune('$')
 			p.output.WriteString(strconv.Itoa(p.bindCount))
 		}
 
 		isLast := i == count-1
 		if count > 1 && !isLast {
-			p.output.WriteByte(',')
+			p.output.WriteRune(',')
 		}
 	}
 }
 
-// readIdent will readChar while strategy(ch)=true.
-func (p *Parser) readIdent(strategy func(ch byte) bool) string {
-	p.readChar()
+// readIdent will [read] while strategy(ch)=true.
+func (p *Parser) readIdent(strategy strategyFn) string {
+	p.read()
 	position := p.position
 	for strategy(p.ch) {
-		p.readChar()
+		p.read()
 	}
 	return p.input[position:p.position]
 }
 
-func (p *Parser) peekChar() byte {
-	return p.input[p.readPosition]
+func (p *Parser) peek() rune {
+	r, _ := utf8.DecodeRuneInString(p.input[p.readPosition:])
+	return r
 }
 
 func (p *Parser) parseIn() string {
-	p.readChar()
+	p.read()
 	p.output.Grow(len(p.input) + 2) // min will be len(input)+2
 
 	for {
@@ -150,8 +155,8 @@ func (p *Parser) parseIn() string {
 			break
 		}
 
-		p.output.WriteByte(p.ch)
-		p.readChar()
+		p.output.WriteRune(p.ch)
+		p.read()
 	}
 
 	return p.output.String()
@@ -160,13 +165,13 @@ func (p *Parser) parseIn() string {
 func (p *Parser) tryReadPlaceholder() {
 	placeholder, readStrategy, isNumbered := getBindInfo(p.bind)
 
-	if p.ch != placeholder {
+	if p.ch != rune(placeholder) {
 		return
 	}
 
-	// escaped placeholder, advance one char
-	if p.peekChar() == placeholder {
-		p.readChar()
+	// escaped placeholder, read next
+	if p.peek() == rune(placeholder) {
+		p.read()
 		return
 	}
 
@@ -174,7 +179,7 @@ func (p *Parser) tryReadPlaceholder() {
 	if readStrategy != nil {
 		ident = p.readIdent(readStrategy)
 	} else {
-		p.readChar()
+		p.read()
 	}
 	p.identCount++
 	count := p.inClauseCountByIndex[p.identCount-1]
@@ -182,7 +187,7 @@ func (p *Parser) tryReadPlaceholder() {
 
 	for i := range count {
 		p.bindCount++
-		p.output.WriteByte(placeholder)
+		p.output.WriteRune(placeholder)
 		if p.bind == binds.Colon {
 			p.output.WriteString(ident)
 		}
@@ -192,25 +197,27 @@ func (p *Parser) tryReadPlaceholder() {
 
 		isLast := i == count-1
 		if count > 1 && !isLast {
-			p.output.WriteByte(',')
+			p.output.WriteRune(',')
 		}
 	}
 }
 
-func getBindInfo(bind binds.Bind) (byte, func(ch byte) bool, bool) {
-	var placeholder byte
-	var readStrategy func(ch byte) bool
+type strategyFn = func(ch rune) bool
+
+func getBindInfo(bind binds.Bind) (rune, strategyFn, bool) {
+	var placeholder rune
+	var readStrategy strategyFn
 	var isNumbered bool
 
 	switch bind {
 	case binds.At:
 		placeholder = '@'
-		readStrategy = isNumber
+		readStrategy = unicode.IsNumber
 		isNumbered = true
 
 	case binds.Dollar:
 		placeholder = '$'
-		readStrategy = isNumber
+		readStrategy = unicode.IsNumber
 		isNumbered = true
 
 	case binds.Colon:
@@ -224,23 +231,8 @@ func getBindInfo(bind binds.Bind) (byte, func(ch byte) bool, bool) {
 	return placeholder, readStrategy, isNumbered
 }
 
-func isLetter(ch byte) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
-}
-
-func isNumber(ch byte) bool {
-	return '0' <= ch && ch <= '9'
-}
-
-func isIdentChar(ch byte) bool {
-	return ch == '_' || ch == '.' ||
-		'a' <= ch && ch <= 'z' ||
-		'A' <= ch && ch <= 'Z' ||
-		'0' <= ch && ch <= '9'
-}
-
-func isWhitespace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+func isIdentChar(ch rune) bool {
+	return ch == '_' || ch == '.' || unicode.IsLetter(ch) || unicode.IsNumber(ch)
 }
 
 func spreadSliceValues(args ...any) (map[int]int, []any, error) {
@@ -289,11 +281,11 @@ func (sb *stringBuilder) String() string {
 	return sb.sb.String()
 }
 
-func (sb *stringBuilder) WriteByte(c byte) error {
+func (sb *stringBuilder) WriteRune(r rune) (int, error) {
 	if sb.skip {
-		return nil
+		return 0, nil
 	}
-	return sb.sb.WriteByte(c)
+	return sb.sb.WriteRune(r)
 }
 
 func (sb *stringBuilder) WriteString(s string) (int, error) {

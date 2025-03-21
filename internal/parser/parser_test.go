@@ -136,16 +136,15 @@ func TestParse(t *testing.T) {
 			expectedQuestion: "",
 			expectedIdents:   nil,
 		},
-		// TODO: add an option to parse using runes instead of bytes
-		// {
-		// 	name:             "non english characters",
-		// 	input:            "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
-		// 	expectedAt:       "INSERT INTO foo (a, b, c) VALUES (@p1, @p2, @p3)",
-		// 	expectedColon:    "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
-		// 	expectedDollar:   "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3)",
-		// 	expectedQuestion: "INSERT INTO foo (a, b, c) VALUES (?, ?, ?)",
-		// 	expectedIdents:   []string{"あ", "b", "名前"},
-		// },
+		{
+			name:             "non english characters",
+			input:            "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
+			expectedAt:       "INSERT INTO foo (a, b, c) VALUES (@p1, @p2, @p3)",
+			expectedColon:    "INSERT INTO foo (a, b, c) VALUES (:あ, :b, :名前)",
+			expectedDollar:   "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3)",
+			expectedQuestion: "INSERT INTO foo (a, b, c) VALUES (?, ?, ?)",
+			expectedIdents:   []string{"あ", "b", "名前"},
+		},
 	}
 
 	for _, tt := range tests {
