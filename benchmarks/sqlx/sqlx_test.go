@@ -32,6 +32,7 @@ func BenchmarkPlaceholderExec(b *testing.B) {
 	input := "INSERT INTO benchmark (name, age) VALUES (?, ?)"
 	args := []any{"Alice", 32}
 
+	b.ResetTimer()
 	for range b.N {
 		_, err := db.Exec(input, args...)
 		noError(b, err)
@@ -53,8 +54,9 @@ func BenchmarkPlaceholderQueryRow(b *testing.B) {
 
 	input := "SELECT name FROM benchmark WHERE id = ?"
 
-	var name string
+	b.ResetTimer()
 	for range b.N {
+		var name string
 		err = db.Get(&name, input, 1)
 		noError(b, err)
 	}
@@ -76,8 +78,9 @@ func BenchmarkNamedQueryRow(b *testing.B) {
 	input := "SELECT name FROM benchmark WHERE id = :id"
 	arg := map[string]any{"id": 1}
 
-	var name string
+	b.ResetTimer()
 	for range b.N {
+		var name string
 		q, args, err := sqlx.Named(input, arg)
 		noError(b, err)
 		err = db.Get(&name, q, args...)
@@ -113,6 +116,7 @@ func BenchmarkBatchInsertStruct(b *testing.B) {
 	input := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
 
+	b.ResetTimer()
 	for range b.N {
 		_, err := db.NamedExec(input, args)
 		noError(b, err)
@@ -145,6 +149,7 @@ func BenchmarkBatchInsertMap(b *testing.B) {
 	input := `INSERT INTO benchmark (username, email, password, age)
 		VALUES (:username, :email, :password, :age)`
 
+	b.ResetTimer()
 	for range b.N {
 		_, err := db.NamedExec(input, args)
 		noError(b, err)
@@ -183,6 +188,7 @@ func BenchmarkStructScan(b *testing.B) {
 
 	input := "SELECT * FROM benchmark"
 
+	b.ResetTimer()
 	for range b.N {
 		var users []user
 		err := db.Select(&users, input)
@@ -215,6 +221,7 @@ func BenchmarkStringScan(b *testing.B) {
 
 	input := "SELECT name FROM benchmark"
 
+	b.ResetTimer()
 	for range b.N {
 		var names []string
 		err := db.Select(&names, input)
@@ -257,6 +264,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 		378, 591, 204, 876, 345, 689, 432, 517, 923, 671, 308, 754, 192,
 		546, 819, 263, 947, 605, 134, 782, 421, 853, 397}}
 
+	b.ResetTimer()
 	for range b.N {
 		q, args, err := sqlx.Named(input, arg)
 		noError(b, err)
@@ -304,6 +312,7 @@ func BenchmarkPlaceholderInClause(b *testing.B) {
 		378, 591, 204, 876, 345, 689, 432, 517, 923, 671, 308, 754, 192,
 		546, 819, 263, 947, 605, 134, 782, 421, 853, 397}
 
+	b.ResetTimer()
 	for range b.N {
 		q, args, err := sqlx.In(input, arg)
 		noError(b, err)
@@ -350,6 +359,7 @@ func BenchmarkCustomStructTag(b *testing.B) {
 		378, 591, 204, 876, 345, 689, 432, 517, 923, 671, 308, 754, 192,
 		546, 819, 263, 947, 605, 134, 782, 421, 853, 397}
 
+	b.ResetTimer()
 	for range b.N {
 		q, args, err := sqlx.In(input, arg)
 		noError(b, err)
