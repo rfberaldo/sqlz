@@ -10,6 +10,8 @@ import (
 	"github.com/rfberaldo/sqlz/binds"
 )
 
+const EOF = 0
+
 type Parser struct {
 	input        string
 	bind         binds.Bind
@@ -20,7 +22,6 @@ type Parser struct {
 	identCount   int
 	bindCount    int
 	output       stringBuilder
-	eof          bool
 
 	// the slice length by ident index which have an `IN` clause.
 	// if there's items in this map we have to duplicate placeholder by count.
@@ -41,7 +42,7 @@ func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
 		p.skipWhitespace()
 		p.tryReadIdent(opts.skipIdents)
 
-		if p.eof {
+		if p.ch == EOF {
 			break
 		}
 
@@ -57,9 +58,6 @@ func (p *Parser) skipWhitespace() {
 
 	for isWhitespace(p.ch) {
 		p.readChar()
-		if p.eof {
-			break
-		}
 	}
 
 	if p.readPosition > pos {
@@ -69,7 +67,7 @@ func (p *Parser) skipWhitespace() {
 
 func (p *Parser) readChar() {
 	if p.readPosition >= len(p.input) {
-		p.eof = true
+		p.ch = EOF
 	} else {
 		p.ch = p.input[p.readPosition]
 	}
@@ -126,14 +124,11 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 	}
 }
 
-// readIdent will readChar while strategy(ch)=true or EOF.
+// readIdent will readChar while strategy(ch)=true.
 func (p *Parser) readIdent(strategy func(ch byte) bool) string {
 	p.readChar()
 	position := p.position
 	for strategy(p.ch) {
-		if p.eof {
-			break
-		}
 		p.readChar()
 	}
 	return p.input[position:p.position]
@@ -151,7 +146,7 @@ func (p *Parser) parseIn() string {
 		p.skipWhitespace()
 		p.tryReadPlaceholder()
 
-		if p.eof {
+		if p.ch == EOF {
 			break
 		}
 
