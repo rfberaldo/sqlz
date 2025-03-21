@@ -67,7 +67,6 @@ func ParseInNamed(bind binds.Bind, input string, args []any) (string, []any, err
 }
 
 // ParseIn is like [ParseInNamed], but for non-named queries.
-// Only works for [BindQuestion] bindvar.
 func ParseIn(bind binds.Bind, input string, args ...any) (string, []any, error) {
 	countByIndex, spreadArgs, err := spreadSliceValues(args...)
 	if err != nil {
