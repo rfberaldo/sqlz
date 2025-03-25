@@ -243,6 +243,16 @@ func TestParseInClause(t *testing.T) {
 			expectedQuestion: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND email = ? AND company IN (?,?)",
 		},
 		{
+			name:             "should not spread []byte",
+			input:            "SELECT * FROM user WHERE name = :name AND id IN (:ids) AND json = :json",
+			inputArgs:        []any{"Alice", []int{4, 8, 16}, []byte{4, 8, 16}},
+			expectedArgs:     []any{"Alice", 4, 8, 16, []byte{4, 8, 16}},
+			expectedAt:       "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4) AND json = @p5",
+			expectedColon:    "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids) AND json = :json",
+			expectedDollar:   "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4) AND json = $5",
+			expectedQuestion: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND json = ?",
+		},
+		{
 			name:        "an empty slice",
 			input:       "SELECT * FROM user WHERE id IN (:ids)",
 			inputArgs:   []any{[]int{}},
@@ -353,6 +363,14 @@ func TestParseIn_Question(t *testing.T) {
 			expectError:    false,
 		},
 		{
+			name:           "should not spread []byte",
+			input:          "SELECT * FROM user WHERE json = ?",
+			args:           []any{[]byte{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE json = ?",
+			expectedArgs:   []any{[]byte{4, 8, 16}},
+			expectError:    false,
+		},
+		{
 			name:        "wrong number of placeholders",
 			input:       "SELECT * FROM user WHERE name = ? AND id IN (?)",
 			args:        []any{4, []int{8, 16, 32, 64}, 8},
@@ -457,6 +475,14 @@ func TestParseIn_Numbered(t *testing.T) {
 			args:           []any{"Alice", []int{4, 8, 16}},
 			expectedOutput: "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4)",
 			expectedArgs:   []any{"Alice", 4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:           "should not spread []byte",
+			input:          "SELECT * FROM user WHERE json = $1",
+			args:           []any{[]byte{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE json = $1",
+			expectedArgs:   []any{[]byte{4, 8, 16}},
 			expectError:    false,
 		},
 		{

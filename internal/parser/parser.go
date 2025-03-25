@@ -240,10 +240,8 @@ func spreadSliceValues(args ...any) (map[int]int, []any, error) {
 	outArgs := make([]any, 0, len(args))
 
 	for i, arg := range args {
-		refValue := reflect.ValueOf(arg)
-		switch refValue.Kind() {
-		case reflect.Array, reflect.Slice:
-			// if it's slice then it's part of `IN` clause and have to spread
+		if shouldSpread(arg) {
+			refValue := reflect.ValueOf(arg)
 			length := refValue.Len()
 			if length == 0 {
 				return nil, nil, fmt.Errorf("sqlz: empty slice passed to 'IN' clause")
@@ -252,12 +250,34 @@ func spreadSliceValues(args ...any) (map[int]int, []any, error) {
 			for j := range length {
 				outArgs = append(outArgs, refValue.Index(j).Interface())
 			}
-		default:
-			outArgs = append(outArgs, arg)
+			continue
 		}
+
+		outArgs = append(outArgs, arg)
 	}
 
 	return inClauseCountByIndex, outArgs, nil
+}
+
+func shouldSpread(arg any) bool {
+	if arg == nil {
+		return false
+	}
+
+	v := reflect.ValueOf(arg)
+	t := v.Type()
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// []byte is a [driver.Value] type so it should not be expanded
+	if t == reflect.TypeOf([]byte{}) {
+		return false
+	}
+
+	// if it's slice then it's part of 'IN' clause and have to spread
+	kind := v.Kind()
+	return kind == reflect.Slice || kind == reflect.Array
 }
 
 // stringBuilder is a wrapper around [strings.Builder] to skip
