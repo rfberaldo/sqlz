@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
 	"testing"
 
+	"github.com/rfberaldo/sqlz/sqlogger"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -37,20 +40,31 @@ func TestNew_panic(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
-	db, err := Connect("sqlite3", ":memory:")
-	assert.NoError(t, err)
-	assert.NotNil(t, db)
-	assert.IsType(t, &DB{}, db)
-}
+	t.Run("success", func(t *testing.T) {
+		db, err := Connect("sqlite3", ":memory:", nil)
+		assert.NoError(t, err)
+		assert.NotNil(t, db)
+		assert.IsType(t, &DB{}, db)
+	})
 
-func TestConnect_wrong_driver(t *testing.T) {
-	_, err := Connect("wrongdriver", ":memory:")
-	assert.Error(t, err)
-	assert.ErrorContains(t, err, "unknown driver")
+	t.Run("error", func(t *testing.T) {
+		_, err := Connect("wrongdriver", ":memory:", nil)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "unknown driver")
+	})
+
+	t.Run("with options", func(t *testing.T) {
+		debugLogger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		_, err := Connect("sqlite3", ":memory:", &Options{
+			Logger:        debugLogger,
+			LoggerOptions: sqlogger.Options{},
+		})
+		assert.NoError(t, err)
+	})
 }
 
 func TestMustConnect(t *testing.T) {
-	db := MustConnect("sqlite3", ":memory:")
+	db := MustConnect("sqlite3", ":memory:", nil)
 	assert.NotNil(t, db)
 	assert.IsType(t, &DB{}, db)
 }

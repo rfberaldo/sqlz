@@ -9,13 +9,22 @@ import (
 	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rfberaldo/sqlz/binds"
 	"github.com/rfberaldo/sqlz/internal/named"
+	"github.com/rfberaldo/sqlz/sqlogger"
 )
 
 const defaultStructTag = "db"
 
-// Options are optional configs for sqlz.
+// Options holds sqlz options to be used in [New], [Connect] and [MustConnect].
+// A zero Options consists entirely of default values.
 type Options struct {
+	// StructTag is used to map struct fields, default is "db".
 	StructTag string
+
+	// Logger is an instance of [slog.Logger], ignored in [New].
+	Logger sqlogger.Logger
+
+	// LoggerOptions are optional parameters for logger, ignored in [New].
+	LoggerOptions sqlogger.Options
 }
 
 // New returns a [DB] instance using an existing [sql.DB].
@@ -51,10 +60,14 @@ func New(driverName string, db *sql.DB, opts *Options) *DB {
 // The returned [DB] is safe for concurrent use by multiple goroutines
 // and maintains its own pool of idle connections. Thus, the Connect
 // function should be called just once.
-func Connect(driverName, dataSourceName string) (*DB, error) {
+func Connect(driverName, dataSourceName string, opts *Options) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("sqlz: unable to open sql connection: %w", err)
+	}
+
+	if opts != nil && opts.Logger != nil {
+		db = sqlogger.New(db.Driver(), dataSourceName, opts.Logger, &opts.LoggerOptions)
 	}
 
 	err = db.Ping()
@@ -63,12 +76,12 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("sqlz: unable to ping: %w", err)
 	}
 
-	return New(driverName, db, nil), nil
+	return New(driverName, db, opts), nil
 }
 
 // MustConnect is like [Connect], but panics on error.
-func MustConnect(driverName, dataSourceName string) *DB {
-	db, err := Connect(driverName, dataSourceName)
+func MustConnect(driverName, dataSourceName string, opts *Options) *DB {
+	db, err := Connect(driverName, dataSourceName, opts)
 	if err != nil {
 		panic(err)
 	}

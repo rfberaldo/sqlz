@@ -21,7 +21,7 @@ go get github.com/rfberaldo/sqlz
 // there's 2 ways of connecting:
 
 // 1. using [sqlz.Connect]
-db, err := sqlz.Connect("sqlite3", ":memory:")
+db, err := sqlz.Connect("sqlite3", ":memory:", nil)
 
 // 2. using [sql.Open] and [sqlz.New]
 pool, err := sql.Open("sqlite3", ":memory:")
@@ -111,6 +111,7 @@ err = tx.Commit()
 
 To find the key of a struct property, sqlz first try to find the `db` tag,
 if it's not present, it then converts the property name to snake case.
+To set a custom tag use [Options](#options).
 
 ```go
 type User struct {
@@ -120,13 +121,21 @@ type User struct {
 }
 ```
 
-#### Custom struct tag
+### Options
 
-To set a custom struct tag, use `Options`:
+sqlz has a few options, use `sqlz.Options` as third parameter of `New` or `Connect`.
+At the moment it's possible to change the default struct tag, and set a logger using `slog`.
 
 ```go
+// 1. using [sqlz.New]
 pool, err := sql.Open("sqlite3", ":memory:")
 db := sqlz.New("sqlite3", pool, &sqlz.Options{StructTag: "json"})
+
+// 2. using [sqlz.Connect]
+db, err := sqlz.Connect("sqlite3", ":memory:", &sqlz.Options{
+  StructTag: "json",
+  Logger: slog.Default(),
+})
 ```
 
 ## Dependencies
