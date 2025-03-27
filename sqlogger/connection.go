@@ -29,7 +29,7 @@ func (c *connection) Begin() (driver.Tx, error) {
 	ctx := context.Background()
 	start := time.Now()
 	lvl := slog.LevelDebug
-	id := c.logger.IdGenerator()
+	id := c.logger.idGenerator()
 	attrs := append(c.logData(), slog.String(txKey, id))
 
 	tx, err := c.Conn.Begin()
@@ -46,9 +46,9 @@ func (c *connection) Begin() (driver.Tx, error) {
 func (c *connection) Prepare(query string) (driver.Stmt, error) {
 	ctx := context.Background()
 	start := time.Now()
-	lvl := slog.LevelInfo
-	id := c.logger.IdGenerator()
-	attrs := append(c.logData(), slog.String(stmtKey, id), slog.String("query", query))
+	lvl := slog.LevelDebug
+	id := c.logger.idGenerator()
+	attrs := append(c.logData(), slog.String(stmtKey, id), slog.String(queryKey, query))
 
 	stmt, err := c.Conn.Prepare(query)
 	if err != nil {
@@ -60,7 +60,7 @@ func (c *connection) Prepare(query string) (driver.Stmt, error) {
 	return &statement{stmt, id, c.id, query, c.logger}, err
 }
 
-// Prepare implements [driver.Conn]
+// Close implements [driver.Conn]
 func (c *connection) Close() error {
 	ctx := context.Background()
 	start := time.Now()
@@ -85,7 +85,7 @@ func (c *connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver
 
 	start := time.Now()
 	lvl := slog.LevelDebug
-	id := c.logger.IdGenerator()
+	id := c.logger.idGenerator()
 	attrs := append(c.logData(), slog.String(txKey, id))
 
 	tx, err := drvTx.BeginTx(ctx, opts)
@@ -106,9 +106,9 @@ func (c *connection) PrepareContext(ctx context.Context, query string) (driver.S
 	}
 
 	start := time.Now()
-	lvl := slog.LevelInfo
-	id := c.logger.IdGenerator()
-	attrs := append(c.logData(), slog.String(stmtKey, id), slog.String("query", query))
+	lvl := slog.LevelDebug
+	id := c.logger.idGenerator()
+	attrs := append(c.logData(), slog.String(stmtKey, id), slog.String(queryKey, query))
 
 	stmt, err := driverPrep.PrepareContext(ctx, query)
 	if err != nil {
@@ -150,7 +150,7 @@ func (c *connection) Exec(query string, args []driver.Value) (driver.Result, err
 	ctx := context.Background()
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(c.logData(), slog.String("query", query), slog.Any("args", args))
+	attrs := append(c.logData(), slog.String(queryKey, query), slog.Any(argsKey, args))
 
 	res, err := driverExecer.Exec(query, args)
 	if err != nil {
@@ -171,7 +171,7 @@ func (c *connection) ExecContext(ctx context.Context, query string, args []drive
 
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(c.logData(), slog.String("query", query), slog.Any("args", valuesFromNamedArgs(args)))
+	attrs := append(c.logData(), slog.String(queryKey, query), slog.Any(argsKey, valuesFromNamedArgs(args)))
 
 	res, err := driverExecerContext.ExecContext(ctx, query, args)
 	if err != nil {
@@ -193,7 +193,7 @@ func (c *connection) Query(query string, args []driver.Value) (driver.Rows, erro
 	ctx := context.Background()
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(c.logData(), slog.String("query", query), slog.Any("args", args))
+	attrs := append(c.logData(), slog.String(queryKey, query), slog.Any(argsKey, args))
 
 	rows, err := driverQueryer.Query(query, args)
 	if err != nil {
@@ -214,7 +214,7 @@ func (c *connection) QueryContext(ctx context.Context, query string, args []driv
 
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(c.logData(), slog.String("query", query), slog.Any("args", valuesFromNamedArgs(args)))
+	attrs := append(c.logData(), slog.String(queryKey, query), slog.Any(argsKey, valuesFromNamedArgs(args)))
 
 	rows, err := driverQueryerContext.QueryContext(ctx, query, args)
 	if err != nil {

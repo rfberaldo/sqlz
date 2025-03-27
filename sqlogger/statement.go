@@ -47,7 +47,7 @@ func (s *statement) Exec(args []driver.Value) (driver.Result, error) {
 	ctx := context.Background()
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(s.logAttrs(), slog.Any("args", args))
+	attrs := append(s.logAttrs(), slog.Any(argsKey, args))
 
 	res, err := s.Stmt.Exec(args)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *statement) Query(args []driver.Value) (driver.Rows, error) {
 	ctx := context.Background()
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(s.logAttrs(), slog.Any("args", args))
+	attrs := append(s.logAttrs(), slog.Any(argsKey, args))
 
 	rows, err := s.Stmt.Query(args)
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *statement) ExecContext(ctx context.Context, args []driver.NamedValue) (
 
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(s.logAttrs(), slog.Any("args", valuesFromNamedArgs(args)))
+	attrs := append(s.logAttrs(), slog.Any(argsKey, valuesFromNamedArgs(args)))
 
 	res, err := stmtExecer.ExecContext(ctx, args)
 	if err != nil {
@@ -106,7 +106,7 @@ func (s *statement) QueryContext(ctx context.Context, args []driver.NamedValue) 
 
 	start := time.Now()
 	lvl := slog.LevelInfo
-	attrs := append(s.logAttrs(), slog.Any("args", valuesFromNamedArgs(args)))
+	attrs := append(s.logAttrs(), slog.Any(argsKey, valuesFromNamedArgs(args)))
 
 	rows, err := stmtQueryer.QueryContext(ctx, args)
 	if err != nil {
@@ -152,6 +152,6 @@ func (s *statement) logAttrs() []slog.Attr {
 	return []slog.Attr{
 		slog.String(connKey, s.connId),
 		slog.String(stmtKey, s.id),
-		slog.String("query", s.query),
+		slog.String(queryKey, s.query),
 	}
 }

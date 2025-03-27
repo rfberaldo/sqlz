@@ -66,3 +66,18 @@ func TestOpen(t *testing.T) {
 		assert.Equal(t, id, output.data.ConnId)
 	})
 }
+
+func TestCleanQuery(t *testing.T) {
+	input := `
+		SELECT * FROM
+			user
+		WHERE
+			name = ?
+		AND
+			id IN (?,?)
+		ORDER BY
+			name
+	`
+	expected := "SELECT * FROM user WHERE name = ? AND id IN (?,?) ORDER BY name"
+	assert.Equal(t, expected, cleanQuery(input))
+}

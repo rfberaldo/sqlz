@@ -213,7 +213,7 @@ func TestStatement_ConnIdFlow(t *testing.T) {
 	q := "SELECT * FROM tt WHERE id = ?"
 	stmt, err := conn.Prepare(q)
 	assert.NoError(t, err)
-	assert.Equal(t, slog.LevelInfo, output.data.Level)
+	assert.Equal(t, slog.LevelDebug, output.data.Level)
 	assert.Equal(t, conn.id, output.data.ConnId)
 
 	_, err = stmt.Query([]driver.Value{1})

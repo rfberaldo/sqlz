@@ -17,7 +17,7 @@ type connector struct {
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	start := time.Now()
 	lvl := slog.LevelDebug
-	id := c.logger.IdGenerator()
+	id := c.logger.idGenerator()
 
 	conn, err := c.driver.Open(c.dsn)
 	if err != nil {

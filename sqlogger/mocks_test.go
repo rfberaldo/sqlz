@@ -14,7 +14,7 @@ import (
 var (
 	output   = &writerMock{}
 	tSlogger = slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	tLogger  = &sqlogger{tSlogger, randomId}
+	tLogger  = &sqlogger{tSlogger, randomId, false}
 	ctx      = context.Background()
 )
 

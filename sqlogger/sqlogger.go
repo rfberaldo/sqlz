@@ -1,18 +1,26 @@
 package sqlogger
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"log/slog"
 	"math/rand"
+	"slices"
+	"strings"
 	"time"
 )
 
 const (
-	txKey   = "tx_id"
-	connKey = "conn_id"
-	stmtKey = "stmt_id"
+	txKey       = "tx_id"
+	connKey     = "conn_id"
+	stmtKey     = "stmt_id"
+	queryKey    = "query"
+	errorKey    = "error"
+	argsKey     = "args"
+	durationKey = "duration"
 )
 
 // Logger is an instance of [slog.Logger]
@@ -24,8 +32,12 @@ type Logger interface {
 // A zero Options consists entirely of default values.
 type Options struct {
 	// IdGenerator is a function that returns a string to be used as id.
-	// By default it's a 8-length random string.
+	// Default: 6-length random string.
 	IdGenerator func() string
+
+	// CleanQuery removes any redundant whitespace before logging.
+	// Default: false.
+	CleanQuery bool
 }
 
 // Open opens a database specified by its database driver name and a
@@ -75,7 +87,7 @@ func New(driver driver.Driver, dataSourceName string, logger Logger, opts *Optio
 	conn := &connector{
 		dsn:    dataSourceName,
 		driver: driver,
-		logger: &sqlogger{logger, randomId},
+		logger: &sqlogger{logger, randomId, false},
 	}
 
 	if opts == nil {
@@ -83,15 +95,18 @@ func New(driver driver.Driver, dataSourceName string, logger Logger, opts *Optio
 	}
 
 	if opts.IdGenerator != nil {
-		conn.logger.IdGenerator = opts.IdGenerator
+		conn.logger.idGenerator = opts.IdGenerator
 	}
+
+	conn.logger.cleanQuery = opts.CleanQuery
 
 	return sql.OpenDB(conn)
 }
 
 type sqlogger struct {
 	logger      Logger
-	IdGenerator func() string
+	idGenerator func() string
+	cleanQuery  bool
 }
 
 func (l *sqlogger) log(
@@ -102,17 +117,54 @@ func (l *sqlogger) log(
 	err error,
 	attrs ...slog.Attr,
 ) {
-	l.logger.LogAttrs(ctx, level, msg, buildAttrs(start, err, attrs...)...)
+	if errors.Is(err, driver.ErrSkip) {
+		return
+	}
+
+	l.logger.LogAttrs(ctx, level, msg, l.buildAttrs(start, err, attrs...)...)
 }
 
-func buildAttrs(start time.Time, err error, attrs ...slog.Attr) []slog.Attr {
+var attrPriorityByKey = map[string]int{
+	errorKey:    0,
+	queryKey:    1,
+	argsKey:     2,
+	connKey:     3,
+	stmtKey:     4,
+	txKey:       5,
+	durationKey: 6,
+}
+
+func (l *sqlogger) buildAttrs(start time.Time, err error, attrs ...slog.Attr) []slog.Attr {
 	_attrs := make([]slog.Attr, 0, len(attrs)+2)
+
 	if err != nil {
-		attrs = append(attrs, slog.Any("error", err))
+		attrs = append(attrs, slog.Any(errorKey, err))
 	}
-	_attrs = append(_attrs, attrs...)
-	_attrs = append(_attrs, slog.Duration("duration", time.Since(start)))
+	_attrs = append(_attrs, slog.Duration(durationKey, time.Since(start)))
+
+	for _, attr := range attrs {
+		if l.cleanQuery && attr.Key == queryKey {
+			attr.Value = slog.StringValue(cleanQuery(attr.Value.String()))
+			_attrs = append(_attrs, attr)
+			continue
+		}
+
+		if attr.Key == argsKey && attr.Value.String() == "[]" {
+			continue
+		}
+
+		_attrs = append(_attrs, attr)
+	}
+
+	slices.SortFunc(_attrs, func(a, b slog.Attr) int {
+		return cmp.Compare(attrPriorityByKey[a.Key], attrPriorityByKey[b.Key])
+	})
+
 	return _attrs
+}
+
+func cleanQuery(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 func valuesFromNamedArgs(args []driver.NamedValue) []driver.Value {
@@ -125,10 +177,10 @@ func valuesFromNamedArgs(args []driver.NamedValue) []driver.Value {
 	return values
 }
 
-// randomId generates a string with 8 random characters.
+// randomId generates a string with 6 random characters.
 func randomId() string {
 	const charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	b := make([]byte, 8)
+	b := make([]byte, 6)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]
 	}

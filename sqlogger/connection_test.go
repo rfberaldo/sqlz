@@ -49,7 +49,7 @@ func TestConnection_Prepare(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Implements(t, (*driver.Stmt)(nil), stmt)
 		assert.Equal(t, "Prepare", output.data.Msg)
-		assert.Equal(t, slog.LevelInfo, output.data.Level)
+		assert.Equal(t, slog.LevelDebug, output.data.Level)
 		assert.Equal(t, q, output.data.Query)
 		assert.Equal(t, conn.id, output.data.ConnId)
 		assert.NotEmpty(t, output.data.StmtId)
@@ -157,7 +157,7 @@ func TestConnection_PrepareContext(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Implements(t, (*driver.Stmt)(nil), stmt)
 		assert.Equal(t, "PrepareContext", output.data.Msg)
-		assert.Equal(t, slog.LevelInfo, output.data.Level)
+		assert.Equal(t, slog.LevelDebug, output.data.Level)
 		assert.Equal(t, q, output.data.Query)
 		assert.Equal(t, conn.id, output.data.ConnId)
 		assert.NotEmpty(t, output.data.StmtId)
@@ -241,7 +241,7 @@ func TestConnection_Exec(t *testing.T) {
 		assert.Equal(t, "Exec", output.data.Msg)
 		assert.Equal(t, slog.LevelInfo, output.data.Level)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
@@ -254,7 +254,7 @@ func TestConnection_Exec(t *testing.T) {
 		conn := &connection{connMock, randomId(), tLogger}
 		_, err := conn.Exec(q, []driver.Value{1})
 		assert.Error(t, err)
-		assert.Equal(t, interface{}(driver.ErrBadConn), err)
+		assert.Equal(t, any(driver.ErrBadConn), err)
 
 		assert.Equal(t, "Exec", output.data.Msg)
 		assert.Equal(t, slog.LevelError, output.data.Level)
@@ -271,7 +271,7 @@ func TestConnection_Exec(t *testing.T) {
 		res, err := conn.Exec(q, []driver.Value{1})
 		assert.Nil(t, res)
 		assert.Error(t, err)
-		assert.Equal(t, interface{}(driver.ErrSkip), err)
+		assert.Equal(t, any(driver.ErrSkip), err)
 	})
 }
 
@@ -289,7 +289,7 @@ func TestConnection_ExecContext(t *testing.T) {
 		assert.Equal(t, "ExecContext", output.data.Msg)
 		assert.Equal(t, slog.LevelInfo, output.data.Level)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
@@ -307,7 +307,7 @@ func TestConnection_ExecContext(t *testing.T) {
 		assert.Equal(t, slog.LevelError, output.data.Level)
 		assert.Equal(t, driver.ErrBadConn.Error(), output.data.Error)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
@@ -336,7 +336,7 @@ func TestConnection_Query(t *testing.T) {
 		assert.Equal(t, "Query", output.data.Msg)
 		assert.Equal(t, slog.LevelInfo, output.data.Level)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
@@ -349,13 +349,13 @@ func TestConnection_Query(t *testing.T) {
 		conn := &connection{connMock, randomId(), tLogger}
 		_, err := conn.Query(q, []driver.Value{"testid"})
 		assert.Error(t, err)
-		assert.Equal(t, interface{}(driver.ErrBadConn), err)
+		assert.Equal(t, any(driver.ErrBadConn), err)
 
 		assert.Equal(t, "Query", output.data.Msg)
 		assert.Equal(t, slog.LevelError, output.data.Level)
 		assert.Equal(t, driver.ErrBadConn.Error(), output.data.Error)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
@@ -384,7 +384,7 @@ func TestConnection_QueryContext(t *testing.T) {
 		assert.Equal(t, "QueryContext", output.data.Msg)
 		assert.Equal(t, slog.LevelInfo, output.data.Level)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
@@ -401,7 +401,7 @@ func TestConnection_QueryContext(t *testing.T) {
 		assert.Equal(t, slog.LevelError, output.data.Level)
 		assert.Equal(t, driver.ErrBadConn.Error(), output.data.Error)
 		assert.Equal(t, q, output.data.Query)
-		assert.Equal(t, []interface{}{"testid"}, output.data.Args)
+		assert.Equal(t, []any{"testid"}, output.data.Args)
 		assert.Equal(t, conn.id, output.data.ConnId)
 	})
 
