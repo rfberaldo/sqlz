@@ -381,6 +381,18 @@ func TestQueryRowArgs(t *testing.T) {
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, sql.ErrNoRows)
 		})
+
+		t.Run("query row should return correct error if value is null", func(t *testing.T) {
+			insertTmpl := testutil.Rebind(bind, `INSERT INTO %s (id, username, age, active, created_at) VALUES (?,?,?,?,?)`)
+			_, err = db.Exec(fmt.Sprintf(insertTmpl, table), 100, nil, 18, true, ts)
+			assert.NoError(t, err)
+
+			selectTmpl := testutil.Rebind(bind, `SELECT * FROM %s WHERE id = 100`)
+			var user User
+			err = QueryRow(ctx, db, bind, scanner, &user, fmt.Sprintf(selectTmpl, table))
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, "converting NULL to string is unsupported")
+		})
 	})
 }
 

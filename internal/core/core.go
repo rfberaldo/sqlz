@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"reflect"
 
 	"github.com/georgysavva/scany/v2/dbscan"
@@ -69,7 +68,10 @@ func QueryRow(
 	}
 
 	if err := scanner.ScanOne(dst, rows); err != nil {
-		return errors.Join(sql.ErrNoRows, err)
+		if err == dbscan.ErrNotFound {
+			return sql.ErrNoRows
+		}
+		return err
 	}
 
 	return nil
