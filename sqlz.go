@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/binds"
 	"github.com/rfberaldo/sqlz/internal/core"
 )
 

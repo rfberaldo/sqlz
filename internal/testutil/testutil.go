@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/binds"
 )
 
 // Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,

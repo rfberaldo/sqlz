@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/binds"
 	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )

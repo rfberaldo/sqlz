@@ -9,7 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/binds"
 )
 
 const EOF = 0

@@ -44,6 +44,19 @@ func ExampleNew_options() {
 	}
 }
 
+func ExampleRegister() {
+	customDriver := (&sql.DB{}).Driver() // replace with your driver
+	sql.Register("sqlcustom", customDriver)
+	sqlz.Register("sqlcustom", sqlz.BindQuestion)
+
+	db := sqlz.MustConnect("sqlcustom", ":memory:")
+
+	_, err := db.Exec(ctx, "CREATE TABLE user (id INT PRIMARY KEY, name TEXT")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func ExampleDB_Query() {
 	var names []string
 	age := 27

@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/georgysavva/scany/v2/dbscan"
-	"github.com/rfberaldo/sqlz/binds"
+	"github.com/rfberaldo/sqlz/internal/binds"
 	"github.com/rfberaldo/sqlz/internal/named"
 )
 
@@ -30,7 +30,7 @@ type Options struct {
 func New(driverName string, db *sql.DB, opts *Options) *DB {
 	bind := binds.BindByDriver(driverName)
 	if bind == binds.Unknown {
-		panic(fmt.Sprintf("sqlz: unable to find bind for %q, register with [binds.Register]", driverName))
+		panic(fmt.Sprintf("sqlz: unable to find bind for %q, register with [sqlz.Register]", driverName))
 	}
 
 	structTag := defaultStructTag
@@ -90,4 +90,17 @@ func newScanner(tag string) *dbscan.API {
 		panic("sqlz: creating scanner: " + err.Error())
 	}
 	return scanner
+}
+
+const (
+	BindAt       = binds.At
+	BindColon    = binds.Colon
+	BindDollar   = binds.Dollar
+	BindQuestion = binds.Question
+)
+
+// Register adds a new driver name and its bind to be
+// available to [New] and [Connect]. If name is empty, it panics.
+func Register(name string, bind binds.Bind) {
+	binds.Register(name, binds.Bind(bind))
 }

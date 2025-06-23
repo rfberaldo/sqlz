@@ -42,8 +42,17 @@ func init() {
 }
 
 // Register adds a new driver name and its bind to be
-// available to [BindByDriver].
+// available to [BindByDriver], panics if the name is empty
+// or if the bind is Unknown.
 func Register(name string, bind Bind) {
+	if name == "" {
+		panic("sqlz: driver name cannot be empty")
+	}
+
+	if bind == Unknown {
+		panic("sqlz: bind cannot be unknown")
+	}
+
 	bindByDriverName.Store(name, bind)
 }
 
