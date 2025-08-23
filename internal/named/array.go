@@ -83,33 +83,53 @@ func expandInsertSyntax(query string, length int) (string, error) {
 		return "", fmt.Errorf("sqlz: slice is only supported in INSERT query with \"VALUES\" clause")
 	}
 
-	startPos := loc[1] - 1 // position of '(' after 'VALUES'
-	endPos := 0            // position of last ')'
-
-	// this is done because the ending might have semicolon, tabs, spaces etc
-	for i, ch := range query[startPos:] {
-		if ch == ')' {
-			endPos = startPos + i + 1
-		}
-	}
-
-	if endPos == 0 {
+	i := loc[1] - 1                   // position of '(' after 'VALUES'
+	j := endingParensIndex(query[i:]) // position of ending ')'
+	if j == -1 {
 		return "", fmt.Errorf("sqlz: could not parse batch INSERT, missing ending parenthesis")
 	}
+	j += i + 1
 
-	values := query[startPos:endPos]
-	queryWithoutValues := query[:startPos]
+	beginning := query[:j]
+	values := query[i:j]
+	ending := query[j:]
 
+	length -= 1
 	var sb strings.Builder
-	sb.Grow(len(queryWithoutValues) + (len(values)+1)*length)
-	sb.WriteString(queryWithoutValues)
+	sb.Grow(len(query) + (len(values)+1)*length)
 
-	for i := range length {
-		if i > 0 {
-			sb.WriteByte(',')
-		}
+	sb.WriteString(beginning)
+	for range length {
+		sb.WriteByte(',')
 		sb.WriteString(values)
 	}
+	sb.WriteString(ending)
 
 	return sb.String(), nil
+}
+
+// endingParensIndex find the ending parenthesis of a string starting with '(',
+// returns -1 if not found.
+//
+//	endingParensIndex("(NOW())") // Output: 6
+func endingParensIndex(s string) int {
+	if len(s) <= 1 || s[0] != '(' {
+		return -1
+	}
+
+	count := 0
+	for i, ch := range s {
+		if ch == '(' {
+			count++
+			continue
+		}
+		if ch == ')' {
+			count--
+			if count == 0 {
+				return i
+			}
+		}
+	}
+
+	return -1
 }

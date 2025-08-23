@@ -84,7 +84,7 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name:       "insert query with array of map",
-			inputQuery: `INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age);`,
+			inputQuery: `INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`,
 			inputArg: [2]map[string]any{
 				{"id": 1, "username": "user123", "email": "user@example.com", "password": "abc123", "age": 18},
 				{"id": 2, "username": "user456", "email": "user2@example.com", "password": "abc456", "age": 19},
@@ -239,12 +239,12 @@ func TestNamed(t *testing.T) {
 		},
 		{
 			name:             "slice with named parameters and multiple parenthesis",
-			inputQuery:       "INSERT INTO users (id, name, created_at, updated_at) VALUES (:id, :name, NOW(), NOW()) ; ",
+			inputQuery:       "INSERT INTO users (id, name, created_at, updated_at) VALUES (:id, :name, NOW(), NOW()) ON CONFLICT IGNORE;",
 			inputArg:         []map[string]any{{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}},
-			expectedAt:       "INSERT INTO users (id, name, created_at, updated_at) VALUES (@p1, @p2, NOW(), NOW()),(@p3, @p4, NOW(), NOW())",
-			expectedColon:    "INSERT INTO users (id, name, created_at, updated_at) VALUES (:id, :name, NOW(), NOW()),(:id, :name, NOW(), NOW())",
-			expectedDollar:   "INSERT INTO users (id, name, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()),($3, $4, NOW(), NOW())",
-			expectedQuestion: "INSERT INTO users (id, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW()),(?, ?, NOW(), NOW())",
+			expectedAt:       "INSERT INTO users (id, name, created_at, updated_at) VALUES (@p1, @p2, NOW(), NOW()),(@p3, @p4, NOW(), NOW()) ON CONFLICT IGNORE;",
+			expectedColon:    "INSERT INTO users (id, name, created_at, updated_at) VALUES (:id, :name, NOW(), NOW()),(:id, :name, NOW(), NOW()) ON CONFLICT IGNORE;",
+			expectedDollar:   "INSERT INTO users (id, name, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()),($3, $4, NOW(), NOW()) ON CONFLICT IGNORE;",
+			expectedQuestion: "INSERT INTO users (id, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW()),(?, ?, NOW(), NOW()) ON CONFLICT IGNORE;",
 			expectedArgs:     []any{1, "Alice", 2, "Bob"},
 			expectError:      false,
 		},
@@ -423,6 +423,90 @@ func TestSnakeCaseMapper(t *testing.T) {
 
 	got = SnakeCaseMapper("Createdあ42At")
 	assert.Equal(t, "createdあ42_at", got)
+}
+
+func TestExpandInsertSyntax(t *testing.T) {
+	input := "INSERT INTO xx (a,b,c) VALUES (?,?,?) ON CONFLICT IGNORE"
+	result, err := expandInsertSyntax(input, 3)
+	assert.NoError(t, err)
+	expect := "INSERT INTO xx (a,b,c) VALUES (?,?,?),(?,?,?),(?,?,?) ON CONFLICT IGNORE"
+	assert.Equal(t, expect, result)
+}
+
+func TestEndingParensIndex(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		{
+			name:     "empty string",
+			input:    "",
+			expected: -1,
+		},
+		{
+			name:     "single opening paren",
+			input:    "(",
+			expected: -1,
+		},
+		{
+			name:     "no leading paren",
+			input:    "abc",
+			expected: -1,
+		},
+		{
+			name:     "simple matching parens",
+			input:    "()",
+			expected: 1,
+		},
+		{
+			name:     "nested parens",
+			input:    "((a)b)",
+			expected: 5,
+		},
+		{
+			name:     "unbalanced left parens",
+			input:    "(((",
+			expected: -1,
+		},
+		{
+			name:     "missing one",
+			input:    "(((a))",
+			expected: -1,
+		},
+		{
+			name:     "balanced with extra content",
+			input:    "(abc)xyz",
+			expected: 4,
+		},
+		{
+			name:     "deeply nested",
+			input:    "(((x)))",
+			expected: 6,
+		},
+		{
+			name:     "closing later",
+			input:    "(a(b)c)d",
+			expected: 6,
+		},
+		{
+			name:     "only closing paren at start",
+			input:    ")abc",
+			expected: -1,
+		},
+		{
+			name:     "real example",
+			input:    "(ABC,DEF,NOW(),NOW())",
+			expected: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := endingParensIndex(tt.input)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
 }
 
 func BenchmarkNamedMap(b *testing.B) {
