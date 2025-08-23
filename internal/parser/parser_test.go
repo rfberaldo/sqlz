@@ -561,7 +561,7 @@ func BenchmarkParser(b *testing.B) {
 
 	input := sb.String()
 
-	for range b.N {
+	for b.Loop() {
 		ParseNamed(binds.Question, input)
 	}
 }

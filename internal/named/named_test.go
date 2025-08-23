@@ -517,7 +517,7 @@ func BenchmarkNamedMap(b *testing.B) {
 		args = append(args, map[string]any{"id": i + 1, "username": "user123", "email": "user@example.com", "password": "abc123", "age": 18})
 	}
 
-	for range b.N {
+	for b.Loop() {
 		_, _, err := Compile(binds.Question, "db", input, args)
 		assert.NoError(b, err)
 	}
@@ -538,7 +538,7 @@ func BenchmarkNamedStruct(b *testing.B) {
 		args = append(args, user{i + 1, "user123", "user@example.com", "abc123", 18})
 	}
 
-	for range b.N {
+	for b.Loop() {
 		_, _, err := Compile(binds.Question, "db", input, args)
 		assert.NoError(b, err)
 	}
