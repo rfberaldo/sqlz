@@ -11,18 +11,10 @@ const (
 	Primitive Type = 1 << iota
 	Map
 	Struct
-	Pointer
 	Slice
-
-	SlicePrimitive        = Slice | Primitive
-	SliceMap              = Slice | Map
-	SliceStruct           = Slice | Struct
-	PointerPrimitive      = Pointer | Primitive
-	PointerMap            = Pointer | Map
-	PointerStruct         = Pointer | Struct
-	SlicePointerPrimitive = Slice | Pointer | Primitive
-	SlicePointerMap       = Slice | Pointer | Map
-	SlicePointerStruct    = Slice | Pointer | Struct
+	SlicePrimitive = Slice | Primitive
+	SliceMap       = Slice | Map
+	SliceStruct    = Slice | Struct
 )
 
 func TypeOf(v any) Type {
@@ -30,10 +22,6 @@ func TypeOf(v any) Type {
 }
 
 func typeOf(t reflect.Type) Type {
-	if t == nil {
-		return PointerPrimitive // interface
-	}
-
 	switch t.Kind() {
 	case reflect.Map:
 		return Map
@@ -47,9 +35,7 @@ func typeOf(t reflect.Type) Type {
 		}
 
 	case reflect.Pointer:
-		if et := typeOf(t.Elem()); et > 0 {
-			return Pointer | et
-		}
+		return typeOf(t.Elem())
 
 	case
 		reflect.Bool,
@@ -68,25 +54,32 @@ func typeOf(t reflect.Type) Type {
 		reflect.Float64,
 		reflect.Complex64,
 		reflect.Complex128,
-		reflect.String,
-		reflect.Interface:
+		reflect.String:
+		// reflect.Interface:
 		return Primitive
 	}
 
 	return Invalid
 }
 
-// Deref recursively derefs a [reflect.Value].
-// If v is a nil pointer or nil interface, it returns an invalid value.
-func Deref(v reflect.Value) reflect.Value {
-	kind := v.Kind()
-	if kind == reflect.Pointer || kind == reflect.Interface {
+func DerefValue(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return v
 		}
-
-		return Deref(v.Elem())
+		return DerefValue(v.Elem())
 	}
 
 	return v
+}
+
+func DerefType(t reflect.Type) reflect.Type {
+	if t.Kind() == reflect.Pointer {
+		return DerefType(t.Elem())
+	}
+	return t
+}
+
+func Append(s reflect.Value, elem any) {
+	s.Set(reflect.Append(s, reflect.ValueOf(elem)))
 }

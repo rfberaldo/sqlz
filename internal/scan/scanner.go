@@ -3,6 +3,7 @@ package scan
 import (
 	"database/sql"
 	"fmt"
+	"reflect"
 
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
@@ -27,31 +28,40 @@ func NewColBinding(columns []string) *ColBinding {
 	return cb
 }
 
+func (cb *ColBinding) Value(i int) any {
+	v := cb.values[i]
+	if v, ok := v.([]byte); ok {
+		return string(v)
+	}
+	return v
+}
+
 // Rows is [sql.Rows]
 type Rows interface {
 	Close() error
-	ColumnTypes() ([]*sql.ColumnType, error)
+	// ColumnTypes() ([]*sql.ColumnType, error)
 	Columns() ([]string, error)
 	Err() error
 	Next() bool
-	NextResultSet() bool
+	// NextResultSet() bool
 	Scan(dest ...any) error
 }
 
 type Scanner struct {
 	queryRow bool
+	rowCount int
 	rows     Rows
 }
 
 func (r *Scanner) Scan(arg any) (err error) {
-	argType := reflectutil.TypeOf(arg)
-	switch argType {
-	case reflectutil.Invalid:
-		return fmt.Errorf("sqlz/scan: arg type is not valid")
-
-	// maps and slices are references by default
-	case reflectutil.Primitive, reflectutil.Struct:
+	if reflect.TypeOf(arg).Kind() != reflect.Pointer {
 		return fmt.Errorf("sqlz/scan: arg must be a pointer")
+	}
+
+	argType := reflectutil.TypeOf(arg)
+
+	if argType == reflectutil.Invalid {
+		return fmt.Errorf("sqlz/scan: arg type is not valid")
 	}
 
 	defer func() {
@@ -65,23 +75,24 @@ func (r *Scanner) Scan(arg any) (err error) {
 		return fmt.Errorf("sqlz/scan: getting column names: %w", err)
 	}
 
-	count := 0
-	for r.rows.Next() {
-		cb := NewColBinding(columns)
-		if err := r.rows.Scan(cb.ptrs...); err != nil {
-			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
+	switch argType {
+	case reflectutil.Primitive:
+		if len(columns) != 1 {
+			return fmt.Errorf("sqlz/scan: expected 1 column, got %d", len(columns))
 		}
 
-		switch argType {
-		case reflectutil.Map, reflectutil.PointerMap:
-			if err := scanMap(arg, cb); err != nil {
-				return err
-			}
+		if err := r.scanPrimitive(arg); err != nil {
+			return err
 		}
 
-		count++
-		if r.queryRow && count > 1 {
-			return fmt.Errorf("sqlz/scan: expected one row, but got multiple")
+	case reflectutil.Map:
+		if err := r.scanMap(arg, columns); err != nil {
+			return err
+		}
+
+	case reflectutil.SliceMap:
+		if err := r.scanSliceMap(arg, columns); err != nil {
+			return err
 		}
 	}
 
@@ -89,46 +100,76 @@ func (r *Scanner) Scan(arg any) (err error) {
 		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
 	}
 
-	if r.queryRow && count == 0 {
+	if r.queryRow && r.rowCount > 1 {
+		return fmt.Errorf("sqlz/scan: expected one row, but got %d", r.rowCount)
+	}
+
+	if r.queryRow && r.rowCount == 0 {
 		return sql.ErrNoRows
 	}
 
 	return err
 }
 
-func scanMap(arg any, cb *ColBinding) error {
-	m, ok := asMap(arg)
-	if !ok {
-		return fmt.Errorf("sqlz/scan: maps must be of type map[string]any")
-	}
-
-	for i, col := range cb.columns {
-		v := cb.values[i]
-		if v, ok := v.([]byte); ok {
-			m[col] = string(v)
-			continue
+func (r *Scanner) scanPrimitive(arg any) (err error) {
+	for r.rows.Next() {
+		if err := r.rows.Scan(arg); err != nil {
+			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
 		}
-		m[col] = v
+
+		r.rowCount++
 	}
 
 	return nil
 }
 
-func asMap(arg any) (map[string]any, bool) {
-	switch v := arg.(type) {
-	case map[string]any:
-		if v == nil {
-			v = make(map[string]any)
-		}
-		return v, true
-
-	case *map[string]any:
-		if *v == nil {
-			*v = make(map[string]any)
-		}
-		return *v, true
-
-	default:
-		return nil, false
+func (r *Scanner) scanMap(arg any, columns []string) error {
+	v := reflectutil.DerefValue(reflect.ValueOf(arg))
+	if !v.IsValid() {
+		return fmt.Errorf("sqlz/scan: unexpected arg")
 	}
+
+	m, ok := v.Interface().(map[string]any)
+	if !ok {
+		return fmt.Errorf("sqlz/scan: map must be of type map[string]any")
+	}
+
+	for r.rows.Next() {
+		cb := NewColBinding(columns)
+		if err := r.rows.Scan(cb.ptrs...); err != nil {
+			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
+		}
+
+		for i, col := range cb.columns {
+			m[col] = cb.Value(i)
+		}
+
+		r.rowCount++
+	}
+
+	return nil
+}
+
+func (r *Scanner) scanSliceMap(arg any, columns []string) error {
+	v := reflectutil.DerefValue(reflect.ValueOf(arg))
+	if !v.IsValid() {
+		return fmt.Errorf("sqlz/scan: unexpected arg")
+	}
+
+	for r.rows.Next() {
+		cb := NewColBinding(columns)
+		if err := r.rows.Scan(cb.ptrs...); err != nil {
+			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
+		}
+
+		m := make(map[string]any, len(columns))
+		for i, col := range cb.columns {
+			m[col] = cb.Value(i)
+		}
+		reflectutil.Append(v, m)
+
+		r.rowCount++
+	}
+
+	return nil
 }

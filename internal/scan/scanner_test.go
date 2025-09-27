@@ -74,9 +74,10 @@ func TestScanner_ScanMap(t *testing.T) {
 		require.NoError(t, err)
 		scanner := &Scanner{queryRow: true, rows: rows}
 		m := make(map[string]any)
-		err = scanner.Scan(m)
+		m["abc"] = 2
+		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Len(t, m, 4)
+		assert.Equal(t, 5, len(m))
 	})
 
 	t.Run("should work on allocated map pointer", func(t *testing.T) {
@@ -86,18 +87,14 @@ func TestScanner_ScanMap(t *testing.T) {
 		m := make(map[string]any)
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Len(t, m, 4)
+		assert.Equal(t, 4, len(m))
 	})
+}
 
-	t.Run("should work on non allocated map pointer", func(t *testing.T) {
-		rows, err := db.Query("SELECT * FROM user LIMIT 1")
-		require.NoError(t, err)
-		scanner := &Scanner{queryRow: true, rows: rows}
-		var m map[string]any
-		err = scanner.Scan(&m)
-		require.NoError(t, err)
-		assert.Len(t, m, 4)
-	})
+func TestScanner_ScanSliceMap(t *testing.T) {
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(t, err)
 
 	t.Run("should work map slice", func(t *testing.T) {
 		rows, err := db.Query("SELECT * FROM user")
@@ -114,13 +111,34 @@ func TestScanner_ScanMap(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanArgs(t *testing.T) {
-	scanner := &Scanner{rows: &MockRows{}}
+func TestScanner_ScanPrimitive(t *testing.T) {
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(t, err)
 
-	t.Run("should not fail on nil map", func(t *testing.T) {
-		var m map[string]any
-		err := scanner.Scan(m)
+	t.Run("string", func(t *testing.T) {
+		rows, err := db.Query("SELECT username FROM user LIMIT 1")
 		require.NoError(t, err)
+		scanner := &Scanner{queryRow: true, rows: rows}
+		var m string
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Contains(t, m, "abc")
+	})
+}
+
+func TestScanner_ScanArgs(t *testing.T) {
+	scanner := &Scanner{rows: &MockRows{
+		ColumnsFunc: func() ([]string, error) {
+			return []string{"user"}, nil
+		},
+	}}
+
+	t.Run("should fail if not a pointer", func(t *testing.T) {
+		var m string
+		err := scanner.Scan(m)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "arg must be a pointer")
 	})
 
 	t.Run("should not fail on nil map pointer", func(t *testing.T) {
@@ -147,22 +165,10 @@ func TestScanner_ScanArgs(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("should not fail on interface pointer", func(t *testing.T) {
+	t.Run("should fail on interface pointer", func(t *testing.T) {
 		var m any
 		err := scanner.Scan(&m)
-		require.NoError(t, err)
-	})
-
-	t.Run("should fail if not a primitive pointer", func(t *testing.T) {
-		var m string
-		err := scanner.Scan(m)
 		require.Error(t, err)
-	})
-
-	t.Run("should not fail if not a interface pointer", func(t *testing.T) {
-		var m any
-		err := scanner.Scan(m)
-		require.NoError(t, err)
 	})
 }
 
