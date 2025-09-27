@@ -104,10 +104,6 @@ func TestScanner_ScanSliceMap(t *testing.T) {
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
 		assert.Len(t, m, 3)
-
-		for k, v := range m {
-			fmt.Println(k, v)
-		}
 	})
 }
 
@@ -124,6 +120,86 @@ func TestScanner_ScanPrimitive(t *testing.T) {
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
 		assert.Contains(t, m, "abc")
+	})
+
+	t.Run("int", func(t *testing.T) {
+		rows, err := db.Query("SELECT age FROM user LIMIT 1")
+		require.NoError(t, err)
+		scanner := &Scanner{queryRow: true, rows: rows}
+		var m int
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, m, 18)
+	})
+
+	t.Run("int8", func(t *testing.T) {
+		rows, err := db.Query("SELECT age FROM user LIMIT 1")
+		require.NoError(t, err)
+		scanner := &Scanner{queryRow: true, rows: rows}
+		var m int8
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, m, int8(18))
+	})
+
+	t.Run("float32", func(t *testing.T) {
+		rows, err := db.Query("SELECT value FROM user LIMIT 1")
+		require.NoError(t, err)
+		scanner := &Scanner{queryRow: true, rows: rows}
+		var m float32
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, m, float32(3.14))
+	})
+
+	t.Run("float64", func(t *testing.T) {
+		rows, err := db.Query("SELECT value FROM user LIMIT 1")
+		require.NoError(t, err)
+		scanner := &Scanner{queryRow: true, rows: rows}
+		var m float64
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, m, 3.14)
+	})
+
+	t.Run("slice string", func(t *testing.T) {
+		rows, err := db.Query("SELECT username FROM user")
+		require.NoError(t, err)
+		scanner := &Scanner{rows: rows}
+		var m []string
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, len(m), 3)
+	})
+
+	t.Run("slice int", func(t *testing.T) {
+		rows, err := db.Query("SELECT age FROM user")
+		require.NoError(t, err)
+		scanner := &Scanner{rows: rows}
+		var m []int
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, len(m), 3)
+	})
+
+	t.Run("slice string pointer", func(t *testing.T) {
+		rows, err := db.Query("SELECT username FROM user")
+		require.NoError(t, err)
+		scanner := &Scanner{rows: rows}
+		var m []*string
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, len(m), 3)
+	})
+
+	t.Run("slice int pointer", func(t *testing.T) {
+		rows, err := db.Query("SELECT age FROM user")
+		require.NoError(t, err)
+		scanner := &Scanner{rows: rows}
+		var m []*int
+		err = scanner.Scan(&m)
+		require.NoError(t, err)
+		assert.Equal(t, len(m), 3)
 	})
 }
 
@@ -229,4 +305,36 @@ func (m *MockRows) Scan(dest ...any) error {
 		return nil
 	}
 	return m.ScanFunc(dest...)
+}
+
+func BenchmarkMapScan(b *testing.B) {
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(b, err)
+
+	for b.Loop() {
+		m := make(map[string]any)
+		rows, err := db.Query("SELECT * FROM user LIMIT 1")
+		require.NoError(b, err)
+		scanner := &Scanner{queryRow: true, rows: rows}
+		err = scanner.Scan(&m)
+		require.NoError(b, err)
+		assert.Equal(b, 4, len(m))
+	}
+}
+
+func BenchmarkMapSliceScan(b *testing.B) {
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(b, err)
+
+	for b.Loop() {
+		var m []map[string]any
+		rows, err := db.Query("SELECT * FROM user")
+		require.NoError(b, err)
+		scanner := &Scanner{rows: rows}
+		err = scanner.Scan(&m)
+		require.NoError(b, err)
+		assert.Equal(b, 3, len(m))
+	}
 }

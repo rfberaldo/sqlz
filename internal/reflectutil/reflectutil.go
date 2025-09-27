@@ -79,7 +79,3 @@ func DerefType(t reflect.Type) reflect.Type {
 	}
 	return t
 }
-
-func Append(s reflect.Value, elem any) {
-	s.Set(reflect.Append(s, reflect.ValueOf(elem)))
-}
