@@ -62,8 +62,9 @@ func typeOf(t reflect.Type) Type {
 	return Invalid
 }
 
+// DerefValue de-references a [reflect.Value], nil pointers are preserved.
 func DerefValue(v reflect.Value) reflect.Value {
-	if v.Kind() == reflect.Pointer {
+	if k := v.Kind(); k == reflect.Pointer || k == reflect.Interface {
 		if v.IsNil() {
 			return v
 		}
@@ -78,4 +79,12 @@ func DerefType(t reflect.Type) reflect.Type {
 		return DerefType(t.Elem())
 	}
 	return t
+}
+
+func IsNilStruct(v reflect.Value) bool {
+	if v.Kind() != reflect.Pointer {
+		return false
+	}
+
+	return v.IsNil() && v.Type().Elem().Kind() == reflect.Struct
 }

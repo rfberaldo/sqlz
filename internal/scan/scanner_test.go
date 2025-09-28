@@ -203,6 +203,29 @@ func TestScanner_ScanPrimitive(t *testing.T) {
 	})
 }
 
+func TestScanner_ScanStruct(t *testing.T) {
+	type User struct {
+		Id       int
+		Username string
+		Age      int
+		Decimal  float64 `db:"value"`
+	}
+
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(t, err)
+
+	rows, err := db.Query("SELECT * FROM user LIMIT 1")
+	require.NoError(t, err)
+
+	var user User
+	scanner := &Scanner{queryRow: true, rows: rows}
+	err = scanner.Scan(&user)
+	require.NoError(t, err)
+
+	fmt.Printf("%#v\n", user)
+}
+
 func TestScanner_ScanArgs(t *testing.T) {
 	scanner := &Scanner{rows: &MockRows{
 		ColumnsFunc: func() ([]string, error) {

@@ -67,6 +67,9 @@ func (r *Scanner) Scan(arg any) (err error) {
 	case reflectutil.SliceMap:
 		err = r.scanSliceMap(arg, columns)
 
+	case reflectutil.Struct:
+		err = r.scanStruct(arg, columns)
+
 	}
 
 	if err != nil {
@@ -101,11 +104,11 @@ func (r *Scanner) scanPrimitive(arg any) (err error) {
 }
 
 func (r *Scanner) scanSlicePrimitive(arg any) error {
-	s := reflectutil.DerefValue(reflect.ValueOf(arg))
-	if !s.IsValid() {
+	argValue := reflectutil.DerefValue(reflect.ValueOf(arg))
+	if !argValue.IsValid() {
 		return fmt.Errorf("sqlz/scan: unexpected arg")
 	}
-	elType := s.Type().Elem()
+	elType := argValue.Type().Elem()
 
 	for r.rows.Next() {
 		v := reflect.New(elType)
@@ -113,7 +116,7 @@ func (r *Scanner) scanSlicePrimitive(arg any) error {
 			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
 		}
 
-		s.Set(reflect.Append(s, v.Elem()))
+		argValue.Set(reflect.Append(argValue, v.Elem()))
 
 		r.rowCount++
 	}
@@ -122,16 +125,12 @@ func (r *Scanner) scanSlicePrimitive(arg any) error {
 }
 
 func (r *Scanner) scanMap(arg any, columns []string) error {
-	v := reflectutil.DerefValue(reflect.ValueOf(arg))
-	if !v.IsValid() {
+	argValue := reflectutil.DerefValue(reflect.ValueOf(arg))
+	if !argValue.IsValid() {
 		return fmt.Errorf("sqlz/scan: unexpected arg")
 	}
 
-	// if kind := v.Kind(); kind != reflect.Map {
-	// 	return fmt.Errorf("sqlz/scan: expected map, got %s", kind)
-	// }
-
-	m, ok := v.Interface().(map[string]any)
+	m, ok := argValue.Interface().(map[string]any)
 	if !ok {
 		return fmt.Errorf("sqlz/scan: map must be of type map[string]any")
 	}
@@ -143,7 +142,6 @@ func (r *Scanner) scanMap(arg any, columns []string) error {
 		}
 
 		for i, col := range cb.columns {
-			// v.SetMapIndex(reflect.ValueOf(col), reflect.ValueOf(cb.Value(i)))
 			m[col] = cb.Value(i)
 		}
 
@@ -154,8 +152,8 @@ func (r *Scanner) scanMap(arg any, columns []string) error {
 }
 
 func (r *Scanner) scanSliceMap(arg any, columns []string) error {
-	s := reflectutil.DerefValue(reflect.ValueOf(arg))
-	if !s.IsValid() {
+	argValue := reflectutil.DerefValue(reflect.ValueOf(arg))
+	if !argValue.IsValid() {
 		return fmt.Errorf("sqlz/scan: unexpected arg")
 	}
 
@@ -170,7 +168,38 @@ func (r *Scanner) scanSliceMap(arg any, columns []string) error {
 			m[col] = cb.Value(i)
 		}
 
-		s.Set(reflect.Append(s, reflect.ValueOf(m)))
+		argValue.Set(reflect.Append(argValue, reflect.ValueOf(m)))
+
+		r.rowCount++
+	}
+
+	return nil
+}
+
+func (r *Scanner) scanStruct(arg any, columns []string) error {
+	argValue := reflectutil.DerefValue(reflect.ValueOf(arg))
+	if !argValue.IsValid() {
+		return fmt.Errorf("sqlz/scan: unexpected arg")
+	}
+
+	for r.rows.Next() {
+		sb := &StructBinding{structTag: "db", fieldKeyMapper: SnakeCaseMapper}
+		ptrs := make([]any, len(columns))
+		for i, col := range columns {
+			f, ok := sb.FieldByTag(col, argValue)
+			if !ok {
+				return fmt.Errorf("not found %s", col)
+			}
+			if f.CanAddr() {
+				ptrs[i] = f.Addr().Interface()
+			} else {
+				panic("not addressable?")
+			}
+		}
+
+		if err := r.rows.Scan(ptrs...); err != nil {
+			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
+		}
 
 		r.rowCount++
 	}
