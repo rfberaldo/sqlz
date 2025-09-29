@@ -1,6 +1,7 @@
-package scan
+package sqlz
 
 import (
+	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
@@ -36,7 +37,7 @@ func (cb *colBinding) value(i int) any {
 	return v
 }
 
-func structPtrs(stv *reflectutil.StructValue, v reflect.Value, columns []string) ([]any, error) {
+func structPtrs(stv *reflectutil.StructMapper, v reflect.Value, columns []string) ([]any, error) {
 	ptrs := make([]any, len(columns))
 
 	for i, col := range columns {
@@ -66,4 +67,10 @@ func SnakeCaseMapper(str string) string {
 	}
 
 	return sb.String()
+}
+
+var scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+
+func isScannable(v reflect.Type) bool {
+	return reflect.PointerTo(v).Implements(scannerType) || v.Implements(scannerType)
 }

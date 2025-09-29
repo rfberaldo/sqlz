@@ -1,11 +1,16 @@
 package testutil
 
 import (
+	"cmp"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
+	"testing"
 
 	"github.com/rfberaldo/sqlz/internal/binds"
 )
@@ -106,4 +111,85 @@ func PrettyPrint(arg any) {
 		log.Fatalf("could not pretty print: %s\n", err)
 	}
 	log.Print(string(data))
+}
+
+type TableHelper struct {
+	tb        testing.TB
+	tableName string
+}
+
+func NewTableHelper(t testing.TB) *TableHelper {
+	return &TableHelper{t, TableName(t.Name())}
+}
+
+// Cleanup drops table with [testing.TB.Cleanup].
+func (t *TableHelper) Cleanup(db *sql.DB) {
+	t.tb.Cleanup(func() {
+		db.Exec(t.Fmt("DROP TABLE IF EXISTS %s"))
+	})
+}
+
+// Fmt replaces '%s' with table name.
+func (t *TableHelper) Fmt(query string) string {
+	return fmt.Sprintf(query, t.tableName)
+}
+
+// FmtRebind replaces '%s' with table name then run through [Rebind].
+func (t *TableHelper) FmtRebind(bindTo binds.Bind, query string) string {
+	return Rebind(bindTo, t.Fmt(query))
+}
+
+func NewDB(driverName, dataSourceName string) (*sql.DB, error) {
+	db, err := sql.Open(driverName, dataSourceName)
+	if err != nil {
+		log.Printf("error connecting to %v: %v", driverName, err)
+		return nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Printf("error pinging to %v: %v", driverName, err)
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}
+
+type MultiDB struct {
+	dbByName map[string]*sql.DB
+}
+
+func NewMultiDB() *MultiDB {
+	mdb := &MultiDB{dbByName: make(map[string]*sql.DB)}
+
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), MYSQL_DSN)
+	if db, err := NewDB("mysql", dsn); err == nil {
+		mdb.dbByName["MySQL"] = db
+	}
+
+	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), POSTGRES_DSN)
+	if db, err := NewDB("pgx", dsn); err == nil {
+		mdb.dbByName["PostgreSQL"] = db
+	}
+
+	return mdb
+}
+
+func (m *MultiDB) Run(t *testing.T, fn func(t *testing.T, db *sql.DB)) {
+	t.Parallel()
+	for name, db := range m.dbByName {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if db != nil {
+				fn(t, db)
+			}
+
+			err := "unable to connect to DB:" + t.Name()
+			if os.Getenv("CI") == "true" {
+				t.Fatal(err)
+			}
+			t.Skip(err)
+		})
+	}
 }
