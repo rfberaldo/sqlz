@@ -45,7 +45,6 @@ func TestScan(t *testing.T) {
 
 	defer rows.Close()
 
-	fmt.Println(rows.Columns())
 	ct, err := rows.ColumnTypes()
 	require.NoError(t, err)
 

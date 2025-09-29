@@ -18,69 +18,50 @@ type Rows interface {
 }
 
 type Scanner struct {
-	queryRow bool
-	rowCount int
-	rows     Rows
+	columns    []string
+	queryRow   bool
+	queryError error
+	rowCount   int
+	rows       Rows
 }
 
-func (r *Scanner) Scan(arg any) (err error) {
-	if reflect.TypeOf(arg).Kind() != reflect.Pointer {
-		return fmt.Errorf("sqlz/scan: arg must be a pointer")
+// setup must be called before scanning rows
+func (r *Scanner) setup(arg any) (argType reflectutil.Type, err error) {
+	if r.queryError != nil {
+		return argType, r.queryError
 	}
 
-	argType := reflectutil.TypeOf(arg)
+	if reflect.TypeOf(arg).Kind() != reflect.Pointer {
+		return argType, fmt.Errorf("sqlz/scan: arg must be a pointer")
+	}
+
+	argType = reflectutil.TypeOf(arg)
 
 	if argType == reflectutil.Invalid {
-		return fmt.Errorf("sqlz/scan: arg type is not valid")
+		return argType, fmt.Errorf("sqlz/scan: arg type is not valid")
 	}
 
-	defer func() {
-		if errClose := r.rows.Close(); errClose != nil {
-			err = fmt.Errorf("sqlz/scan: closing rows: %w", errClose)
-		}
-	}()
-
-	columns, err := r.rows.Columns()
+	r.columns, err = r.rows.Columns()
 	if err != nil {
-		return fmt.Errorf("sqlz/scan: getting column names: %w", err)
+		return argType, fmt.Errorf("sqlz/scan: getting column names: %w", err)
 	}
 
-	if len(columns) == 0 {
-		return fmt.Errorf("sqlz/scan: columns length must be > 0")
+	if len(r.columns) == 0 {
+		return argType, fmt.Errorf("sqlz/scan: columns length must be > 0")
 	}
 
 	expectOneCol := argType == reflectutil.Primitive ||
 		argType == reflectutil.SlicePrimitive
 
-	if expectOneCol && len(columns) != 1 {
-		return fmt.Errorf("sqlz/scan: expected 1 column, got %d", len(columns))
+	if expectOneCol && len(r.columns) != 1 {
+		return argType, fmt.Errorf("sqlz/scan: expected 1 column, got %d", len(r.columns))
 	}
 
-	switch argType {
-	case reflectutil.Primitive:
-		err = r.scanPrimitive(arg)
+	return argType, nil
+}
 
-	case reflectutil.SlicePrimitive:
-		err = r.scanSlicePrimitive(arg)
-
-	case reflectutil.Map:
-		err = r.scanMap(arg, columns)
-
-	case reflectutil.SliceMap:
-		err = r.scanSliceMap(arg, columns)
-
-	case reflectutil.Struct:
-		err = r.scanStruct(arg, columns)
-
-	case reflectutil.SliceStruct:
-		err = r.scanSliceStruct(arg, columns)
-
-	}
-
-	if err != nil {
-		return err
-	}
-
+// cleanup must be called after scanning rows
+func (r *Scanner) cleanup() error {
 	if err := r.rows.Err(); err != nil {
 		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
 	}
@@ -93,10 +74,57 @@ func (r *Scanner) Scan(arg any) (err error) {
 		return sql.ErrNoRows
 	}
 
+	return nil
+}
+
+func (r *Scanner) Scan(arg any) (err error) {
+	argType, err := r.setup(arg)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if errClose := r.rows.Close(); errClose != nil {
+			err = fmt.Errorf("sqlz/scan: closing rows: %w", errClose)
+		}
+	}()
+
+	switch argType {
+	case reflectutil.Primitive:
+		err = r.scanPrimitive(arg)
+
+	case reflectutil.SlicePrimitive:
+		err = r.scanSlicePrimitive(arg)
+
+	case reflectutil.Map:
+		err = r.scanMap(arg)
+
+	case reflectutil.SliceMap:
+		err = r.scanSliceMap(arg)
+
+	case reflectutil.Struct:
+		err = r.scanStruct(arg)
+
+	case reflectutil.SliceStruct:
+		err = r.scanSliceStruct(arg)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if err := r.cleanup(); err != nil {
+		return err
+	}
+
 	return err
 }
 
-func (r *Scanner) scanPrimitive(arg any) (err error) {
+// func (r *Scanner) RowScan(arg any) error {
+
+// }
+
+func (r *Scanner) scanPrimitive(arg any) error {
 	for r.rows.Next() {
 		if err := r.rows.Scan(arg); err != nil {
 			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
@@ -126,7 +154,7 @@ func (r *Scanner) scanSlicePrimitive(arg any) error {
 	return nil
 }
 
-func (r *Scanner) scanMap(arg any, columns []string) error {
+func (r *Scanner) scanMap(arg any) error {
 	mapValue := reflectutil.DerefValue(reflect.ValueOf(arg))
 
 	m, ok := mapValue.Interface().(map[string]any)
@@ -135,12 +163,12 @@ func (r *Scanner) scanMap(arg any, columns []string) error {
 	}
 
 	for r.rows.Next() {
-		cb := newColBinding(columns)
+		cb := newColBinding(r.columns)
 		if err := r.rows.Scan(cb.ptrs...); err != nil {
 			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
 		}
 
-		for i, col := range cb.columns {
+		for i, col := range r.columns {
 			m[col] = cb.value(i)
 		}
 
@@ -150,17 +178,17 @@ func (r *Scanner) scanMap(arg any, columns []string) error {
 	return nil
 }
 
-func (r *Scanner) scanSliceMap(arg any, columns []string) error {
+func (r *Scanner) scanSliceMap(arg any) error {
 	argValue := reflectutil.DerefValue(reflect.ValueOf(arg))
 
 	for r.rows.Next() {
-		cb := newColBinding(columns)
+		cb := newColBinding(r.columns)
 		if err := r.rows.Scan(cb.ptrs...); err != nil {
 			return fmt.Errorf("sqlz/scan: scanning row: %w", err)
 		}
 
-		m := make(map[string]any, len(columns))
-		for i, col := range cb.columns {
+		m := make(map[string]any, len(r.columns))
+		for i, col := range r.columns {
 			m[col] = cb.value(i)
 		}
 
@@ -172,11 +200,11 @@ func (r *Scanner) scanSliceMap(arg any, columns []string) error {
 	return nil
 }
 
-func (r *Scanner) scanStruct(arg any, columns []string) error {
+func (r *Scanner) scanStruct(arg any) error {
 	stv := reflectutil.NewStruct("db", SnakeCaseMapper)
 
 	for r.rows.Next() {
-		ptrs, err := structPtrs(stv, reflect.ValueOf(arg), columns)
+		ptrs, err := structPtrs(stv, reflect.ValueOf(arg), r.columns)
 		if err != nil {
 			return err
 		}
@@ -191,13 +219,13 @@ func (r *Scanner) scanStruct(arg any, columns []string) error {
 	return nil
 }
 
-func (r *Scanner) scanSliceStruct(arg any, columns []string) error {
+func (r *Scanner) scanSliceStruct(arg any) error {
 	sliceValue := reflectutil.DerefValue(reflect.ValueOf(arg))
 	stv := reflectutil.NewStruct("db", SnakeCaseMapper)
 
 	for r.rows.Next() {
 		structValue := reflect.New(sliceValue.Type().Elem())
-		ptrs, err := structPtrs(stv, structValue, columns)
+		ptrs, err := structPtrs(stv, structValue, r.columns)
 		if err != nil {
 			return err
 		}
