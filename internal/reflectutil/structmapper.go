@@ -5,28 +5,33 @@ import (
 	"strings"
 )
 
-type StructValue struct {
-	tag        string
-	nameMapper func(string) string
-	indexByKey map[string][]int
+type StructMapper struct {
+	tag             string
+	fieldNameMapper func(string) string
+	indexByKey      map[string][]int
 }
 
-// NewStruct returns a new [StructValue], it abstracts [reflect.Value] of [reflect.Struct] kind,
+// NewStructMapper returns [StructMapper], it abstracts [reflect.Value] of [reflect.Struct] kind,
 // adds caching and method to find field by struct tag.
-// NewStruct should be called for each struct type, otherwise caching won't work.
-// nameMapper is used to process the name of the field, if the tag was not found.
-func NewStruct(tag string, nameMapper func(string) string) *StructValue {
-	if nameMapper == nil {
-		nameMapper = func(s string) string { return strings.ToLower(s) }
+// A new [StructMapper] should be called for each struct type, otherwise caching won't work.
+// fieldNameMapper is used to process the name of the field, if the tag was not found.
+func NewStructMapper(tag string, fieldNameMapper func(string) string) *StructMapper {
+	if fieldNameMapper == nil {
+		fieldNameMapper = func(s string) string { return strings.ToLower(s) }
 	}
-	return &StructValue{tag, nameMapper, make(map[string][]int)}
+	return &StructMapper{tag, fieldNameMapper, make(map[string][]int)}
 }
 
 // FieldByTagName recursively finds a field in a struct by tag or name that satisfies match func.
 // Key will be used to find the field and for caching, should be unique.
 // Returns an invalid [reflect.Value] if not found. Panics if rval is not a struct or pointer to struct.
-func (v *StructValue) FieldByTagName(key string, rval reflect.Value) reflect.Value {
+func (v *StructMapper) FieldByTagName(key string, rval reflect.Value) reflect.Value {
 	rval = DerefValue(rval)
+
+	if IsNilStruct(rval) {
+		rval.Set(reflect.New(rval.Type().Elem()))
+		rval = DerefValue(rval)
+	}
 
 	if index, ok := v.indexByKey[key]; ok {
 		if fv, err := rval.FieldByIndexErr(index); err == nil {
@@ -35,7 +40,7 @@ func (v *StructValue) FieldByTagName(key string, rval reflect.Value) reflect.Val
 	}
 
 	matcher := func(s string) bool {
-		return s == key || v.nameMapper(s) == key
+		return s == key || v.fieldNameMapper(s) == key
 	}
 
 	fv, index := walkStruct(v.tag, rval, matcher, []int{})

@@ -202,7 +202,7 @@ func BenchmarkFieldByTagName(b *testing.B) {
 		"active",
 		"createdat",
 	}
-	stv := NewStruct("json", nil)
+	stv := NewStructMapper("json", nil)
 
 	for b.Loop() {
 		var user User
