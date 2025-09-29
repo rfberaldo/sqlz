@@ -39,9 +39,9 @@ func TestScan(t *testing.T) {
 	rows, err := db.Query("SELECT * FROM user")
 	require.NoError(t, err)
 
-	var id, age int
+	var id, age *int
 	var username string
-	var value float64
+	var value *float64
 
 	defer rows.Close()
 
@@ -103,7 +103,7 @@ func TestScanner_ScanSliceMap(t *testing.T) {
 		var m []map[string]any
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Len(t, m, 3)
+		assert.Len(t, m, 5)
 	})
 }
 
@@ -169,17 +169,17 @@ func TestScanner_ScanPrimitive(t *testing.T) {
 		var m []string
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Equal(t, len(m), 3)
+		assert.Equal(t, len(m), 5)
 	})
 
 	t.Run("slice int", func(t *testing.T) {
-		rows, err := db.Query("SELECT age FROM user")
+		rows, err := db.Query("SELECT id FROM user")
 		require.NoError(t, err)
 		scanner := &Scanner{rows: rows}
 		var m []int
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Equal(t, len(m), 3)
+		assert.Equal(t, len(m), 5)
 	})
 
 	t.Run("slice string pointer", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestScanner_ScanPrimitive(t *testing.T) {
 		var m []*string
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Equal(t, len(m), 3)
+		assert.Equal(t, len(m), 5)
 	})
 
 	t.Run("slice int pointer", func(t *testing.T) {
@@ -199,7 +199,7 @@ func TestScanner_ScanPrimitive(t *testing.T) {
 		var m []*int
 		err = scanner.Scan(&m)
 		require.NoError(t, err)
-		assert.Equal(t, len(m), 3)
+		assert.Equal(t, len(m), 5)
 	})
 }
 
@@ -224,6 +224,31 @@ func TestScanner_ScanStruct(t *testing.T) {
 	require.NoError(t, err)
 
 	fmt.Printf("%#v\n", user)
+}
+
+func TestScanner_ScanSliceStruct(t *testing.T) {
+	type User struct {
+		Id          int
+		TheUsername *struct {
+			Username string
+		}
+		Age     *int
+		Decimal *float64 `db:"value"`
+	}
+
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(t, err)
+
+	rows, err := db.Query("SELECT * FROM user")
+	require.NoError(t, err)
+
+	var users []User
+	scanner := &Scanner{rows: rows}
+	err = scanner.Scan(&users)
+	require.NoError(t, err)
+
+	testutil.PrettyPrint(users)
 }
 
 func TestScanner_ScanArgs(t *testing.T) {

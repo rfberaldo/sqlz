@@ -24,7 +24,7 @@ func NewStruct(tag string, nameMapper func(string) string) *StructValue {
 
 // FieldByTagName recursively finds a field in a struct by tag or name that satisfies match func.
 // Key will be used to find the field and for caching, should be unique.
-// Returns a zeroed [reflect.Value] if not found. Panics if rval is not a struct or pointer to struct.
+// Returns an invalid [reflect.Value] if not found. Panics if rval is not a struct or pointer to struct.
 func (v *StructValue) FieldByTagName(key string, rval reflect.Value) reflect.Value {
 	rval = DerefValue(rval)
 

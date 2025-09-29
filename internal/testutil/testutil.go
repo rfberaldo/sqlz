@@ -1,6 +1,8 @@
 package testutil
 
 import (
+	"encoding/json"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -95,4 +97,13 @@ func QuestionToDollar(query string) string {
 // DollarToAt replaces all `$` with `@`.
 func DollarToAt(query string) string {
 	return strings.ReplaceAll(query, "$", "@")
+}
+
+// PrettyPrint marshal and print arg, only works with exported fields.
+func PrettyPrint(arg any) {
+	data, err := json.MarshalIndent(arg, "", "  ")
+	if err != nil {
+		log.Fatalf("could not pretty print: %s\n", err)
+	}
+	log.Print(string(data))
 }
