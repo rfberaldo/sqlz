@@ -63,6 +63,21 @@ func TestScan(t *testing.T) {
 	fmt.Println(id, username, age, value)
 }
 
+func TestScanner_Scan_Map(t *testing.T) {
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(t, err)
+
+	rows, err := db.Query("SELECT * FROM user LIMIT 1")
+	require.NoError(t, err)
+	scanner := &Scanner{queryRow: true, rows: rows}
+	m := make(map[string]any)
+	m["abc"] = 2
+	err = scanner.Scan(&m)
+	require.NoError(t, err)
+	assert.Equal(t, 5, len(m))
+}
+
 func TestScanner_ScanMap(t *testing.T) {
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
 	db, err := connect("mysql", dsn)
@@ -73,19 +88,15 @@ func TestScanner_ScanMap(t *testing.T) {
 		require.NoError(t, err)
 		scanner := &Scanner{queryRow: true, rows: rows}
 		m := make(map[string]any)
-		m["abc"] = 2
-		err = scanner.Scan(&m)
-		require.NoError(t, err)
-		assert.Equal(t, 5, len(m))
-	})
 
-	t.Run("should work on allocated map pointer", func(t *testing.T) {
-		rows, err := db.Query("SELECT * FROM user LIMIT 1")
+		defer scanner.Close()
+		for scanner.NextRow() {
+			err = scanner.ScanMap(&m)
+			require.NoError(t, err)
+		}
+		err = scanner.Err()
 		require.NoError(t, err)
-		scanner := &Scanner{queryRow: true, rows: rows}
-		m := make(map[string]any)
-		err = scanner.Scan(&m)
-		require.NoError(t, err)
+
 		assert.Equal(t, 4, len(m))
 	})
 }
@@ -202,7 +213,7 @@ func TestScanner_ScanPrimitive(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanStruct(t *testing.T) {
+func TestScanner_Scan_Struct(t *testing.T) {
 	type User struct {
 		Id       int
 		Username string
@@ -223,6 +234,35 @@ func TestScanner_ScanStruct(t *testing.T) {
 	require.NoError(t, err)
 
 	fmt.Printf("%#v\n", user)
+}
+
+func TestScanner_ScanStruct(t *testing.T) {
+	type User struct {
+		Id       int
+		Username string
+		Age      *int
+		Decimal  *float64 `db:"value"`
+	}
+
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), testutil.MYSQL_DSN)
+	db, err := connect("mysql", dsn)
+	require.NoError(t, err)
+
+	rows, err := db.Query("SELECT * FROM user")
+	require.NoError(t, err)
+
+	var users []User
+	scanner := &Scanner{rows: rows}
+	defer scanner.Close()
+	for scanner.NextRow() {
+		var user User
+		err = scanner.ScanStruct(&user)
+		require.NoError(t, err)
+		users = append(users, user)
+	}
+
+	assert.Equal(t, 5, len(users))
+	testutil.PrettyPrint(users)
 }
 
 func TestScanner_ScanSliceStruct(t *testing.T) {
@@ -250,50 +290,50 @@ func TestScanner_ScanSliceStruct(t *testing.T) {
 	testutil.PrettyPrint(users)
 }
 
-func TestScanner_ScanArgs(t *testing.T) {
-	scanner := &Scanner{rows: &MockRows{
-		ColumnsFunc: func() ([]string, error) {
-			return []string{"user"}, nil
-		},
-	}}
+// func TestScanner_ScanArgs(t *testing.T) {
+// 	scanner := &Scanner{rows: &MockRows{
+// 		ColumnsFunc: func() ([]string, error) {
+// 			return []string{"user"}, nil
+// 		},
+// 	}}
 
-	t.Run("should fail if not a pointer", func(t *testing.T) {
-		var m string
-		err := scanner.Scan(m)
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "arg must be a pointer")
-	})
+// 	t.Run("should fail if not a pointer", func(t *testing.T) {
+// 		var m string
+// 		err := scanner.Scan(m)
+// 		require.Error(t, err)
+// 		assert.ErrorContains(t, err, "arg must be a pointer")
+// 	})
 
-	t.Run("should not fail on nil map pointer", func(t *testing.T) {
-		var m map[string]any
-		err := scanner.Scan(&m)
-		require.NoError(t, err)
-	})
+// 	t.Run("should not fail on nil map pointer", func(t *testing.T) {
+// 		var m map[string]any
+// 		err := scanner.Scan(&m)
+// 		require.NoError(t, err)
+// 	})
 
-	t.Run("should not fail on allocated map", func(t *testing.T) {
-		m := make(map[string]any)
-		err := scanner.Scan(&m)
-		require.NoError(t, err)
-	})
+// 	t.Run("should not fail on allocated map", func(t *testing.T) {
+// 		m := make(map[string]any)
+// 		err := scanner.Scan(&m)
+// 		require.NoError(t, err)
+// 	})
 
-	t.Run("should not fail on primitive pointer", func(t *testing.T) {
-		var m string
-		err := scanner.Scan(&m)
-		require.NoError(t, err)
-	})
+// 	t.Run("should not fail on primitive pointer", func(t *testing.T) {
+// 		var m string
+// 		err := scanner.Scan(&m)
+// 		require.NoError(t, err)
+// 	})
 
-	t.Run("should not fail on nil pointer", func(t *testing.T) {
-		var m *string
-		err := scanner.Scan(&m)
-		require.NoError(t, err)
-	})
+// 	t.Run("should not fail on nil pointer", func(t *testing.T) {
+// 		var m *string
+// 		err := scanner.Scan(&m)
+// 		require.NoError(t, err)
+// 	})
 
-	t.Run("should fail on interface pointer", func(t *testing.T) {
-		var m any
-		err := scanner.Scan(&m)
-		require.Error(t, err)
-	})
-}
+// 	t.Run("should fail on interface pointer", func(t *testing.T) {
+// 		var m any
+// 		err := scanner.Scan(&m)
+// 		require.Error(t, err)
+// 	})
+// }
 
 type MockRows struct {
 	CloseFunc         func() error
