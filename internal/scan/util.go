@@ -10,17 +10,15 @@ import (
 )
 
 type colBinding struct {
-	columns []string
-	values  []any
-	ptrs    []any
+	values []any
+	ptrs   []any
 }
 
-// newColBinding returns a [cColBinding], which is a helper for map scanner.
+// newColBinding returns a [colBinding], which is a helper for map scanner.
 func newColBinding(columns []string) *colBinding {
 	cb := &colBinding{
-		columns: columns,
-		values:  make([]any, len(columns)),
-		ptrs:    make([]any, len(columns)),
+		values: make([]any, len(columns)),
+		ptrs:   make([]any, len(columns)),
 	}
 
 	for i := range cb.values {
