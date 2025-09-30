@@ -13,27 +13,28 @@ var (
 	mapType = reflect.TypeOf(map[string]any{})
 )
 
-type colBinding struct {
+// mapBinding is a helper for map scanning.
+type mapBinding struct {
 	values []any
 	ptrs   []any
 }
 
-// newColBinding returns a [colBinding], which is a helper for map scanner.
-func newColBinding(columns []string) *colBinding {
-	cb := &colBinding{
-		values: make([]any, len(columns)),
-		ptrs:   make([]any, len(columns)),
+// newMapBinding returns a [mapBinding], which is a helper for map scanning.
+func newMapBinding(columnCount int) *mapBinding {
+	mb := &mapBinding{
+		values: make([]any, columnCount),
+		ptrs:   make([]any, columnCount),
 	}
 
-	for i := range cb.values {
-		cb.ptrs[i] = &cb.values[i]
+	for i := range mb.values {
+		mb.ptrs[i] = &mb.values[i]
 	}
 
-	return cb
+	return mb
 }
 
-func (cb *colBinding) value(i int) any {
-	v := cb.values[i]
+func (mb *mapBinding) value(i int) any {
+	v := mb.values[i]
 	if v, ok := v.([]byte); ok {
 		return string(v)
 	}
