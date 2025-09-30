@@ -140,27 +140,26 @@ func (s *Scanner) Scan(dest any) (err error) {
 
 	isSlice := reflectutil.IsSlice(destValue.Kind())
 	var elType reflect.Type
+	var elValue reflect.Value
 	if isSlice {
 		elType = destValue.Type().Elem()
+		elValue = reflect.New(elType).Elem()
 	}
 
 	for s.rows.Next() {
-		var elValue reflect.Value
-
 		switch destType {
 		case reflectutil.Primitive:
 			err = s.ScanRow(dest)
 
 		case reflectutil.SlicePrimitive:
-			elValue = reflect.New(elType)
-			err = s.ScanRow(elValue.Interface())
+			err = s.ScanRow(elValue.Addr().Interface())
 
 		case reflectutil.Struct:
 			err = s.ScanStruct(dest)
 
 		case reflectutil.SliceStruct:
-			elValue = reflect.New(elType)
-			err = s.ScanStruct(elValue.Interface())
+			elValue.SetZero()
+			err = s.ScanStruct(elValue.Addr().Interface())
 
 		case reflectutil.Map:
 			if reflectutil.IsNilMap(destValue) {
@@ -173,13 +172,11 @@ func (s *Scanner) Scan(dest any) (err error) {
 			err = s.ScanMap(m)
 
 		case reflectutil.SliceMap:
-			mapValue := reflect.MakeMap(mapType)
-			m, errMap := assertMap(mapValue.Interface())
+			elValue.Set(reflect.MakeMap(mapType))
+			m, errMap := assertMap(elValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
-			elValue = reflect.New(mapType) // pointer to map
-			elValue.Elem().Set(mapValue)   // point to mapValue
 			err = s.ScanMap(m)
 		}
 
@@ -188,7 +185,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		}
 
 		if isSlice {
-			destValue.Set(reflect.Append(destValue, elValue.Elem()))
+			destValue.Set(reflect.Append(destValue, elValue))
 		}
 
 		s.rowCount++
