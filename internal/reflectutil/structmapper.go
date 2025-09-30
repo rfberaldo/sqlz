@@ -28,11 +28,6 @@ func NewStructMapper(tag string, fieldNameMapper func(string) string) *StructMap
 func (v *StructMapper) FieldByTagName(key string, rval reflect.Value) reflect.Value {
 	rval = DerefValue(rval)
 
-	if IsNilStruct(rval) {
-		rval.Set(reflect.New(rval.Type().Elem()))
-		rval = DerefValue(rval)
-	}
-
 	if index, ok := v.indexByKey[key]; ok {
 		if fv, err := rval.FieldByIndexErr(index); err == nil {
 			return fv

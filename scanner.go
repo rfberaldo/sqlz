@@ -18,26 +18,27 @@ type Rows interface {
 }
 
 type Scanner struct {
-	columns      []string
-	queryRow     bool
-	rowCount     int
-	structMapper *reflectutil.StructMapper
-	rows         Rows
+	columns             []string
+	queryRow            bool
+	rowCount            int
+	structMapper        *reflectutil.StructMapper
+	ignoreMissingFields bool
+	rows                Rows
 }
 
 type ScannerOptions struct {
 	// QueryRow enforces result to be a single row.
 	QueryRow bool
 
-	// StructTag is the reflection tag that will used to map fields.
+	// StructTag is the reflection tag that will be used to map fields.
 	StructTag string
 
-	// StructFieldNameMapper is used to process a struct field name in case
-	// the tag was not found.
-	StructFieldNameMapper func(string) string
+	// FieldNameMapper is a func that maps a struct field name to the database column.
+	// It is only used when the struct tag is not found.
+	FieldNameMapper func(string) string
 
-	// StructIgnoreOmitFields makes omitted struct fields to not return error.
-	StructIgnoreOmitFields bool
+	// IgnoreMissingFields makes struct scan to ignore missing fields instead of returning error.
+	IgnoreMissingFields bool
 }
 
 func NewScanner(rows Rows, opts *ScannerOptions) (*Scanner, error) {
@@ -58,17 +59,18 @@ func NewScanner(rows Rows, opts *ScannerOptions) (*Scanner, error) {
 		opts.StructTag = defaultStructTag
 	}
 
-	if opts.StructFieldNameMapper == nil {
-		opts.StructFieldNameMapper = SnakeCaseMapper
+	if opts.FieldNameMapper == nil {
+		opts.FieldNameMapper = SnakeCaseMapper
 	}
 
 	scanner := &Scanner{
-		columns:  columns,
-		rows:     rows,
-		queryRow: opts.QueryRow,
+		columns:             columns,
+		rows:                rows,
+		queryRow:            opts.QueryRow,
+		ignoreMissingFields: opts.IgnoreMissingFields,
 		structMapper: reflectutil.NewStructMapper(
 			opts.StructTag,
-			opts.StructFieldNameMapper,
+			opts.FieldNameMapper,
 		),
 	}
 
@@ -91,17 +93,18 @@ func (r *Scanner) postScan() error {
 	return nil
 }
 
-func (r *Scanner) checkDest(dest any) error {
-	t := reflect.TypeOf(dest)
-	if t.Kind() != reflect.Pointer {
-		return fmt.Errorf("sqlz/scan: destination must be a pointer, got %T", dest)
+func (r *Scanner) checkDest(dest any) (reflect.Value, error) {
+	v := reflectutil.DerefValue(reflect.ValueOf(dest))
+	if !v.CanSet() {
+		return reflect.Value{}, fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
 	}
-	return nil
+	return v, nil
 }
 
 // Scan automatically iterates over rows and scans results into dest.
 func (r *Scanner) Scan(dest any) (err error) {
-	if err := r.checkDest(dest); err != nil {
+	destValue, err := r.checkDest(dest)
+	if err != nil {
 		return err
 	}
 
@@ -124,9 +127,9 @@ func (r *Scanner) Scan(dest any) (err error) {
 		}
 	}()
 
-	destValue := reflectutil.DerefValue(reflect.ValueOf(dest))
+	isSlice := reflectutil.IsSlice(destValue.Kind())
 	var elType reflect.Type
-	if reflectutil.IsSlice(destValue.Kind()) {
+	if isSlice {
 		elType = destValue.Type().Elem()
 	}
 
@@ -157,18 +160,23 @@ func (r *Scanner) Scan(dest any) (err error) {
 			}
 
 		case reflectutil.Map:
-			m, errMap := assertMap(dest)
+			if reflectutil.IsNilMap(destValue) {
+				destValue.Set(reflect.MakeMap(mapType))
+			}
+			m, errMap := assertMap(destValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
 			err = r.ScanMap(m)
 
 		case reflectutil.SliceMap:
-			elValue = reflect.MakeMap(elType)
-			m, errMap := assertMap(elValue.Interface())
+			mapValue := reflect.MakeMap(mapType)
+			m, errMap := assertMap(mapValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
+			elValue = reflect.New(mapType) // pointer to map
+			elValue.Elem().Set(mapValue)   // point to mapValue
 			err = r.ScanMap(m)
 		}
 
@@ -176,12 +184,8 @@ func (r *Scanner) Scan(dest any) (err error) {
 			return err
 		}
 
-		switch destType {
-		case reflectutil.SlicePrimitive, reflectutil.SliceStruct:
+		if isSlice {
 			destValue.Set(reflect.Append(destValue, elValue.Elem()))
-
-		case reflectutil.SliceMap:
-			destValue.Set(reflect.Append(destValue, elValue))
 		}
 
 		r.rowCount++
@@ -226,11 +230,19 @@ func (r *Scanner) ScanMap(m map[string]any) error {
 // ScanStruct scans a single row into dest, if dest is not a struct it panics.
 // Must be called after [Scanner.NextRow].
 func (r *Scanner) ScanStruct(dest any) error {
-	if err := r.checkDest(dest); err != nil {
+	destValue, err := r.checkDest(dest)
+	if err != nil {
 		return err
 	}
 
-	ptrs, err := structPtrs(r.structMapper, reflect.ValueOf(dest), r.columns)
+	if reflectutil.IsNilStruct(destValue) {
+		if !destValue.CanSet() {
+			return fmt.Errorf("sqlz/scan: destination is a non addressable nil pointer: %T", dest)
+		}
+		destValue.Set(reflect.New(destValue.Type().Elem()))
+	}
+
+	ptrs, err := r.structPtrs(destValue)
 	if err != nil {
 		return err
 	}
@@ -240,6 +252,24 @@ func (r *Scanner) ScanStruct(dest any) error {
 	}
 
 	return nil
+}
+
+func (r *Scanner) structPtrs(v reflect.Value) ([]any, error) {
+	ptrs := make([]any, len(r.columns))
+
+	for i, col := range r.columns {
+		fv := r.structMapper.FieldByTagName(col, v)
+		if !fv.IsValid() {
+			if !r.ignoreMissingFields {
+				return nil, fmt.Errorf("sqlz/scan: field not found: %s", col)
+			}
+			var tmp any
+			fv = reflect.ValueOf(&tmp).Elem()
+		}
+		ptrs[i] = fv.Addr().Interface()
+	}
+
+	return ptrs, nil
 }
 
 // Close closes [Scanner], preventing further enumeration, and returning the connection to the pool.
