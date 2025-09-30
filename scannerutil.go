@@ -74,3 +74,11 @@ var scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 func isScannable(v reflect.Type) bool {
 	return reflect.PointerTo(v).Implements(scannerType) || v.Implements(scannerType)
 }
+
+func assertMap(arg any) (map[string]any, error) {
+	m, ok := arg.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("sqlz/scan: map must be of type map[string]any, got %T", m)
+	}
+	return m, nil
+}

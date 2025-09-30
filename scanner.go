@@ -18,12 +18,11 @@ type Rows interface {
 }
 
 type Scanner struct {
-	columns               []string
-	queryRow              bool
-	structTag             string
-	structFieldNameMapper func(string) string
-	rowCount              int
-	rows                  Rows
+	columns      []string
+	queryRow     bool
+	rowCount     int
+	structMapper *reflectutil.StructMapper
+	rows         Rows
 }
 
 type ScannerOptions struct {
@@ -64,11 +63,13 @@ func NewScanner(rows Rows, opts *ScannerOptions) (*Scanner, error) {
 	}
 
 	scanner := &Scanner{
-		columns:               columns,
-		rows:                  rows,
-		queryRow:              opts.QueryRow,
-		structTag:             opts.StructTag,
-		structFieldNameMapper: opts.StructFieldNameMapper,
+		columns:  columns,
+		rows:     rows,
+		queryRow: opts.QueryRow,
+		structMapper: reflectutil.NewStructMapper(
+			opts.StructTag,
+			opts.StructFieldNameMapper,
+		),
 	}
 
 	return scanner, nil
@@ -99,7 +100,6 @@ func (r *Scanner) checkDest(dest any) error {
 }
 
 // Scan automatically iterates over rows and scans results into dest.
-// dest must be a pointer of any primitive type, map, struct or slices.
 func (r *Scanner) Scan(dest any) (err error) {
 	if err := r.checkDest(dest); err != nil {
 		return err
@@ -108,7 +108,7 @@ func (r *Scanner) Scan(dest any) (err error) {
 	destType := reflectutil.TypeOf(dest)
 
 	if destType == reflectutil.Invalid {
-		return fmt.Errorf("sqlz/scan: destination type is not valid, got %T", dest)
+		return fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
 	}
 
 	expectOneCol := destType == reflectutil.Primitive ||
@@ -124,24 +124,67 @@ func (r *Scanner) Scan(dest any) (err error) {
 		}
 	}()
 
-	switch destType {
-	case reflectutil.Primitive:
-		err = r.scanPrimitive(dest)
+	destValue := reflectutil.DerefValue(reflect.ValueOf(dest))
+	var elType reflect.Type
+	if reflectutil.IsSlice(destValue.Kind()) {
+		elType = destValue.Type().Elem()
+	}
 
-	case reflectutil.SlicePrimitive:
-		err = r.scanSlicePrimitive(dest)
+	for r.rows.Next() {
+		var elValue reflect.Value
 
-	case reflectutil.Map:
-		err = r.scanMap(dest)
+		switch destType {
+		case reflectutil.Primitive:
+			err = r.ScanRow(dest)
 
-	case reflectutil.SliceMap:
-		err = r.scanSliceMap(dest)
+		case reflectutil.SlicePrimitive:
+			elValue = reflect.New(elType)
+			err = r.ScanRow(elValue.Interface())
 
-	case reflectutil.Struct:
-		err = r.scanStruct(dest)
+		case reflectutil.Struct:
+			if isScannable(destValue.Type()) {
+				err = r.ScanRow(dest)
+			} else {
+				err = r.ScanStruct(dest)
+			}
 
-	case reflectutil.SliceStruct:
-		err = r.scanSliceStruct(dest)
+		case reflectutil.SliceStruct:
+			elValue = reflect.New(elType)
+			if isScannable(elType) {
+				err = r.ScanRow(elValue.Interface())
+			} else {
+				err = r.ScanStruct(elValue.Interface())
+			}
+
+		case reflectutil.Map:
+			m, errMap := assertMap(dest)
+			if errMap != nil {
+				return errMap
+			}
+			err = r.ScanMap(m)
+
+		case reflectutil.SliceMap:
+			elValue = reflect.MakeMap(elType)
+			m, errMap := assertMap(elValue.Interface())
+			if errMap != nil {
+				return errMap
+			}
+			err = r.ScanMap(m)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		switch destType {
+		case reflectutil.SlicePrimitive, reflectutil.SliceStruct:
+			destValue.Set(reflect.Append(destValue, elValue.Elem()))
+
+		case reflectutil.SliceMap:
+			destValue.Set(reflect.Append(destValue, elValue))
+		}
+
+		r.rowCount++
 	}
 
 	if err != nil {
@@ -155,7 +198,9 @@ func (r *Scanner) Scan(dest any) (err error) {
 	return err
 }
 
-// ScanRow is like [sql.Rows.Scan].
+// ScanRow copies the columns in the current row into the values pointed at by dest.
+// The number of values in dest must be the same as the number of columns.
+// Must be called after [Scanner.NextRow]. Refer to [sql.Rows.Scan].
 func (r *Scanner) ScanRow(dest ...any) error {
 	if err := r.rows.Scan(dest...); err != nil {
 		return fmt.Errorf("sqlz/scan: scanning row: %w", err)
@@ -164,36 +209,7 @@ func (r *Scanner) ScanRow(dest ...any) error {
 	return nil
 }
 
-func (r *Scanner) scanPrimitive(dest any) error {
-	for r.rows.Next() {
-		if err := r.ScanRow(dest); err != nil {
-			return err
-		}
-		r.rowCount++
-	}
-
-	return nil
-}
-
-func (r *Scanner) scanSlicePrimitive(dest any) error {
-	sliceValue := reflectutil.DerefValue(reflect.ValueOf(dest))
-	elType := sliceValue.Type().Elem()
-
-	for r.rows.Next() {
-		v := reflect.New(elType)
-		if err := r.ScanRow(v.Interface()); err != nil {
-			return err
-		}
-
-		sliceValue.Set(reflect.Append(sliceValue, v.Elem()))
-
-		r.rowCount++
-	}
-
-	return nil
-}
-
-// ScanMap scans a single row into m. It must be called after [Scanner.NextRow].
+// ScanMap scans a single row into m. Must be called after [Scanner.NextRow].
 func (r *Scanner) ScanMap(m map[string]any) error {
 	cb := newColBinding(r.columns)
 	if err := r.ScanRow(cb.ptrs...); err != nil {
@@ -207,45 +223,14 @@ func (r *Scanner) ScanMap(m map[string]any) error {
 	return nil
 }
 
-func (r *Scanner) scanMap(dest any) error {
-	mapValue := reflectutil.DerefValue(reflect.ValueOf(dest))
-
-	m, ok := mapValue.Interface().(map[string]any)
-	if !ok {
-		return fmt.Errorf("sqlz/scan: map must be of type map[string]any, got %T", m)
-	}
-
-	for r.rows.Next() {
-		if err := r.ScanMap(m); err != nil {
-			return err
-		}
-		r.rowCount++
-	}
-
-	return nil
-}
-
-func (r *Scanner) scanSliceMap(dest any) error {
-	sliceValue := reflectutil.DerefValue(reflect.ValueOf(dest))
-
-	for r.rows.Next() {
-		m := make(map[string]any, len(r.columns))
-		if err := r.ScanMap(m); err != nil {
-			return err
-		}
-		sliceValue.Set(reflect.Append(sliceValue, reflect.ValueOf(m)))
-		r.rowCount++
-	}
-
-	return nil
-}
-
 // ScanStruct scans a single row into dest, if dest is not a struct it panics.
-// It must be called after [Scanner.NextRow].
+// Must be called after [Scanner.NextRow].
 func (r *Scanner) ScanStruct(dest any) error {
-	stv := reflectutil.NewStructMapper(r.structTag, r.structFieldNameMapper)
+	if err := r.checkDest(dest); err != nil {
+		return err
+	}
 
-	ptrs, err := structPtrs(stv, reflect.ValueOf(dest), r.columns)
+	ptrs, err := structPtrs(r.structMapper, reflect.ValueOf(dest), r.columns)
 	if err != nil {
 		return err
 	}
@@ -257,58 +242,18 @@ func (r *Scanner) ScanStruct(dest any) error {
 	return nil
 }
 
-func (r *Scanner) scanStruct(dest any) error {
-	for r.rows.Next() {
-		if err := r.ScanStruct(dest); err != nil {
-			return err
-		}
-
-		r.rowCount++
-	}
-
-	return nil
-}
-
-func (r *Scanner) scanSliceStruct(dest any) error {
-	sliceValue := reflectutil.DerefValue(reflect.ValueOf(dest))
-
-	elType := sliceValue.Type().Elem()
-	if isScannable(elType) {
-		return r.scanSlicePrimitive(dest)
-	}
-
-	stv := reflectutil.NewStructMapper(r.structTag, r.structFieldNameMapper)
-
-	for r.rows.Next() {
-		structValue := reflect.New(elType)
-		ptrs, err := structPtrs(stv, structValue, r.columns)
-		if err != nil {
-			return err
-		}
-
-		if err := r.ScanRow(ptrs...); err != nil {
-			return err
-		}
-
-		sliceValue.Set(reflect.Append(sliceValue, structValue.Elem()))
-
-		r.rowCount++
-	}
-
-	return nil
-}
-
 // Close closes [Scanner], preventing further enumeration, and returning the connection to the pool.
 // Close is idempotent and does not affect the result of [Scanner.Err].
 func (r *Scanner) Close() error { return r.rows.Close() }
 
-// NextRow prepares the next result row for reading with [Scanner.ScanMap] or [Scanner.ScanStruct] methods.
+// NextRow prepares the next result row for reading with [Scanner.ScanRow],
+// [Scanner.ScanMap] or [Scanner.ScanStruct] methods.
 // It returns true on success, or false if there is no next result row or an error
 // happened while preparing it. [Scanner.Err] should be consulted to distinguish between
 // the two cases.
 //
-// Every call to [Scanner.ScanMap] or [Scanner.ScanStruct], even the first one,
-// must be preceded by a call to [Scanner.NextRow].
+// Every call to [Scanner.ScanRow], [Scanner.ScanMap] or [Scanner.ScanStruct],
+// even the first one, must be preceded by a call to [Scanner.NextRow].
 func (r *Scanner) NextRow() bool { return r.rows.Next() }
 
 // Err returns the error, if any, that was encountered during iteration.

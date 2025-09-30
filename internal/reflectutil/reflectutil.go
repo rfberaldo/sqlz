@@ -88,3 +88,7 @@ func IsNilStruct(v reflect.Value) bool {
 
 	return v.IsNil() && v.Type().Elem().Kind() == reflect.Struct
 }
+
+func IsSlice(kind reflect.Kind) bool {
+	return kind == reflect.Slice || kind == reflect.Array
+}
