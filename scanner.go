@@ -26,6 +26,8 @@ type Scanner struct {
 	rows                RowScanner
 	mapBinding          *mapBinding
 	structMapper        *reflectutil.StructMapper
+	structPtrs          []any
+	sink                any // ignored fields sink
 }
 
 type ScannerOptions struct {
@@ -71,6 +73,7 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 		queryRow:            opts.QueryRow,
 		ignoreMissingFields: opts.IgnoreMissingFields,
 		mapBinding:          newMapBinding(len(columns)),
+		structPtrs:          make([]any, len(columns)),
 		structMapper: reflectutil.NewStructMapper(
 			opts.StructTag,
 			opts.FieldNameMapper,
@@ -246,30 +249,27 @@ func (s *Scanner) ScanStruct(dest any) error {
 		destValue.Set(reflect.New(destValue.Type().Elem()))
 	}
 
-	ptrs, err := s.structPtrs(destValue)
-	if err != nil {
+	if err := s.setStructPtrs(destValue); err != nil {
 		return err
 	}
 
-	return s.ScanRow(ptrs...)
+	return s.ScanRow(s.structPtrs...)
 }
 
-func (s *Scanner) structPtrs(v reflect.Value) ([]any, error) {
-	ptrs := make([]any, len(s.columns))
-
+func (s *Scanner) setStructPtrs(v reflect.Value) error {
 	for i, col := range s.columns {
 		fv := s.structMapper.FieldByTagName(col, v)
 		if !fv.IsValid() {
 			if !s.ignoreMissingFields {
-				return nil, fmt.Errorf("sqlz/scan: field not found: %s", col)
+				return fmt.Errorf("sqlz/scan: field not found: %s", col)
 			}
-			var tmp any
-			fv = reflect.ValueOf(&tmp).Elem()
+			s.structPtrs[i] = &s.sink
+			continue
 		}
-		ptrs[i] = fv.Addr().Interface()
+		s.structPtrs[i] = fv.Addr().Interface()
 	}
 
-	return ptrs, nil
+	return nil
 }
 
 // Close closes [Scanner], preventing further enumeration, and returning the connection to the pool.
