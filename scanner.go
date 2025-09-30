@@ -8,8 +8,9 @@ import (
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
 
-// Rows is [sql.Rows]
-type Rows interface {
+// RowScanner defines the minimal interface for iterating over
+// and scanning database query results. It is satisfied by [sql.Rows].
+type RowScanner interface {
 	Close() error
 	Columns() ([]string, error)
 	Err() error
@@ -22,7 +23,7 @@ type Scanner struct {
 	queryRow            bool
 	rowCount            int
 	ignoreMissingFields bool
-	rows                Rows
+	rows                RowScanner
 	mapBinding          *mapBinding
 	structMapper        *reflectutil.StructMapper
 }
@@ -42,7 +43,7 @@ type ScannerOptions struct {
 	IgnoreMissingFields bool
 }
 
-func NewScanner(rows Rows, opts *ScannerOptions) (*Scanner, error) {
+func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("sqlz/scan: getting column names: %w", err)
@@ -152,19 +153,11 @@ func (s *Scanner) Scan(dest any) (err error) {
 			err = s.ScanRow(elValue.Interface())
 
 		case reflectutil.Struct:
-			if isScannable(destValue.Type()) {
-				err = s.ScanRow(dest)
-			} else {
-				err = s.ScanStruct(dest)
-			}
+			err = s.ScanStruct(dest)
 
 		case reflectutil.SliceStruct:
 			elValue = reflect.New(elType)
-			if isScannable(elType) {
-				err = s.ScanRow(elValue.Interface())
-			} else {
-				err = s.ScanStruct(elValue.Interface())
-			}
+			err = s.ScanStruct(elValue.Interface())
 
 		case reflectutil.Map:
 			if reflectutil.IsNilMap(destValue) {
@@ -222,7 +215,6 @@ func (s *Scanner) ScanRow(dest ...any) error {
 
 // ScanMap scans a single row into m. Must be called after [Scanner.NextRow].
 func (s *Scanner) ScanMap(m map[string]any) error {
-	// cb := newMapBinding(s.columns)
 	if err := s.ScanRow(s.mapBinding.ptrs...); err != nil {
 		return err
 	}
@@ -242,6 +234,11 @@ func (s *Scanner) ScanStruct(dest any) error {
 		return err
 	}
 
+	// if dest implements [sql.Scanner], just pass directly to [sql.Rows.Scan].
+	if isScannable(destValue.Type()) {
+		return s.ScanRow(dest)
+	}
+
 	if reflectutil.IsNilStruct(destValue) {
 		if !destValue.CanSet() {
 			return fmt.Errorf("sqlz/scan: destination is a non addressable nil pointer: %T", dest)
@@ -254,11 +251,7 @@ func (s *Scanner) ScanStruct(dest any) error {
 		return err
 	}
 
-	if err := s.ScanRow(ptrs...); err != nil {
-		return err
-	}
-
-	return nil
+	return s.ScanRow(ptrs...)
 }
 
 func (s *Scanner) structPtrs(v reflect.Value) ([]any, error) {
