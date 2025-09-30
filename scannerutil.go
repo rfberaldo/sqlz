@@ -6,8 +6,11 @@ import (
 	"reflect"
 	"strings"
 	"unicode"
+)
 
-	"github.com/rfberaldo/sqlz/internal/reflectutil"
+var (
+	// mapType is the [reflect.Type] of a map[string]any
+	mapType = reflect.TypeOf(map[string]any{})
 )
 
 type colBinding struct {
@@ -37,20 +40,6 @@ func (cb *colBinding) value(i int) any {
 	return v
 }
 
-func structPtrs(stv *reflectutil.StructMapper, v reflect.Value, columns []string) ([]any, error) {
-	ptrs := make([]any, len(columns))
-
-	for i, col := range columns {
-		fv := stv.FieldByTagName(col, v)
-		if !fv.IsValid() {
-			return nil, fmt.Errorf("sqlz/scan: %q not found", col)
-		}
-		ptrs[i] = fv.Addr().Interface()
-	}
-
-	return ptrs, nil
-}
-
 func SnakeCaseMapper(str string) string {
 	var sb strings.Builder
 	sb.Grow(len(str) + 2)
@@ -78,7 +67,7 @@ func isScannable(v reflect.Type) bool {
 func assertMap(arg any) (map[string]any, error) {
 	m, ok := arg.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("sqlz/scan: map must be of type map[string]any, got %T", m)
+		return nil, fmt.Errorf("sqlz/scan: map must be of type map[string]any, got %T", arg)
 	}
 	return m, nil
 }

@@ -142,15 +142,12 @@ func (t *TableHelper) FmtRebind(bindTo binds.Bind, query string) string {
 func NewDB(driverName, dataSourceName string) (*sql.DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
-		log.Printf("error connecting to %v: %v", driverName, err)
-		return nil, err
+		return nil, fmt.Errorf("error connecting to %v: %w", driverName, err)
 	}
 
-	err = db.Ping()
-	if err != nil {
-		log.Printf("error pinging to %v: %v", driverName, err)
+	if err := db.Ping(); err != nil {
 		db.Close()
-		return nil, err
+		return nil, fmt.Errorf("error pinging to %v: %w", driverName, err)
 	}
 
 	return db, nil
@@ -160,7 +157,7 @@ type MultiDB struct {
 	dbByName map[string]*sql.DB
 }
 
-func NewMultiDB() *MultiDB {
+func NewMultiDB(t testing.TB) *MultiDB {
 	mdb := &MultiDB{dbByName: make(map[string]*sql.DB)}
 
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), MYSQL_DSN)
@@ -171,6 +168,10 @@ func NewMultiDB() *MultiDB {
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), POSTGRES_DSN)
 	if db, err := NewDB("pgx", dsn); err == nil {
 		mdb.dbByName["PostgreSQL"] = db
+	}
+
+	if len(mdb.dbByName) == 0 {
+		t.Fatal("no databases connected")
 	}
 
 	return mdb

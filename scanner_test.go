@@ -36,7 +36,9 @@ func (cst *CustomScan) Scan(val any) error {
 func allocDest(dest any) any {
 	destType := reflect.TypeOf(dest)
 	if destType.Kind() == reflect.Map {
-		return reflect.MakeMap(destType).Interface()
+		v := reflect.New(destType)
+		v.Elem().Set(reflect.MakeMap(destType))
+		return v.Interface()
 	}
 	return reflect.New(destType).Interface()
 }
@@ -47,7 +49,7 @@ func derefDest(dest any) any {
 }
 
 func TestScanner_Scan(t *testing.T) {
-	mdb := testutil.NewMultiDB()
+	mdb := testutil.NewMultiDB(t)
 	ts, _ := time.Parse(time.DateTime, "2025-09-29 12:00:00")
 
 	testCases := []struct {
@@ -59,10 +61,10 @@ func TestScanner_Scan(t *testing.T) {
 			name: "struct",
 			query: `
 				SELECT
-					1            AS id,
-					'Alice'      AS name,
-					69420.42      AS salary,
-					TRUE         AS is_active,
+					1         AS id,
+					'Alice'   AS name,
+					69420.42  AS salary,
+					TRUE      AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
 			expected: struct {
@@ -83,10 +85,10 @@ func TestScanner_Scan(t *testing.T) {
 			name: "struct with pointer fields",
 			query: `
 				SELECT
-					1            AS id,
-					'Alice'      AS name,
-					69420.42      AS salary,
-					TRUE         AS is_active,
+					1         AS id,
+					'Alice'   AS name,
+					69420.42  AS salary,
+					TRUE      AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
 			expected: struct {
@@ -107,10 +109,10 @@ func TestScanner_Scan(t *testing.T) {
 			name: "struct with sql.NullX fields",
 			query: `
 				SELECT
-					1            AS id,
-					'Alice'      AS name,
-					69420.42      AS salary,
-					TRUE         AS is_active,
+					1         AS id,
+					'Alice'   AS name,
+					69420.42  AS salary,
+					TRUE      AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
 			expected: struct {
@@ -134,14 +136,12 @@ func TestScanner_Scan(t *testing.T) {
 					1            AS id,
 					'Alice'      AS name,
 					69420.42      AS salary,
-					TRUE         AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
 			expected: map[string]any{
-				"id":         1,
+				"id":         int64(1),
 				"name":       "Alice",
-				"salary":     69420.42,
-				"is_active":  true,
+				"salary":     "69420.42",
 				"created_at": ts,
 			},
 		},
@@ -152,7 +152,7 @@ func TestScanner_Scan(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				rows, err := db.Query(tc.query)
 				require.NoError(t, err)
-				scanner, err := sqlz.NewScanner(rows, nil)
+				scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{QueryRow: true})
 				require.NoError(t, err)
 				dst := allocDest(tc.expected)
 				scanner.Scan(dst)
@@ -162,8 +162,8 @@ func TestScanner_Scan(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanSlice(t *testing.T) {
-	mdb := testutil.NewMultiDB()
+func TestScanner_ScanSlices(t *testing.T) {
+	mdb := testutil.NewMultiDB(t)
 
 	testCases := []struct {
 		name     string
@@ -316,7 +316,7 @@ func TestScanner_ScanSlice(t *testing.T) {
 					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}' AS foo
 					UNION ALL
 					SELECT '{"key1": "foo val 2", "key2": "bar val 2"}'
-				) AS t;
+				) AS t
 			`,
 			expected: []CustomScan{
 				{Key1: "foo val 1", Key2: "bar val 1"},
@@ -333,7 +333,7 @@ func TestScanner_ScanSlice(t *testing.T) {
 					SELECT NULL
 					UNION ALL
 					SELECT '{"key1": "foo val 2", "key2": "bar val 2"}'
-				) AS t;
+				) AS t
 			`,
 			expected: []*CustomScan{
 				{Key1: "foo val 1", Key2: "bar val 1"},
@@ -358,7 +358,191 @@ func TestScanner_ScanSlice(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanArgs(t *testing.T) {
+func TestScanner_ScanStructMissingFields(t *testing.T) {
+	mdb := testutil.NewMultiDB(t)
+	query := `
+		SELECT
+			1         AS id,
+			'Alice'   AS name,
+			'alice'   AS username,
+			69420.42  AS salary,
+			TRUE      AS is_active`
+
+	type User struct {
+		Id       int
+		Name     string
+		Salary   float64
+		IsActive bool
+	}
+
+	expect := &User{
+		Id:       1,
+		Name:     "Alice",
+		Salary:   69420.42,
+		IsActive: true,
+	}
+
+	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+		t.Run("missing field error", func(t *testing.T) {
+			rows, err := db.Query(query)
+			require.NoError(t, err)
+			scanner, err := sqlz.NewScanner(rows, nil)
+			require.NoError(t, err)
+			var user User
+			err = scanner.Scan(&user)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "field not found")
+		})
+
+		t.Run("ignore missing fields", func(t *testing.T) {
+			rows, err := db.Query(query)
+			require.NoError(t, err)
+			scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
+			require.NoError(t, err)
+			var user *User
+			err = scanner.Scan(&user)
+			require.NoError(t, err)
+			assert.Equal(t, expect, user)
+		})
+	})
+}
+
+func TestScanner_ScanStructNested(t *testing.T) {
+	mdb := testutil.NewMultiDB(t)
+	query := `
+		SELECT
+			1         AS id,
+			'Alice'   AS name,
+			'alice'   AS username,
+			69420.42  AS salary,
+			TRUE      AS is_active,
+			1         AS profession_id,
+			'Dev'     AS profession_name`
+
+	type Profession struct {
+		ProfessionId   int
+		ProfessionName string
+	}
+
+	type User struct {
+		Id         int
+		Name       string
+		Salary     float64
+		Profession *Profession
+		IsActive   bool
+	}
+
+	expect := User{
+		Id:       1,
+		Name:     "Alice",
+		Salary:   69420.42,
+		IsActive: true,
+		Profession: &Profession{
+			ProfessionId:   1,
+			ProfessionName: "Dev",
+		},
+	}
+
+	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+		rows, err := db.Query(query)
+		require.NoError(t, err)
+		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
+		require.NoError(t, err)
+		var user User
+		err = scanner.Scan(&user)
+		require.NoError(t, err)
+		assert.Equal(t, expect, user)
+	})
+}
+
+func TestScanner_ScanStructEmbed(t *testing.T) {
+	mdb := testutil.NewMultiDB(t)
+	query := `
+		SELECT
+			1         AS id,
+			'Alice'   AS name,
+			'alice'   AS username,
+			69420.42  AS salary,
+			TRUE      AS is_active,
+			1         AS profession_id,
+			'Dev'     AS profession_name`
+
+	type Profession struct {
+		ProfessionId   int
+		ProfessionName string
+	}
+
+	type User struct {
+		Id     int
+		Name   string
+		Salary float64
+		*Profession
+		IsActive bool
+	}
+
+	expect := User{
+		Id:       1,
+		Name:     "Alice",
+		Salary:   69420.42,
+		IsActive: true,
+		Profession: &Profession{
+			ProfessionId:   1,
+			ProfessionName: "Dev",
+		},
+	}
+
+	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+		rows, err := db.Query(query)
+		require.NoError(t, err)
+		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
+		require.NoError(t, err)
+		var user User
+		err = scanner.Scan(&user)
+		require.NoError(t, err)
+		assert.Equal(t, expect, user)
+	})
+}
+
+func TestScanner_ScanMap(t *testing.T) {
+	mdb := testutil.NewMultiDB(t)
+	query := `
+		SELECT
+			99         AS id,
+			'Alice'   AS name,
+			69420.42  AS salary`
+
+	expect := map[string]any{
+		"id":     int64(99),
+		"name":   "Alice",
+		"salary": "69420.42",
+	}
+
+	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+		t.Run("allocated map", func(t *testing.T) {
+			rows, err := db.Query(query)
+			require.NoError(t, err)
+			scanner, err := sqlz.NewScanner(rows, nil)
+			require.NoError(t, err)
+			user := make(map[string]any)
+			err = scanner.Scan(&user)
+			require.NoError(t, err)
+			assert.EqualValues(t, expect, user)
+		})
+
+		t.Run("non allocated map", func(t *testing.T) {
+			rows, err := db.Query(query)
+			require.NoError(t, err)
+			scanner, err := sqlz.NewScanner(rows, nil)
+			require.NoError(t, err)
+			var user map[string]any
+			err = scanner.Scan(&user)
+			require.NoError(t, err)
+			assert.EqualValues(t, expect, user)
+		})
+	})
+}
+
+func TestScanner_CheckDest(t *testing.T) {
 	scanner, err := sqlz.NewScanner(&mock.Rows{
 		ColumnsFunc: func() ([]string, error) {
 			return []string{"user"}, nil
@@ -366,40 +550,79 @@ func TestScanner_ScanArgs(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	t.Run("should fail if not a pointer", func(t *testing.T) {
+	errAddressable := "destination must be addressable"
+
+	t.Run("no ref to string", func(t *testing.T) {
 		var m string
 		err := scanner.Scan(m)
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "destination must be a pointer")
+		assert.ErrorContains(t, err, errAddressable)
 	})
 
-	t.Run("should not fail on nil map pointer", func(t *testing.T) {
-		var m map[string]any
-		err := scanner.Scan(&m)
-		require.NoError(t, err)
+	t.Run("no ref to pointer string", func(t *testing.T) {
+		var m *string
+		err := scanner.Scan(m)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, errAddressable)
 	})
 
-	t.Run("should not fail on allocated map", func(t *testing.T) {
-		m := make(map[string]any)
-		err := scanner.Scan(&m)
-		require.NoError(t, err)
-	})
-
-	t.Run("should not fail on primitive pointer", func(t *testing.T) {
+	t.Run("ref to string", func(t *testing.T) {
 		var m string
 		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
-	t.Run("should not fail on nil pointer", func(t *testing.T) {
+	t.Run("ref to pointer string", func(t *testing.T) {
 		var m *string
 		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
-	t.Run("should fail on interface pointer", func(t *testing.T) {
+	t.Run("ref to map", func(t *testing.T) {
+		var m map[string]any
+		err := scanner.Scan(&m)
+		require.NoError(t, err)
+	})
+
+	t.Run("no ref to map", func(t *testing.T) {
+		var m map[string]any
+		err := scanner.Scan(m)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, errAddressable)
+	})
+
+	t.Run("no ref to slice", func(t *testing.T) {
+		var s []string
+		err := scanner.Scan(s)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, errAddressable)
+	})
+
+	t.Run("ref to slice", func(t *testing.T) {
+		var s []string
+		err := scanner.Scan(&s)
+		require.NoError(t, err)
+	})
+
+	t.Run("ref to interface", func(t *testing.T) {
 		var m any
 		err := scanner.Scan(&m)
 		require.Error(t, err)
+		assert.ErrorContains(t, err, "unsupported destination type")
+	})
+
+	t.Run("no ref to pointer struct", func(t *testing.T) {
+		type User struct{}
+		var user *User
+		err = scanner.Scan(user)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, errAddressable)
+	})
+
+	t.Run("ref to pointer struct", func(t *testing.T) {
+		type User struct{}
+		var user *User
+		err = scanner.Scan(&user)
+		require.NoError(t, err)
 	})
 }
