@@ -21,16 +21,16 @@ type mapBinding struct {
 
 // newMapBinding returns a [mapBinding], which is a helper for map scanning.
 func newMapBinding(columnCount int) *mapBinding {
-	mb := &mapBinding{
+	b := &mapBinding{
 		values: make([]any, columnCount),
 		ptrs:   make([]any, columnCount),
 	}
 
-	for i := range mb.values {
-		mb.ptrs[i] = &mb.values[i]
+	for i := range b.values {
+		b.ptrs[i] = &b.values[i]
 	}
 
-	return mb
+	return b
 }
 
 func (mb *mapBinding) value(i int) any {
@@ -43,7 +43,7 @@ func (mb *mapBinding) value(i int) any {
 
 func SnakeCaseMapper(str string) string {
 	var sb strings.Builder
-	sb.Grow(len(str) + 2)
+	sb.Grow(len(str))
 
 	var lastCh rune
 	for i, ch := range str {
