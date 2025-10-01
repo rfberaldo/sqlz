@@ -210,7 +210,7 @@ func TestTransaction(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		db := New(conn.DriverName, conn.DB, nil)
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := db.Exec(ctx, th.Fmt(`
 			CREATE TABLE %s (
