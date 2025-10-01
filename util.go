@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rfberaldo/sqlz/internal/binds"
-	"github.com/rfberaldo/sqlz/internal/named"
 )
 
 const defaultStructTag = "db"
@@ -38,7 +36,7 @@ func New(driverName string, db *sql.DB, opts *Options) *DB {
 		structTag = cmp.Or(opts.StructTag, defaultStructTag)
 	}
 
-	return &DB{db, bind, newScanner(structTag)}
+	return &DB{db, bind, structTag}
 }
 
 // Connect opens a database specified by its database driver name and a
@@ -78,18 +76,6 @@ func MustConnect(driverName, dataSourceName string) *DB {
 // IsNotFound is a helper to check if err contains [sql.ErrNoRows].
 func IsNotFound(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
-}
-
-func newScanner(tag string) *dbscan.API {
-	scanner, err := dbscan.NewAPI(
-		dbscan.WithStructTagKey(tag),
-		dbscan.WithFieldNameMapper(named.SnakeCaseMapper),
-		dbscan.WithScannableTypes((*sql.Scanner)(nil)),
-	)
-	if err != nil {
-		panic("sqlz: creating scanner: " + err.Error())
-	}
-	return scanner
 }
 
 const (

@@ -14,16 +14,16 @@ func TestQuestionToDollar(t *testing.T) {
 	assert.Equal(t, expected, got)
 }
 
-func TestTableName(t *testing.T) {
+func TestToSnakeCase(t *testing.T) {
 	input := "TestOneArgMapShouldPerformABatchInsert/MySQL"
-	contains := "TestOneArgMapShouldPerformABatchInsert"
-	got := TableName(input)
-	assert.Contains(t, got, contains)
+	expect := "test_one_arg_map_should_perform_a_batch_insert"
+	got := slugify(input)
+	assert.Equal(t, got, expect)
 }
 
 func TestRebind(t *testing.T) {
 	input := "SELECT * FROM user WHERE id = ? AND age = ?"
 	expected := "SELECT * FROM user WHERE id = $1 AND age = $2"
-	got := Rebind(binds.Dollar, input)
+	got := rebind(binds.Dollar, input)
 	assert.Equal(t, expected, got)
 }
