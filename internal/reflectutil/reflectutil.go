@@ -54,8 +54,8 @@ func typeOf(t reflect.Type) Type {
 		reflect.Float64,
 		reflect.Complex64,
 		reflect.Complex128,
-		reflect.String:
-		// reflect.Interface:
+		reflect.String,
+		reflect.Interface:
 		return Primitive
 	}
 

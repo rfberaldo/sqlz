@@ -607,8 +607,7 @@ func TestScanner_CheckDest(t *testing.T) {
 	t.Run("ref to interface", func(t *testing.T) {
 		var m any
 		err := scanner.Scan(&m)
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "unsupported destination type")
+		require.NoError(t, err)
 	})
 
 	t.Run("no ref to pointer struct", func(t *testing.T) {
