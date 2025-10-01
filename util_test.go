@@ -15,17 +15,17 @@ func TestNew(t *testing.T) {
 	db := New("sqlite3", &sql.DB{}, nil)
 	assert.NotNil(t, db)
 	assert.IsType(t, &DB{}, db)
-	assert.Equal(t, "db", db.scanner.StructTagKey())
+	assert.Equal(t, "db", db.structTag)
 
 	db = New("sqlite3", &sql.DB{}, &Options{})
 	assert.NotNil(t, db)
 	assert.IsType(t, &DB{}, db)
-	assert.Equal(t, "db", db.scanner.StructTagKey())
+	assert.Equal(t, "db", db.structTag)
 
 	db = New("sqlite3", &sql.DB{}, &Options{StructTag: "json"})
 	assert.NotNil(t, db)
 	assert.IsType(t, &DB{}, db)
-	assert.Equal(t, "json", db.scanner.StructTagKey())
+	assert.Equal(t, "json", db.structTag)
 }
 
 func TestNew_panic(t *testing.T) {

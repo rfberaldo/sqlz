@@ -1,11 +1,11 @@
-package core
+package sqlz
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 
-	"github.com/georgysavva/scany/v2/dbscan"
 	"github.com/rfberaldo/sqlz/internal/binds"
 	"github.com/rfberaldo/sqlz/internal/named"
 	"github.com/rfberaldo/sqlz/internal/parser"
@@ -15,12 +15,6 @@ import (
 type Querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
-type Scanner interface {
-	ScanOne(dst any, rows dbscan.Rows) error
-	ScanAll(dst any, rows dbscan.Rows) error
-	StructTagKey() string
 }
 
 // Query will adapt depending on args:
@@ -34,21 +28,24 @@ func Query(
 	ctx context.Context,
 	db Querier,
 	bind binds.Bind,
-	scanner Scanner,
+	structTag string,
 	dst any,
 	query string,
 	args ...any,
 ) error {
-	rows, err := queryDecider(ctx, db, bind, scanner.StructTagKey(), query, args...)
+	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
 	if err != nil {
 		return err
 	}
 
-	if err := scanner.ScanAll(dst, rows); err != nil {
-		return err
+	scanner, err := NewScanner(rows, &ScannerOptions{
+		StructTag: structTag,
+	})
+	if err != nil {
+		return fmt.Errorf("sqlz: creating scanner: %w", err)
 	}
 
-	return nil
+	return scanner.Scan(dst)
 }
 
 // QueryRow is like [Query], but will only scan one row,
@@ -57,24 +54,25 @@ func QueryRow(
 	ctx context.Context,
 	db Querier,
 	bind binds.Bind,
-	scanner Scanner,
+	structTag string,
 	dst any,
 	query string,
 	args ...any,
 ) error {
-	rows, err := queryDecider(ctx, db, bind, scanner.StructTagKey(), query, args...)
+	rows, err := queryDecider(ctx, db, bind, structTag, query, args...)
 	if err != nil {
 		return err
 	}
 
-	if err := scanner.ScanOne(dst, rows); err != nil {
-		if err == dbscan.ErrNotFound {
-			return sql.ErrNoRows
-		}
-		return err
+	scanner, err := NewScanner(rows, &ScannerOptions{
+		QueryRow:  true,
+		StructTag: structTag,
+	})
+	if err != nil {
+		return fmt.Errorf("sqlz: creating scanner: %w", err)
 	}
 
-	return nil
+	return scanner.Scan(dst)
 }
 
 func queryDecider(

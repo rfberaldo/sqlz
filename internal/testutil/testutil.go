@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/rfberaldo/sqlz/internal/binds"
 )
@@ -26,51 +26,44 @@ const (
 // Why is this not in the std lib?
 func PtrTo[T any](v T) *T { return &v }
 
-// TableName dynamically generate a new table name based on the test name.
-// Stops at first slash, then appends a random 3-char string at the end.
-//
-// Example:
-//
-//	table := TableName(t.Name())
-func TableName(name string) string {
-	isValid := func(ch byte) bool {
-		return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
-	}
-
+// slugify is used to generate table name based on test name, stops on first '/'.
+func slugify(name string) string {
 	var sb strings.Builder
-	sb.Grow(len(name) + 2)
+	sb.Grow(len(name))
+	prevUnderscore := false
 
-nameLoop:
-	for i := range name {
-		ch := name[i]
+	for i, r := range name {
+		if i == 0 {
+			r = unicode.ToLower(r)
+		}
 
-		switch {
-		case ch == '/':
-			break nameLoop
+		if r == '/' {
+			break
+		}
 
-		case isValid(ch):
-			sb.WriteByte(ch)
+		if unicode.IsLower(r) || unicode.IsNumber(r) {
+			sb.WriteRune(r)
+			prevUnderscore = false
+			continue
+		}
+
+		if unicode.IsUpper(r) {
+			sb.WriteRune('_')
+			sb.WriteRune(unicode.ToLower(r))
+			prevUnderscore = false
+			continue
+		}
+
+		if !prevUnderscore {
+			sb.WriteRune('_')
+			prevUnderscore = true
 		}
 	}
 
-	sb.WriteByte('_')
-	sb.Write(randStr(3))
-
-	return sb.String()
+	return strings.Trim(sb.String(), "_")
 }
 
-func randStr(length int) []byte {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range length {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return b
-}
-
-// Rebind receives a question-bind query and return a rebound query if needed,
-// based on bindTo argument.
-func Rebind(bindTo binds.Bind, query string) string {
+func rebind(bindTo binds.Bind, query string) string {
 	switch bindTo {
 	case binds.Question:
 		return query
@@ -86,15 +79,14 @@ func Rebind(bindTo binds.Bind, query string) string {
 func QuestionToDollar(query string) string {
 	count := 0
 	var sb strings.Builder
-	for i := range query {
-		ch := query[i]
+	for _, ch := range query {
 		if ch == '?' {
 			count++
 			sb.WriteByte('$')
 			sb.WriteString(strconv.Itoa(count))
 			continue
 		}
-		sb.WriteByte(ch)
+		sb.WriteRune(ch)
 	}
 	return sb.String()
 }
@@ -115,28 +107,26 @@ func PrettyPrint(arg any) {
 
 type TableHelper struct {
 	tb        testing.TB
+	conn      *Conn
 	tableName string
 }
 
-func NewTableHelper(t testing.TB) *TableHelper {
-	return &TableHelper{t, TableName(t.Name())}
-}
+// NewTableHelper returns a [TableHelper] which is a helper for dealing with
+// dynamic generated tables, it runs a cleanup func that drops the table.
+// conn is only used to run cleanup, and to know the currect bind.
+func NewTableHelper(t testing.TB, conn *Conn) *TableHelper {
+	tableName := slugify(t.Name())
 
-// Cleanup drops table with [testing.TB.Cleanup].
-func (t *TableHelper) Cleanup(db *sql.DB) {
-	t.tb.Cleanup(func() {
-		db.Exec(t.Fmt("DROP TABLE IF EXISTS %s"))
+	t.Cleanup(func() {
+		conn.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	})
+
+	return &TableHelper{t, conn, tableName}
 }
 
-// Fmt replaces '%s' with table name.
+// Fmt replaces '%s' with table name, and transform MySQL query to the targeted driver.
 func (t *TableHelper) Fmt(query string) string {
-	return fmt.Sprintf(query, t.tableName)
-}
-
-// FmtRebind replaces '%s' with table name then run through [Rebind].
-func (t *TableHelper) FmtRebind(bindTo binds.Bind, query string) string {
-	return Rebind(bindTo, t.Fmt(query))
+	return rebind(t.conn.Bind, fmt.Sprintf(query, t.tableName))
 }
 
 func NewDB(driverName, dataSourceName string) (*sql.DB, error) {
@@ -153,37 +143,54 @@ func NewDB(driverName, dataSourceName string) (*sql.DB, error) {
 	return db, nil
 }
 
-type MultiDB struct {
-	dbByName map[string]*sql.DB
+type MultiConn []*Conn
+
+type Conn struct {
+	Name       string
+	DB         *sql.DB
+	Bind       binds.Bind
+	DriverName string
 }
 
-func NewMultiDB(t testing.TB) *MultiDB {
-	mdb := &MultiDB{dbByName: make(map[string]*sql.DB)}
+func NewMultiConn(t testing.TB) MultiConn {
+	var conns []*Conn
 
+	const mysqlDriverName = "mysql"
 	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), MYSQL_DSN)
-	if db, err := NewDB("mysql", dsn); err == nil {
-		mdb.dbByName["MySQL"] = db
+	if db, err := NewDB(mysqlDriverName, dsn); err == nil {
+		conns = append(conns, &Conn{
+			Name:       "MySQL",
+			DB:         db,
+			Bind:       binds.Question,
+			DriverName: mysqlDriverName,
+		})
 	}
 
+	const postgresDriverName = "pgx"
 	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), POSTGRES_DSN)
-	if db, err := NewDB("pgx", dsn); err == nil {
-		mdb.dbByName["PostgreSQL"] = db
+	if db, err := NewDB(postgresDriverName, dsn); err == nil {
+		conns = append(conns, &Conn{
+			Name:       "PostgreSQL",
+			DB:         db,
+			Bind:       binds.Dollar,
+			DriverName: postgresDriverName,
+		})
 	}
 
-	if len(mdb.dbByName) == 0 {
+	if len(conns) == 0 {
 		t.Fatal("no databases connected")
 	}
 
-	return mdb
+	return conns
 }
 
-func (m *MultiDB) Run(t *testing.T, fn func(t *testing.T, db *sql.DB)) {
+func (conns MultiConn) Run(t *testing.T, fn func(t *testing.T, conn *Conn)) {
 	t.Parallel()
-	for name, db := range m.dbByName {
-		t.Run(name, func(t *testing.T) {
+	for _, conn := range conns {
+		t.Run(conn.Name, func(t *testing.T) {
 			t.Parallel()
-			if db != nil {
-				fn(t, db)
+			if conn.DB != nil {
+				fn(t, conn)
 			}
 
 			err := "unable to connect to DB:" + t.Name()

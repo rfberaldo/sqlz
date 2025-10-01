@@ -49,9 +49,8 @@ func derefDest(dest any) any {
 }
 
 func TestScanner_Scan(t *testing.T) {
-	mdb := testutil.NewMultiDB(t)
+	multi := testutil.NewMultiConn(t)
 	ts, _ := time.Parse(time.DateTime, "2025-09-29 12:00:00")
-
 	testCases := []struct {
 		name     string
 		query    string
@@ -147,10 +146,10 @@ func TestScanner_Scan(t *testing.T) {
 		},
 	}
 
-	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				rows, err := db.Query(tc.query)
+				rows, err := conn.DB.Query(tc.query)
 				require.NoError(t, err)
 				scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{QueryRow: true})
 				require.NoError(t, err)
@@ -163,7 +162,7 @@ func TestScanner_Scan(t *testing.T) {
 }
 
 func TestScanner_ScanSlices(t *testing.T) {
-	mdb := testutil.NewMultiDB(t)
+	multi := testutil.NewMultiConn(t)
 
 	testCases := []struct {
 		name     string
@@ -175,12 +174,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 'foo val' AS foo, 'bar val' AS bar
+					SELECT 'foo val', 'bar val'
 					UNION ALL
 					SELECT 'foo val 2', 'bar val 2'
 					UNION ALL
 					SELECT 'foo val 3', 'bar val 3'
-				) AS t
+				) AS t (foo, bar)
 			`,
 			expected: []struct {
 				Foo string
@@ -196,12 +195,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 'foo val' AS foo, 'bar val' AS bar
+					SELECT 'foo val', 'bar val'
 					UNION ALL
 					SELECT 'foo val 2', 'bar val 2'
 					UNION ALL
 					SELECT 'foo val 3', 'bar val 3'
-				) AS t
+				) AS t (foo, bar)
 			`,
 			expected: []*struct {
 				Foo string
@@ -217,12 +216,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 'foo val' AS foo, 'bar val' AS bar
+					SELECT 'foo val', 'bar val'
 					UNION ALL
 					SELECT 'foo val 2', 'bar val 2'
 					UNION ALL
 					SELECT 'foo val 3', 'bar val 3'
-				) AS t
+				) AS t (foo, bar)
 			`,
 			expected: []map[string]any{
 				{"foo": "foo val", "bar": "bar val"},
@@ -235,12 +234,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 'foo val' AS foo
+					SELECT 'foo val'
 					UNION ALL
 					SELECT 'foo val 2'
 					UNION ALL
 					SELECT 'foo val 3'
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []string{"foo val", "foo val 2", "foo val 3"},
 		},
@@ -249,12 +248,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 'foo val' AS foo
+					SELECT 'foo val'
 					UNION ALL
 					SELECT NULL
 					UNION ALL
 					SELECT 'foo val 3'
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []*string{
 				testutil.PtrTo("foo val"),
@@ -267,12 +266,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 1 AS foo
+					SELECT 1
 					UNION ALL
 					SELECT 2
 					UNION ALL
 					SELECT 3
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []int{1, 2, 3},
 		},
@@ -281,12 +280,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 1 AS foo
+					SELECT 1
 					UNION ALL
 					SELECT NULL
 					UNION ALL
 					SELECT 3
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []*int{testutil.PtrTo(1), nil, testutil.PtrTo(3)},
 		},
@@ -295,12 +294,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT 'foo val' AS foo
+					SELECT 'foo val'
 					UNION ALL
 					SELECT 'foo val 2'
 					UNION ALL
 					SELECT 'foo val 3'
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []sql.NullString{
 				{String: "foo val", Valid: true},
@@ -313,10 +312,10 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}' AS foo
+					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}'
 					UNION ALL
 					SELECT '{"key1": "foo val 2", "key2": "bar val 2"}'
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []CustomScan{
 				{Key1: "foo val 1", Key2: "bar val 1"},
@@ -328,12 +327,12 @@ func TestScanner_ScanSlices(t *testing.T) {
 			query: `
 				SELECT *
 				FROM (
-					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}' AS foo
+					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}'
 					UNION ALL
 					SELECT NULL
 					UNION ALL
 					SELECT '{"key1": "foo val 2", "key2": "bar val 2"}'
-				) AS t
+				) AS t (foo)
 			`,
 			expected: []*CustomScan{
 				{Key1: "foo val 1", Key2: "bar val 1"},
@@ -343,10 +342,10 @@ func TestScanner_ScanSlices(t *testing.T) {
 		},
 	}
 
-	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				rows, err := db.Query(tc.query)
+				rows, err := conn.DB.Query(tc.query)
 				require.NoError(t, err)
 				scanner, err := sqlz.NewScanner(rows, nil)
 				require.NoError(t, err)
@@ -358,8 +357,36 @@ func TestScanner_ScanSlices(t *testing.T) {
 	})
 }
 
+func TestScanner_NoRows(t *testing.T) {
+	multi := testutil.NewMultiConn(t)
+	query := `SELECT NULL LIMIT 0`
+
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+		t.Run("queryRow=false do not return error", func(t *testing.T) {
+			rows, err := conn.DB.Query(query)
+			require.NoError(t, err)
+			scanner, err := sqlz.NewScanner(rows, nil)
+			require.NoError(t, err)
+			var tmp string
+			err = scanner.Scan(&tmp)
+			require.NoError(t, err)
+		})
+
+		t.Run("queryRow=true return error", func(t *testing.T) {
+			rows, err := conn.DB.Query(query)
+			require.NoError(t, err)
+			scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{QueryRow: true})
+			require.NoError(t, err)
+			var tmp string
+			err = scanner.Scan(&tmp)
+			require.Error(t, err)
+			require.ErrorIs(t, err, sql.ErrNoRows)
+		})
+	})
+}
+
 func TestScanner_ScanStructMissingFields(t *testing.T) {
-	mdb := testutil.NewMultiDB(t)
+	multi := testutil.NewMultiConn(t)
 	query := `
 		SELECT
 			1         AS id,
@@ -382,9 +409,9 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 		IsActive: true,
 	}
 
-	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		t.Run("missing field error", func(t *testing.T) {
-			rows, err := db.Query(query)
+			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
 			scanner, err := sqlz.NewScanner(rows, nil)
 			require.NoError(t, err)
@@ -395,7 +422,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 		})
 
 		t.Run("ignore missing fields", func(t *testing.T) {
-			rows, err := db.Query(query)
+			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
 			scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
 			require.NoError(t, err)
@@ -408,7 +435,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 }
 
 func TestScanner_ScanStructNested(t *testing.T) {
-	mdb := testutil.NewMultiDB(t)
+	multi := testutil.NewMultiConn(t)
 	query := `
 		SELECT
 			1         AS id,
@@ -443,8 +470,8 @@ func TestScanner_ScanStructNested(t *testing.T) {
 		},
 	}
 
-	mdb.Run(t, func(t *testing.T, db *sql.DB) {
-		rows, err := db.Query(query)
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
 		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
 		require.NoError(t, err)
@@ -456,7 +483,7 @@ func TestScanner_ScanStructNested(t *testing.T) {
 }
 
 func TestScanner_ScanStructEmbed(t *testing.T) {
-	mdb := testutil.NewMultiDB(t)
+	multi := testutil.NewMultiConn(t)
 	query := `
 		SELECT
 			1         AS id,
@@ -491,8 +518,8 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 		},
 	}
 
-	mdb.Run(t, func(t *testing.T, db *sql.DB) {
-		rows, err := db.Query(query)
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
 		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
 		require.NoError(t, err)
@@ -504,7 +531,7 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 }
 
 func TestScanner_ScanMap(t *testing.T) {
-	mdb := testutil.NewMultiDB(t)
+	multi := testutil.NewMultiConn(t)
 	query := `
 		SELECT
 			99         AS id,
@@ -517,9 +544,9 @@ func TestScanner_ScanMap(t *testing.T) {
 		"salary": "69420.42",
 	}
 
-	mdb.Run(t, func(t *testing.T, db *sql.DB) {
+	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		t.Run("allocated map", func(t *testing.T) {
-			rows, err := db.Query(query)
+			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
 			scanner, err := sqlz.NewScanner(rows, nil)
 			require.NoError(t, err)
@@ -530,7 +557,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		})
 
 		t.Run("non allocated map", func(t *testing.T) {
-			rows, err := db.Query(query)
+			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
 			scanner, err := sqlz.NewScanner(rows, nil)
 			require.NoError(t, err)
