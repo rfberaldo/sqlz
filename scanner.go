@@ -19,6 +19,7 @@ type RowScanner interface {
 }
 
 type Scanner struct {
+	closed              bool
 	columns             []string
 	queryRow            bool
 	rowCount            int
@@ -110,8 +111,8 @@ func (s *Scanner) checkDest(dest any) (reflect.Value, error) {
 // Scan automatically iterates over rows and scans results into dest.
 // Scan can only run once, after it is done [sql.Rows] are closed.
 func (s *Scanner) Scan(dest any) (err error) {
-	if s.rowCount > 0 {
-		panic("sqlz/scan: Scan already done or in progress")
+	if s.closed {
+		panic("sqlz/scan: scan already done or in progress")
 	}
 
 	destValue, err := s.checkDest(dest)
@@ -132,6 +133,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		return fmt.Errorf("sqlz/scan: expected 1 column, got %d", len(s.columns))
 	}
 
+	s.closed = true
 	defer func() {
 		if errClose := s.rows.Close(); errClose != nil {
 			err = fmt.Errorf("sqlz/scan: closing rows: %w", errClose)
@@ -139,10 +141,9 @@ func (s *Scanner) Scan(dest any) (err error) {
 	}()
 
 	isSlice := reflectutil.IsSlice(destValue.Kind())
-	var elType reflect.Type
 	var elValue reflect.Value
 	if isSlice {
-		elType = destValue.Type().Elem()
+		elType := destValue.Type().Elem()
 		elValue = reflect.New(elType).Elem()
 	}
 
