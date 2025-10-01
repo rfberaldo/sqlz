@@ -13,34 +13,6 @@ var (
 	mapType = reflect.TypeOf(map[string]any{})
 )
 
-// mapBinding is a helper for map scanning.
-type mapBinding struct {
-	values []any
-	ptrs   []any
-}
-
-// newMapBinding returns a [mapBinding], which is a helper for map scanning.
-func newMapBinding(columnCount int) *mapBinding {
-	b := &mapBinding{
-		values: make([]any, columnCount),
-		ptrs:   make([]any, columnCount),
-	}
-
-	for i := range b.values {
-		b.ptrs[i] = &b.values[i]
-	}
-
-	return b
-}
-
-func (mb *mapBinding) value(i int) any {
-	v := mb.values[i]
-	if v, ok := v.([]byte); ok {
-		return string(v)
-	}
-	return v
-}
-
 func SnakeCaseMapper(str string) string {
 	var sb strings.Builder
 	sb.Grow(len(str))

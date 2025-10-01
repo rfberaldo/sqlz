@@ -25,10 +25,10 @@ type Scanner struct {
 	rowCount            int
 	ignoreMissingFields bool
 	rows                RowScanner
-	mapBinding          *mapBinding
 	structMapper        *reflectutil.StructMapper
-	structPtrs          []any
 	sink                any // ignored fields sink
+	ptrs                []any
+	values              []any
 }
 
 type ScannerOptions struct {
@@ -73,8 +73,7 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 		rows:                rows,
 		queryRow:            opts.QueryRow,
 		ignoreMissingFields: opts.IgnoreMissingFields,
-		mapBinding:          newMapBinding(len(columns)),
-		structPtrs:          make([]any, len(columns)),
+		ptrs:                make([]any, len(columns)),
 		structMapper: reflectutil.NewStructMapper(
 			opts.StructTag,
 			opts.FieldNameMapper,
@@ -106,6 +105,11 @@ func (s *Scanner) checkDest(dest any) (reflect.Value, error) {
 		return reflect.Value{}, fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
 	}
 	return v, nil
+}
+
+// clearPtrs empty ptrs slice keeping the underlying array
+func (s *Scanner) clearPtrs() {
+	s.ptrs = s.ptrs[:0]
 }
 
 // Scan automatically iterates over rows and scans results into dest.
@@ -207,7 +211,10 @@ func (s *Scanner) Scan(dest any) (err error) {
 // The number of values in dest must be the same as the number of columns.
 // Must be called after [Scanner.NextRow]. Refer to [sql.Rows.Scan].
 func (s *Scanner) ScanRow(dest ...any) error {
-	if err := s.rows.Scan(dest...); err != nil {
+	s.clearPtrs()
+	s.ptrs = append(s.ptrs, dest...)
+
+	if err := s.rows.Scan(s.ptrs...); err != nil {
 		return fmt.Errorf("sqlz/scan: scanning row: %w", err)
 	}
 
@@ -216,12 +223,26 @@ func (s *Scanner) ScanRow(dest ...any) error {
 
 // ScanMap scans a single row into m. Must be called after [Scanner.NextRow].
 func (s *Scanner) ScanMap(m map[string]any) error {
-	if err := s.ScanRow(s.mapBinding.ptrs...); err != nil {
-		return err
+	if s.values == nil {
+		s.values = make([]any, len(s.columns))
+	}
+
+	s.clearPtrs()
+	for i := range s.values {
+		s.ptrs = append(s.ptrs, &s.values[i])
+	}
+
+	if err := s.rows.Scan(s.ptrs...); err != nil {
+		return fmt.Errorf("sqlz/scan: scanning row into map: %w", err)
 	}
 
 	for i, col := range s.columns {
-		m[col] = s.mapBinding.value(i)
+		v := s.values[i]
+		if v, ok := v.([]byte); ok {
+			m[col] = string(v)
+			continue
+		}
+		m[col] = v
 	}
 
 	return nil
@@ -251,20 +272,26 @@ func (s *Scanner) ScanStruct(dest any) error {
 		return err
 	}
 
-	return s.ScanRow(s.structPtrs...)
+	if err := s.rows.Scan(s.ptrs...); err != nil {
+		return fmt.Errorf("sqlz/scan: scanning row into struct: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Scanner) setStructPtrs(v reflect.Value) error {
-	for i, col := range s.columns {
+	s.clearPtrs()
+
+	for _, col := range s.columns {
 		fv := s.structMapper.FieldByTagName(col, v)
 		if !fv.IsValid() {
 			if !s.ignoreMissingFields {
-				return fmt.Errorf("sqlz/scan: field not found: %s", col)
+				return fmt.Errorf("sqlz/scan: field not found: '%s'", col)
 			}
-			s.structPtrs[i] = &s.sink
+			s.ptrs = append(s.ptrs, &s.sink)
 			continue
 		}
-		s.structPtrs[i] = fv.Addr().Interface()
+		s.ptrs = append(s.ptrs, fv.Addr().Interface())
 	}
 
 	return nil
