@@ -107,26 +107,27 @@ func PrettyPrint(arg any) {
 
 type TableHelper struct {
 	tb        testing.TB
-	conn      *Conn
+	db        *sql.DB
+	bind      binds.Bind
 	tableName string
 }
 
 // NewTableHelper returns a [TableHelper] which is a helper for dealing with
 // dynamic generated tables, it runs a cleanup func that drops the table.
-// conn is only used to run cleanup, and to know the currect bind.
-func NewTableHelper(t testing.TB, conn *Conn) *TableHelper {
+// db is only used to run cleanup.
+func NewTableHelper(t testing.TB, db *sql.DB, bind binds.Bind) *TableHelper {
 	tableName := slugify(t.Name())
 
 	t.Cleanup(func() {
-		conn.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+		db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	})
 
-	return &TableHelper{t, conn, tableName}
+	return &TableHelper{t, db, bind, tableName}
 }
 
 // Fmt replaces '%s' with table name, and transform MySQL query to the targeted driver.
 func (t *TableHelper) Fmt(query string) string {
-	return rebind(t.conn.Bind, fmt.Sprintf(query, t.tableName))
+	return rebind(t.bind, fmt.Sprintf(query, t.tableName))
 }
 
 func NewDB(driverName, dataSourceName string) (*sql.DB, error) {

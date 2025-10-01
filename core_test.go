@@ -58,7 +58,7 @@ func TestCore_ShouldReturnErrorForWrongQuery(t *testing.T) {
 func TestCore_ShouldReturnNotFoundOnQueryRow(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`CREATE TABLE %s (id INT PRIMARY KEY)`))
 		assert.NoError(t, err)
@@ -75,7 +75,7 @@ func TestCore_ShouldReturnNotFoundOnQueryRow(t *testing.T) {
 func TestCore_QueryArgs(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
 			CREATE TABLE %s (
@@ -203,7 +203,7 @@ func TestCore_QueryArgs(t *testing.T) {
 func TestCore_QueryRowArgs(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
 			CREATE TABLE %s (
@@ -320,7 +320,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 func TestCore_ExecArgs(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
 			CREATE TABLE %s (
@@ -480,7 +480,7 @@ func TestCore_ExecArgs(t *testing.T) {
 func TestCore_CustomStructTag(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
 			CREATE TABLE %s (
@@ -525,7 +525,7 @@ func TestCore_CustomStructTag(t *testing.T) {
 func TestCore_NonEnglishCharacters(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		th := testutil.NewTableHelper(t, conn)
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
 			CREATE TABLE %s (
