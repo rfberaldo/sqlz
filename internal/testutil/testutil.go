@@ -144,6 +144,46 @@ func NewDB(driverName, dataSourceName string) (*sql.DB, error) {
 	return db, nil
 }
 
+func NewMySQL(t testing.TB) *Conn {
+	conn := &Conn{
+		Name:       "MySQL",
+		DriverName: "mysql",
+		Bind:       binds.Question,
+	}
+
+	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), MYSQL_DSN)
+	db, err := NewDB(conn.DriverName, dsn)
+	if err != nil {
+		if _, ok := os.LookupEnv("CI"); ok {
+			t.Fatal(err)
+		}
+		return conn
+	}
+
+	conn.DB = db
+	return conn
+}
+
+func NewPostgreSQL(t testing.TB) *Conn {
+	conn := &Conn{
+		Name:       "PostgreSQL",
+		DriverName: "pgx",
+		Bind:       binds.Dollar,
+	}
+
+	dsn := cmp.Or(os.Getenv("POSTGRES_DSN"), MYSQL_DSN)
+	db, err := NewDB(conn.DriverName, dsn)
+	if err != nil {
+		if _, ok := os.LookupEnv("CI"); ok {
+			t.Fatal(err)
+		}
+		return conn
+	}
+
+	conn.DB = db
+	return conn
+}
+
 type MultiConn []*Conn
 
 type Conn struct {
@@ -153,36 +193,22 @@ type Conn struct {
 	DriverName string
 }
 
+var multiConn MultiConn
+
+// NewMultiConn is a singleton to avoid creating multiple connections.
 func NewMultiConn(t testing.TB) MultiConn {
-	var conns []*Conn
-
-	const mysqlDriverName = "mysql"
-	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), MYSQL_DSN)
-	if db, err := NewDB(mysqlDriverName, dsn); err == nil {
-		conns = append(conns, &Conn{
-			Name:       "MySQL",
-			DB:         db,
-			Bind:       binds.Question,
-			DriverName: mysqlDriverName,
-		})
+	if multiConn != nil {
+		return multiConn
 	}
 
-	const postgresDriverName = "pgx"
-	dsn = cmp.Or(os.Getenv("POSTGRES_DSN"), POSTGRES_DSN)
-	if db, err := NewDB(postgresDriverName, dsn); err == nil {
-		conns = append(conns, &Conn{
-			Name:       "PostgreSQL",
-			DB:         db,
-			Bind:       binds.Dollar,
-			DriverName: postgresDriverName,
-		})
-	}
+	multiConn = append(multiConn, NewMySQL(t))
+	multiConn = append(multiConn, NewPostgreSQL(t))
 
-	if len(conns) == 0 {
+	if multiConn[0].DB == nil && multiConn[1].DB == nil {
 		t.Fatal("no databases connected")
 	}
 
-	return conns
+	return multiConn
 }
 
 func (conns MultiConn) Run(t *testing.T, fn func(t *testing.T, conn *Conn)) {
@@ -192,13 +218,9 @@ func (conns MultiConn) Run(t *testing.T, fn func(t *testing.T, conn *Conn)) {
 			t.Parallel()
 			if conn.DB != nil {
 				fn(t, conn)
+			} else {
+				t.Skip()
 			}
-
-			err := "unable to connect to DB:" + t.Name()
-			if os.Getenv("CI") == "true" {
-				t.Fatal(err)
-			}
-			t.Skip(err)
 		})
 	}
 }
