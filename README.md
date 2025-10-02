@@ -4,8 +4,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rfberaldo/sqlz)](https://goreportcard.com/report/github.com/rfberaldo/sqlz)
 [![Go Reference](https://pkg.go.dev/badge/github.com/rfberaldo/sqlz.svg)](https://pkg.go.dev/github.com/rfberaldo/sqlz)
 
-sqlz is a thin wrapper around standard library's `database/sql`, specifically `sql.DB` and `sql.Tx`.
-It aims to be lightweight and easy to use, with a much smaller API. Scanning is powered by [scany](https://github.com/georgysavva/scany).
+**sqlz** is a wrapper around standard library's [database/sql](https://pkg.go.dev/database/sql), specifically [sql.DB](https://pkg.go.dev/database/sql#DB) and [sql.Tx](https://pkg.go.dev/database/sql#Tx).
+It aims to be lightweight and easy to use, with a much smaller API.
 
 ## Getting started
 
@@ -30,7 +30,7 @@ db := sqlz.New("sqlite3", pool, nil)
 
 ## Querying
 
-sqlz has only three main methods, they will behave different depending on the args provided:
+sqlz has only three main methods, they behave different depending on the args provided:
 
 ```go
 Query(ctx context.Context, dst any, query string, args ...any) error
@@ -41,7 +41,7 @@ Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
 ### Query / QueryRow
 
 They both query from database and do the scanning.
-`QueryRow` only return one record, and return error if not found.
+`QueryRow` only returns one record, or [sql.ErrNoRows](https://pkg.go.dev/database/sql#ErrNoRows) if not found.
 
 ```go
 // struct or map args are treated as a named query
@@ -109,8 +109,8 @@ err = tx.Commit()
 
 ### Struct tags
 
-To find the key of a struct property, sqlz first try to find the `db` tag,
-if it's not present, it then converts the property name to snake case.
+To find the key of a struct field, sqlz first try to find the `db` tag,
+if it's not present, it then converts the field's name to snake case.
 
 ```go
 type User struct {
@@ -131,13 +131,10 @@ db := sqlz.New("sqlite3", pool, &sqlz.Options{StructTag: "json"})
 
 ## Dependencies
 
-The only dependency of sqlz is [scany](https://github.com/georgysavva/scany).
-All the others listed in [go.mod](go.mod) are testing/dev dependencies.
+**sqlz** has no dependencies, only testing/dev deps: [testify and db drivers](go.mod).
 
 ## Comparison with [sqlx](https://github.com/jmoiron/sqlx)
 
-- sqlz has a smaller scope, it doesn't support prepared statements and all the
-scanning work is done by [scany](https://github.com/georgysavva/scany).
 - It was designed with a simpler API for everyday use, with fewer concepts and less verbose.
 - It supports non-english utf-8 characters in named queries.
 
