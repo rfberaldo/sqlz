@@ -1,6 +1,7 @@
 package sqlz
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+var ctx = context.Background()
 
 func TestCore_BasicQueryMethods(t *testing.T) {
 	multi := testutil.NewMultiConn(t)

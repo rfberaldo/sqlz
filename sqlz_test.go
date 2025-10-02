@@ -1,4 +1,4 @@
-package sqlz
+package sqlz_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rfberaldo/sqlz"
 	"github.com/rfberaldo/sqlz/internal/binds"
 	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -15,12 +16,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-var ctx = context.Background()
-
 func TestBasicQueryMethods(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		db := New(conn.DriverName, conn.DB, nil)
+		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		var err error
 		var s string
 		var ss []string
@@ -55,9 +54,9 @@ func TestBasicQueryMethods(t *testing.T) {
 func TestContextCancellation(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		db := New(conn.DriverName, conn.DB, nil)
+		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
-		if db.bind == binds.Dollar {
+		if conn.Bind == binds.Dollar {
 			q = "SELECT PG_SLEEP(1)"
 		}
 
@@ -120,9 +119,9 @@ func TestContextCancellation(t *testing.T) {
 func TestTxContextCancellation(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		db := New(conn.DriverName, conn.DB, nil)
+		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
-		if db.bind == binds.Dollar {
+		if conn.Bind == binds.Dollar {
 			q = "SELECT PG_SLEEP(1)"
 		}
 
@@ -209,7 +208,7 @@ func TestTxContextCancellation(t *testing.T) {
 func TestTransaction(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		db := New(conn.DriverName, conn.DB, nil)
+		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := db.Exec(ctx, th.Fmt(`
@@ -323,7 +322,7 @@ func TestTransaction(t *testing.T) {
 func TestCustomStructTag(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		db := New(conn.DriverName, conn.DB, &Options{StructTag: "json"})
+		db := sqlz.New(conn.DriverName, conn.DB, &sqlz.Options{StructTag: "json"})
 
 		type User struct {
 			Identifier int    `json:"id"`
@@ -353,10 +352,10 @@ func TestCustomStructTag(t *testing.T) {
 func TestPool(t *testing.T) {
 	multi := testutil.NewMultiConn(t)
 	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
-		db := New(conn.DriverName, conn.DB, nil)
+		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		assert.IsType(t, &sql.DB{}, db.Pool())
 		db.Pool().SetMaxOpenConns(42)
-		assert.Equal(t, 42, db.pool.Stats().MaxOpenConnections)
+		assert.Equal(t, 42, db.Pool().Stats().MaxOpenConnections)
 
 		tx, err := db.Begin(ctx)
 		assert.NoError(t, err)
