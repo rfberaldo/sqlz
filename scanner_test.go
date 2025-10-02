@@ -570,16 +570,20 @@ func TestScanner_ScanMap(t *testing.T) {
 }
 
 func TestScanner_CheckDest(t *testing.T) {
+	newScanner := func() *sqlz.Scanner {
 	scanner, err := sqlz.NewScanner(&mock.Rows{
 		ColumnsFunc: func() ([]string, error) {
 			return []string{"user"}, nil
 		},
 	}, nil)
 	require.NoError(t, err)
+		return scanner
+	}
 
 	errAddressable := "destination must be addressable"
 
 	t.Run("no ref to string", func(t *testing.T) {
+		scanner := newScanner()
 		var m string
 		err := scanner.Scan(m)
 		require.Error(t, err)
@@ -587,6 +591,7 @@ func TestScanner_CheckDest(t *testing.T) {
 	})
 
 	t.Run("no ref to pointer string", func(t *testing.T) {
+		scanner := newScanner()
 		var m *string
 		err := scanner.Scan(m)
 		require.Error(t, err)
@@ -594,24 +599,28 @@ func TestScanner_CheckDest(t *testing.T) {
 	})
 
 	t.Run("ref to string", func(t *testing.T) {
+		scanner := newScanner()
 		var m string
 		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to pointer string", func(t *testing.T) {
+		scanner := newScanner()
 		var m *string
 		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to map", func(t *testing.T) {
+		scanner := newScanner()
 		var m map[string]any
 		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("no ref to map", func(t *testing.T) {
+		scanner := newScanner()
 		var m map[string]any
 		err := scanner.Scan(m)
 		require.Error(t, err)
@@ -619,6 +628,7 @@ func TestScanner_CheckDest(t *testing.T) {
 	})
 
 	t.Run("no ref to slice", func(t *testing.T) {
+		scanner := newScanner()
 		var s []string
 		err := scanner.Scan(s)
 		require.Error(t, err)
@@ -626,29 +636,51 @@ func TestScanner_CheckDest(t *testing.T) {
 	})
 
 	t.Run("ref to slice", func(t *testing.T) {
+		scanner := newScanner()
 		var s []string
 		err := scanner.Scan(&s)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to interface", func(t *testing.T) {
+		scanner := newScanner()
 		var m any
 		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("no ref to pointer struct", func(t *testing.T) {
+		scanner := newScanner()
 		type User struct{}
 		var user *User
-		err = scanner.Scan(user)
+		err := scanner.Scan(user)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to pointer struct", func(t *testing.T) {
+		scanner := newScanner()
 		type User struct{}
 		var user *User
-		err = scanner.Scan(&user)
+		err := scanner.Scan(&user)
 		require.NoError(t, err)
 	})
+
+	t.Run("ref to pointer struct", func(t *testing.T) {
+		scanner := newScanner()
+		type User struct{}
+		var user *User
+		err := scanner.Scan(&user)
+		require.NoError(t, err)
+	})
+}
+
+func TestScanner_DuplicateColumns(t *testing.T) {
+	_, err := sqlz.NewScanner(&mock.Rows{
+		ColumnsFunc: func() ([]string, error) {
+			return []string{"user", "user"}, nil
+		},
+	}, nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "duplicate column")
 }
