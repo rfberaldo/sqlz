@@ -74,13 +74,6 @@ func DerefValue(v reflect.Value) reflect.Value {
 	return v
 }
 
-func DerefType(t reflect.Type) reflect.Type {
-	if t.Kind() == reflect.Pointer {
-		return DerefType(t.Elem())
-	}
-	return t
-}
-
 func IsNilStruct(v reflect.Value) bool {
 	if v.Kind() != reflect.Pointer {
 		return false
