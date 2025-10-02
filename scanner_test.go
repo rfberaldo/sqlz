@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/rfberaldo/sqlz"
+	"github.com/rfberaldo/sqlz/internal/binds"
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
 	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/rfberaldo/sqlz/internal/testutil/mock"
@@ -691,4 +692,134 @@ func TestScanner_DuplicateColumns(t *testing.T) {
 	}, nil)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "duplicate column")
+}
+
+func setupTestTable(t testing.TB, db *sql.DB) *testutil.TableHelper {
+	th := testutil.NewTableHelper(t, db, binds.Question)
+	query := th.Fmt(`
+		CREATE TABLE %s (
+			id int auto_increment NOT NULL,
+			name varchar(100) NULL,
+			age int NULL,
+			username varchar(100) NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY (id)
+		)`)
+
+	_, err := db.Exec(query)
+	require.NoError(t, err)
+
+	for range 1000 {
+		_, err = db.Exec(
+			th.Fmt("INSERT INTO %s (name, age, username, created_at) VALUES (?,?,?,?)"),
+			"Bob D", 42, "bob", time.Now(),
+		)
+		require.NoError(t, err)
+	}
+
+	return th
+}
+
+// BenchmarkScan_MapSlice-12    	    1189	    938981 ns/op	  537100 B/op	   13785 allocs/op
+func BenchmarkScan_MapSlice(b *testing.B) {
+	conn := testutil.NewMySQL(b)
+	require.NotNil(b, conn.DB)
+	th := setupTestTable(b, conn.DB)
+
+	for b.Loop() {
+		var m []map[string]any
+		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
+		require.NoError(b, err)
+		scanner, err := sqlz.NewScanner(rows, nil)
+		require.NoError(b, err)
+		err = scanner.Scan(&m)
+		require.NoError(b, err)
+		assert.Equal(b, 1000, len(m))
+	}
+}
+
+// BenchmarkScan_StructSlice-12    	    1069	   1041931 ns/op	  265013 B/op	    8705 allocs/op
+func BenchmarkScan_StructSlice(b *testing.B) {
+	conn := testutil.NewMySQL(b)
+	require.NotNil(b, conn.DB)
+	th := setupTestTable(b, conn.DB)
+
+	type User struct {
+		Id        int
+		Name      *string
+		Age       *int
+		Username  string
+		CreatedAt time.Time
+	}
+
+	for b.Loop() {
+		var users []User
+		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
+		require.NoError(b, err)
+		scanner, err := sqlz.NewScanner(rows, nil)
+		require.NoError(b, err)
+		err = scanner.Scan(&users)
+		require.NoError(b, err)
+		assert.Equal(b, 1000, len(users))
+	}
+}
+
+// BenchmarkScan_Primitivelice-12    	    2820	    374166 ns/op	   65314 B/op	    2034 allocs/op
+func BenchmarkScan_Primitivelice(b *testing.B) {
+	conn := testutil.NewMySQL(b)
+	require.NotNil(b, conn.DB)
+	th := setupTestTable(b, conn.DB)
+
+	for b.Loop() {
+		var names []string
+		rows, err := conn.DB.Query(th.Fmt("SELECT name FROM %s"))
+		require.NoError(b, err)
+		scanner, err := sqlz.NewScanner(rows, nil)
+		require.NoError(b, err)
+		err = scanner.Scan(&names)
+		require.NoError(b, err)
+		assert.Equal(b, 1000, len(names))
+	}
+}
+
+// BenchmarkScan_Struct-12    	   10000	    116541 ns/op	    1833 B/op	      54 allocs/op
+func BenchmarkScan_Struct(b *testing.B) {
+	conn := testutil.NewMySQL(b)
+	require.NotNil(b, conn.DB)
+	th := setupTestTable(b, conn.DB)
+
+	type User struct {
+		Id        int
+		Name      *string
+		Age       *int
+		Username  string
+		CreatedAt time.Time
+	}
+
+	for b.Loop() {
+		var user User
+		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s LIMIT 1"))
+		require.NoError(b, err)
+		scanner, err := sqlz.NewScanner(rows, nil)
+		require.NoError(b, err)
+		err = scanner.Scan(&user)
+		require.NoError(b, err)
+	}
+}
+
+// BenchmarkScan_Map-12    	   12676	     94575 ns/op	    1520 B/op	      36 allocs/op
+func BenchmarkScan_Map(b *testing.B) {
+	conn := testutil.NewMySQL(b)
+	require.NotNil(b, conn.DB)
+
+	for b.Loop() {
+		m := make(map[string]any)
+		rows, err := conn.DB.Query("SELECT * FROM user LIMIT 1")
+		require.NoError(b, err)
+		scanner, err := sqlz.NewScanner(rows, nil)
+		require.NoError(b, err)
+		err = scanner.Scan(&m)
+		require.NoError(b, err)
+		assert.Equal(b, 4, len(m))
+	}
 }
