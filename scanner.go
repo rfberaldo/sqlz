@@ -80,6 +80,10 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 		),
 	}
 
+	if err := scanner.checkDuplicateColumns(); err != nil {
+		return nil, err
+	}
+
 	return scanner, nil
 }
 
@@ -96,6 +100,17 @@ func (s *Scanner) postScan() error {
 		return sql.ErrNoRows
 	}
 
+	return nil
+}
+
+func (s *Scanner) checkDuplicateColumns() error {
+	seen := make(map[string]bool, len(s.columns))
+	for _, col := range s.columns {
+		if _, ok := seen[col]; ok {
+			return fmt.Errorf("sqlz/scan: duplicate column name: '%s'", col)
+		}
+		seen[col] = true
+	}
 	return nil
 }
 
