@@ -29,7 +29,7 @@ func typeOf(t reflect.Type) Type {
 	case reflect.Struct:
 		return Struct
 
-	case reflect.Array, reflect.Slice:
+	case reflect.Slice:
 		if et := typeOf(t.Elem()); et > 0 {
 			return Slice | et
 		}
@@ -84,8 +84,4 @@ func IsNilStruct(v reflect.Value) bool {
 
 func IsNilMap(v reflect.Value) bool {
 	return v.Kind() == reflect.Map && v.IsNil()
-}
-
-func IsSlice(kind reflect.Kind) bool {
-	return kind == reflect.Slice || kind == reflect.Array
 }

@@ -673,6 +673,14 @@ func TestScanner_CheckDest(t *testing.T) {
 		err := scanner.Scan(&user)
 		require.NoError(t, err)
 	})
+
+	t.Run("array", func(t *testing.T) {
+		scanner := newScanner()
+		var arr [1]string
+		err := scanner.Scan(&arr)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "unsupported destination type")
+	})
 }
 
 func TestScanner_DuplicateColumns(t *testing.T) {
