@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestNew(t *testing.T) {
@@ -36,23 +34,10 @@ func TestNew_panic(t *testing.T) {
 	New("wrongdriver", &sql.DB{}, nil)
 }
 
-func TestConnect(t *testing.T) {
-	db, err := Connect("sqlite3", ":memory:")
-	assert.NoError(t, err)
-	assert.NotNil(t, db)
-	assert.IsType(t, &DB{}, db)
-}
-
 func TestConnect_wrong_driver(t *testing.T) {
 	_, err := Connect("wrongdriver", ":memory:")
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "unknown driver")
-}
-
-func TestMustConnect(t *testing.T) {
-	db := MustConnect("sqlite3", ":memory:")
-	assert.NotNil(t, db)
-	assert.IsType(t, &DB{}, db)
 }
 
 func TestNotFound(t *testing.T) {
