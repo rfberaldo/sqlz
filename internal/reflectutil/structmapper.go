@@ -83,21 +83,20 @@ func walkStruct(tag string, rval reflect.Value, match func(string) bool, index [
 	return reflect.Value{}, []int{}
 }
 
-// FieldName extracts the name for a struct field, prioritizing tag.
-func FieldName(field reflect.StructField, tag string) string {
-	tagValue := field.Tag.Get(tag)
+// FieldName extracts the name for a struct field, prioritizing structTag.
+func FieldName(field reflect.StructField, structTag string) string {
+	tagValue, ok := field.Tag.Lookup(structTag)
+	if !ok {
+		return field.Name
+	}
 
-	if tagValue != "-" && tagValue != "" {
-		// check for possible comma as in "...,omitempty"
-		commaIdx := strings.Index(tagValue, ",")
+	// check for possible comma as in "...,omitempty"
+	if i := strings.Index(tagValue, ","); i > -1 {
+		tagValue = tagValue[:i]
+	}
 
-		if commaIdx == -1 {
-			return tagValue
-		}
-
-		if tagValue[:commaIdx] != "" {
-			return tagValue[:commaIdx]
-		}
+	if tagValue != "" && tagValue != "-" {
+		return tagValue
 	}
 
 	return field.Name
