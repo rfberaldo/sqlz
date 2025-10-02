@@ -138,7 +138,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		}
 	}()
 
-	isSlice := reflectutil.IsSlice(destValue.Kind())
+	isSlice := destValue.Kind() == reflect.Slice
 	var elValue reflect.Value
 	if isSlice {
 		elType := destValue.Type().Elem()
