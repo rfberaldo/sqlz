@@ -173,8 +173,6 @@ func TestWalkStruct_Embed(t *testing.T) {
 	}
 }
 
-// BenchmarkFieldByTagName-12    	  237490	      4783 ns/op	    1296 B/op	      57 allocs/op
-// BenchmarkFieldByTagName-12    	  295118	      3888 ns/op	     240 B/op	      13 allocs/op
 // BenchmarkFieldByTagName-12    	  440548	      2789 ns/op	     264 B/op	       8 allocs/op
 func BenchmarkFieldByTagName(b *testing.B) {
 	type Person struct {
