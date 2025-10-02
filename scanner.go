@@ -18,31 +18,37 @@ type RowScanner interface {
 	Scan(dest ...any) error
 }
 
+// Scanner wrapps rows and exposes the Scan method that automatically scan rows
+// into destination regardless of type. Each instance of Scan must be for a single
+// query result.
+//
+// Scanner also exposes primitive methods for a single row scan: ScanRow,
+// ScanMap and ScanStruct, these methods do not loop over or close rows,
+// nor can they be mixed.
 type Scanner struct {
-	closed              bool
 	columns             []string
 	queryRow            bool
-	rowCount            int
 	ignoreMissingFields bool
 	rows                RowScanner
 	structMapper        *reflectutil.StructMapper
-	sink                any // ignored fields sink
-	ptrs                []any
-	values              []any
+	ptrs                []any // slice of pointers for scan, used in all methods
+	values              []any // slice of values from rows, used in map scanning
 }
 
+var noOpField any // ignored fields sink
+
 type ScannerOptions struct {
-	// QueryRow enforces result to be a single row.
+	// QueryRow enforces result to be a single row, only used for Scan method.
 	QueryRow bool
 
-	// StructTag is the reflection tag that will be used to map fields.
+	// StructTag is the reflection tag that will be used to map struct fields.
 	StructTag string
 
 	// FieldNameMapper is a func that maps a struct field name to the database column.
 	// It is only used when the struct tag is not found.
 	FieldNameMapper func(string) string
 
-	// IgnoreMissingFields makes struct scan to ignore missing fields instead of returning error.
+	// IgnoreMissingFields makes scan to ignore missing struct fields instead of returning error.
 	IgnoreMissingFields bool
 }
 
@@ -73,7 +79,6 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 		rows:                rows,
 		queryRow:            opts.QueryRow,
 		ignoreMissingFields: opts.IgnoreMissingFields,
-		ptrs:                make([]any, len(columns)),
 		structMapper: reflectutil.NewStructMapper(
 			opts.StructTag,
 			opts.FieldNameMapper,
@@ -85,22 +90,6 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 	}
 
 	return scanner, nil
-}
-
-func (s *Scanner) postScan() error {
-	if err := s.rows.Err(); err != nil {
-		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
-	}
-
-	if s.queryRow && s.rowCount > 1 {
-		return fmt.Errorf("sqlz/scan: expected one row, got %d", s.rowCount)
-	}
-
-	if s.queryRow && s.rowCount == 0 {
-		return sql.ErrNoRows
-	}
-
-	return nil
 }
 
 func (s *Scanner) checkDuplicateColumns() error {
@@ -122,18 +111,9 @@ func (s *Scanner) checkDest(dest any) (reflect.Value, error) {
 	return v, nil
 }
 
-// clearPtrs empty ptrs slice keeping the underlying array
-func (s *Scanner) clearPtrs() {
-	s.ptrs = s.ptrs[:0]
-}
-
 // Scan automatically iterates over rows and scans results into dest.
 // Scan can only run once, after it is done [sql.Rows] are closed.
 func (s *Scanner) Scan(dest any) (err error) {
-	if s.closed {
-		panic("sqlz/scan: scan already done or in progress")
-	}
-
 	destValue, err := s.checkDest(dest)
 	if err != nil {
 		return err
@@ -152,7 +132,6 @@ func (s *Scanner) Scan(dest any) (err error) {
 		return fmt.Errorf("sqlz/scan: expected 1 column, got %d", len(s.columns))
 	}
 
-	s.closed = true
 	defer func() {
 		if errClose := s.rows.Close(); errClose != nil {
 			err = fmt.Errorf("sqlz/scan: closing rows: %w", errClose)
@@ -166,6 +145,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		elValue = reflect.New(elType).Elem()
 	}
 
+	rowCount := 0
 	for s.rows.Next() {
 		switch destType {
 		case reflectutil.Primitive:
@@ -208,15 +188,23 @@ func (s *Scanner) Scan(dest any) (err error) {
 			destValue.Set(reflect.Append(destValue, elValue))
 		}
 
-		s.rowCount++
+		rowCount++
 	}
 
 	if err != nil {
 		return err
 	}
 
-	if err := s.postScan(); err != nil {
-		return err
+	if err := s.rows.Err(); err != nil {
+		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
+	}
+
+	if s.queryRow && rowCount > 1 {
+		return fmt.Errorf("sqlz/scan: expected one row, got %d", rowCount)
+	}
+
+	if s.queryRow && rowCount == 0 {
+		return sql.ErrNoRows
 	}
 
 	return err
@@ -226,7 +214,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 // The number of values in dest must be the same as the number of columns.
 // Must be called after [Scanner.NextRow]. Refer to [sql.Rows.Scan].
 func (s *Scanner) ScanRow(dest ...any) error {
-	s.clearPtrs()
+	s.ptrs = s.ptrs[:0] // empty slice keeping the underlying array
 	s.ptrs = append(s.ptrs, dest...)
 
 	if err := s.rows.Scan(s.ptrs...); err != nil {
@@ -238,14 +226,7 @@ func (s *Scanner) ScanRow(dest ...any) error {
 
 // ScanMap scans a single row into m. Must be called after [Scanner.NextRow].
 func (s *Scanner) ScanMap(m map[string]any) error {
-	if s.values == nil {
-		s.values = make([]any, len(s.columns))
-	}
-
-	s.clearPtrs()
-	for i := range s.values {
-		s.ptrs = append(s.ptrs, &s.values[i])
-	}
+	s.setMapPtrs()
 
 	if err := s.rows.Scan(s.ptrs...); err != nil {
 		return fmt.Errorf("sqlz/scan: scanning row into map: %w", err)
@@ -261,6 +242,19 @@ func (s *Scanner) ScanMap(m map[string]any) error {
 	}
 
 	return nil
+}
+
+func (s *Scanner) setMapPtrs() {
+	if s.ptrs != nil {
+		return
+	}
+
+	s.values = make([]any, len(s.columns))
+	s.ptrs = make([]any, len(s.columns))
+
+	for i := range s.values {
+		s.ptrs[i] = &s.values[i]
+	}
 }
 
 // ScanStruct scans a single row into dest, if dest is not a struct it panics.
@@ -295,18 +289,20 @@ func (s *Scanner) ScanStruct(dest any) error {
 }
 
 func (s *Scanner) setStructPtrs(v reflect.Value) error {
-	s.clearPtrs()
+	if s.ptrs == nil {
+		s.ptrs = make([]any, len(s.columns))
+	}
 
-	for _, col := range s.columns {
+	for i, col := range s.columns {
 		fv := s.structMapper.FieldByTagName(col, v)
 		if !fv.IsValid() {
 			if !s.ignoreMissingFields {
 				return fmt.Errorf("sqlz/scan: field not found: '%s'", col)
 			}
-			s.ptrs = append(s.ptrs, &s.sink)
+			s.ptrs[i] = &noOpField
 			continue
 		}
-		s.ptrs = append(s.ptrs, fv.Addr().Interface())
+		s.ptrs[i] = fv.Addr().Interface()
 	}
 
 	return nil

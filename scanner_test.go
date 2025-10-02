@@ -571,12 +571,12 @@ func TestScanner_ScanMap(t *testing.T) {
 
 func TestScanner_CheckDest(t *testing.T) {
 	newScanner := func() *sqlz.Scanner {
-	scanner, err := sqlz.NewScanner(&mock.Rows{
-		ColumnsFunc: func() ([]string, error) {
-			return []string{"user"}, nil
-		},
-	}, nil)
-	require.NoError(t, err)
+		scanner, err := sqlz.NewScanner(&mock.Rows{
+			ColumnsFunc: func() ([]string, error) {
+				return []string{"user"}, nil
+			},
+		}, nil)
+		require.NoError(t, err)
 		return scanner
 	}
 
