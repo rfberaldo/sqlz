@@ -16,8 +16,7 @@ import (
 var ctx = context.Background()
 
 func TestCore_BasicQueryMethods(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		var err error
 		var s string
 		var ss []string
@@ -37,8 +36,7 @@ func TestCore_BasicQueryMethods(t *testing.T) {
 }
 
 func TestCore_ShouldReturnErrorForWrongQuery(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		var err error
 		var dst any
 		const query = "WRONG QUERY"
@@ -59,8 +57,7 @@ func TestCore_ShouldReturnErrorForWrongQuery(t *testing.T) {
 }
 
 func TestCore_ShouldReturnNotFoundOnQueryRow(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`CREATE TABLE %s (id INT PRIMARY KEY)`))
@@ -76,8 +73,7 @@ func TestCore_ShouldReturnNotFoundOnQueryRow(t *testing.T) {
 }
 
 func TestCore_QueryArgs(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
@@ -204,8 +200,7 @@ func TestCore_QueryArgs(t *testing.T) {
 }
 
 func TestCore_QueryRowArgs(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
@@ -321,8 +316,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 }
 
 func TestCore_ExecArgs(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
@@ -481,8 +475,7 @@ func TestCore_ExecArgs(t *testing.T) {
 }
 
 func TestCore_CustomStructTag(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
@@ -526,8 +519,7 @@ func TestCore_CustomStructTag(t *testing.T) {
 }
 
 func TestCore_NonEnglishCharacters(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
