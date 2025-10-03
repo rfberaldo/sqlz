@@ -23,26 +23,20 @@ type Parser struct {
 	idents       []string
 	identCount   int
 	bindCount    int
-	output       stringBuilder
+	output       strings.Builder
 
 	// the slice length by ident index which have an `IN` clause.
 	// if there's items in this map we have to duplicate placeholder by count.
 	inClauseCountByIndex map[int]int
 }
 
-type namedOptions struct {
-	skipQuery  bool
-	skipIdents bool
-}
-
-func (p *Parser) parseNamed(opts namedOptions) (string, []string) {
+func (p *Parser) parseNamed(skipIdents bool) (string, []string) {
 	p.read()
-	p.output.skip = opts.skipQuery
 	p.output.Grow(len(p.input)) // max will be len(input)
 
 	for {
 		p.skipWhitespace()
-		p.tryReadIdent(opts.skipIdents)
+		p.tryReadIdent(skipIdents)
 
 		if p.ch == EOF {
 			break
@@ -278,39 +272,4 @@ func shouldSpread(arg any) bool {
 	// if it's slice then it's part of 'IN' clause and have to spread
 	kind := v.Kind()
 	return kind == reflect.Slice || kind == reflect.Array
-}
-
-// stringBuilder is a wrapper around [strings.Builder] to skip
-// processing when skipQuery=true
-type stringBuilder struct {
-	sb   strings.Builder
-	skip bool
-}
-
-func (sb *stringBuilder) Grow(n int) {
-	if sb.skip {
-		return
-	}
-	sb.sb.Grow(n)
-}
-
-func (sb *stringBuilder) String() string {
-	if sb.skip {
-		return ""
-	}
-	return sb.sb.String()
-}
-
-func (sb *stringBuilder) WriteRune(r rune) (int, error) {
-	if sb.skip {
-		return 0, nil
-	}
-	return sb.sb.WriteRune(r)
-}
-
-func (sb *stringBuilder) WriteString(s string) (int, error) {
-	if sb.skip {
-		return 0, nil
-	}
-	return sb.sb.WriteString(s)
 }
