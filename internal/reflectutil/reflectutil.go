@@ -62,13 +62,13 @@ func typeOf(t reflect.Type) Type {
 	return Invalid
 }
 
-// DerefValue de-references a [reflect.Value], nil pointers are preserved.
-func DerefValue(v reflect.Value) reflect.Value {
-	if k := v.Kind(); k == reflect.Pointer || k == reflect.Interface {
+// Deref recursively de-references a [reflect.Value], nil pointers are preserved.
+func Deref(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return v
 		}
-		return DerefValue(v.Elem())
+		return Deref(v.Elem())
 	}
 
 	return v

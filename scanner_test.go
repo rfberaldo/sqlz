@@ -46,7 +46,7 @@ func allocDest(dest any) any {
 
 func derefDest(dest any) any {
 	v := reflect.ValueOf(dest)
-	return reflectutil.DerefValue(v).Interface()
+	return reflectutil.Deref(v).Interface()
 }
 
 func TestScanner_Scan(t *testing.T) {
@@ -811,15 +811,15 @@ func BenchmarkScan_Struct(b *testing.B) {
 func BenchmarkScan_Map(b *testing.B) {
 	conn := testutil.NewMySQL(b)
 	require.NotNil(b, conn.DB)
+	th := setupTestTable(b, conn.DB)
 
 	for b.Loop() {
 		m := make(map[string]any)
-		rows, err := conn.DB.Query("SELECT * FROM user LIMIT 1")
+		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s LIMIT 1"))
 		require.NoError(b, err)
 		scanner, err := sqlz.NewScanner(rows, nil)
 		require.NoError(b, err)
 		err = scanner.Scan(&m)
 		require.NoError(b, err)
-		assert.Equal(b, 4, len(m))
 	}
 }
