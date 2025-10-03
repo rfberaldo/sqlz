@@ -17,8 +17,7 @@ import (
 )
 
 func TestBasicQueryMethods(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		var err error
 		var s string
@@ -52,8 +51,7 @@ func TestBasicQueryMethods(t *testing.T) {
 }
 
 func TestContextCancellation(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
 		if conn.Bind == binds.Dollar {
@@ -117,8 +115,7 @@ func TestContextCancellation(t *testing.T) {
 }
 
 func TestTxContextCancellation(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
 		if conn.Bind == binds.Dollar {
@@ -206,8 +203,7 @@ func TestTxContextCancellation(t *testing.T) {
 }
 
 func TestTransaction(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
@@ -320,8 +316,7 @@ func TestTransaction(t *testing.T) {
 }
 
 func TestCustomStructTag(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, &sqlz.Options{StructTag: "json"})
 
 		type User struct {
@@ -350,8 +345,7 @@ func TestCustomStructTag(t *testing.T) {
 }
 
 func TestPool(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		assert.IsType(t, &sql.DB{}, db.Pool())
 		db.Pool().SetMaxOpenConns(42)

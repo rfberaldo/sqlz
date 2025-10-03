@@ -50,16 +50,16 @@ func derefDest(dest any) any {
 }
 
 func TestScanner_Scan(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	ts, _ := time.Parse(time.DateTime, "2025-09-29 12:00:00")
-	testCases := []struct {
-		name     string
-		query    string
-		expected any
-	}{
-		{
-			name: "struct",
-			query: `
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		ts, _ := time.Parse(time.DateTime, "2025-09-29 12:00:00")
+		testCases := []struct {
+			name     string
+			query    string
+			expected any
+		}{
+			{
+				name: "struct",
+				query: `
 				SELECT
 					1         AS id,
 					'Alice'   AS name,
@@ -67,23 +67,23 @@ func TestScanner_Scan(t *testing.T) {
 					TRUE      AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
-			expected: struct {
-				Id        int
-				Name      string
-				Salary    float64
-				IsActive  bool
-				CreatedAt time.Time
-			}{
-				Id:        1,
-				Name:      "Alice",
-				Salary:    69420.42,
-				IsActive:  true,
-				CreatedAt: ts,
+				expected: struct {
+					Id        int
+					Name      string
+					Salary    float64
+					IsActive  bool
+					CreatedAt time.Time
+				}{
+					Id:        1,
+					Name:      "Alice",
+					Salary:    69420.42,
+					IsActive:  true,
+					CreatedAt: ts,
+				},
 			},
-		},
-		{
-			name: "struct with pointer fields",
-			query: `
+			{
+				name: "struct with pointer fields",
+				query: `
 				SELECT
 					1         AS id,
 					'Alice'   AS name,
@@ -91,23 +91,23 @@ func TestScanner_Scan(t *testing.T) {
 					TRUE      AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
-			expected: struct {
-				Id        *int
-				Name      *string
-				Salary    *float64
-				IsActive  *bool
-				CreatedAt *time.Time
-			}{
-				Id:        testutil.PtrTo(1),
-				Name:      testutil.PtrTo("Alice"),
-				Salary:    testutil.PtrTo(69420.42),
-				IsActive:  testutil.PtrTo(true),
-				CreatedAt: testutil.PtrTo(ts),
+				expected: struct {
+					Id        *int
+					Name      *string
+					Salary    *float64
+					IsActive  *bool
+					CreatedAt *time.Time
+				}{
+					Id:        testutil.PtrTo(1),
+					Name:      testutil.PtrTo("Alice"),
+					Salary:    testutil.PtrTo(69420.42),
+					IsActive:  testutil.PtrTo(true),
+					CreatedAt: testutil.PtrTo(ts),
+				},
 			},
-		},
-		{
-			name: "struct with sql.NullX fields",
-			query: `
+			{
+				name: "struct with sql.NullX fields",
+				query: `
 				SELECT
 					1         AS id,
 					'Alice'   AS name,
@@ -115,39 +115,38 @@ func TestScanner_Scan(t *testing.T) {
 					TRUE      AS is_active,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
-			expected: struct {
-				Id        sql.NullInt64
-				Name      sql.NullString
-				Salary    sql.NullFloat64
-				IsActive  sql.NullBool
-				CreatedAt sql.NullTime
-			}{
-				Id:        sql.NullInt64{Int64: 1, Valid: true},
-				Name:      sql.NullString{String: "Alice", Valid: true},
-				Salary:    sql.NullFloat64{Float64: 69420.42, Valid: true},
-				IsActive:  sql.NullBool{Bool: true, Valid: true},
-				CreatedAt: sql.NullTime{Time: ts, Valid: true},
+				expected: struct {
+					Id        sql.NullInt64
+					Name      sql.NullString
+					Salary    sql.NullFloat64
+					IsActive  sql.NullBool
+					CreatedAt sql.NullTime
+				}{
+					Id:        sql.NullInt64{Int64: 1, Valid: true},
+					Name:      sql.NullString{String: "Alice", Valid: true},
+					Salary:    sql.NullFloat64{Float64: 69420.42, Valid: true},
+					IsActive:  sql.NullBool{Bool: true, Valid: true},
+					CreatedAt: sql.NullTime{Time: ts, Valid: true},
+				},
 			},
-		},
-		{
-			name: "map",
-			query: `
+			{
+				name: "map",
+				query: `
 				SELECT
 					1            AS id,
 					'Alice'      AS name,
 					69420.42      AS salary,
 					TIMESTAMP '2025-09-29 12:00:00' AS created_at
 			`,
-			expected: map[string]any{
-				"id":         int64(1),
-				"name":       "Alice",
-				"salary":     "69420.42",
-				"created_at": ts,
+				expected: map[string]any{
+					"id":         int64(1),
+					"name":       "Alice",
+					"salary":     "69420.42",
+					"created_at": ts,
+				},
 			},
-		},
-	}
+		}
 
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				rows, err := conn.DB.Query(tc.query)
@@ -163,16 +162,15 @@ func TestScanner_Scan(t *testing.T) {
 }
 
 func TestScanner_ScanSlices(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-
-	testCases := []struct {
-		name     string
-		query    string
-		expected any
-	}{
-		{
-			name: "slice of structs",
-			query: `
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		testCases := []struct {
+			name     string
+			query    string
+			expected any
+		}{
+			{
+				name: "slice of structs",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 'foo val', 'bar val'
@@ -182,18 +180,18 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 'foo val 3', 'bar val 3'
 				) AS t (foo, bar)
 			`,
-			expected: []struct {
-				Foo string
-				Bar string
-			}{
-				{Foo: "foo val", Bar: "bar val"},
-				{Foo: "foo val 2", Bar: "bar val 2"},
-				{Foo: "foo val 3", Bar: "bar val 3"},
+				expected: []struct {
+					Foo string
+					Bar string
+				}{
+					{Foo: "foo val", Bar: "bar val"},
+					{Foo: "foo val 2", Bar: "bar val 2"},
+					{Foo: "foo val 3", Bar: "bar val 3"},
+				},
 			},
-		},
-		{
-			name: "slice of structs by ptr",
-			query: `
+			{
+				name: "slice of structs by ptr",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 'foo val', 'bar val'
@@ -203,18 +201,18 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 'foo val 3', 'bar val 3'
 				) AS t (foo, bar)
 			`,
-			expected: []*struct {
-				Foo string
-				Bar string
-			}{
-				{Foo: "foo val", Bar: "bar val"},
-				{Foo: "foo val 2", Bar: "bar val 2"},
-				{Foo: "foo val 3", Bar: "bar val 3"},
+				expected: []*struct {
+					Foo string
+					Bar string
+				}{
+					{Foo: "foo val", Bar: "bar val"},
+					{Foo: "foo val 2", Bar: "bar val 2"},
+					{Foo: "foo val 3", Bar: "bar val 3"},
+				},
 			},
-		},
-		{
-			name: "slice of maps",
-			query: `
+			{
+				name: "slice of maps",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 'foo val', 'bar val'
@@ -224,15 +222,15 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 'foo val 3', 'bar val 3'
 				) AS t (foo, bar)
 			`,
-			expected: []map[string]any{
-				{"foo": "foo val", "bar": "bar val"},
-				{"foo": "foo val 2", "bar": "bar val 2"},
-				{"foo": "foo val 3", "bar": "bar val 3"},
+				expected: []map[string]any{
+					{"foo": "foo val", "bar": "bar val"},
+					{"foo": "foo val 2", "bar": "bar val 2"},
+					{"foo": "foo val 3", "bar": "bar val 3"},
+				},
 			},
-		},
-		{
-			name: "slice of strings",
-			query: `
+			{
+				name: "slice of strings",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 'foo val'
@@ -242,11 +240,11 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 'foo val 3'
 				) AS t (foo)
 			`,
-			expected: []string{"foo val", "foo val 2", "foo val 3"},
-		},
-		{
-			name: "slice of *strings",
-			query: `
+				expected: []string{"foo val", "foo val 2", "foo val 3"},
+			},
+			{
+				name: "slice of *strings",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 'foo val'
@@ -256,15 +254,15 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 'foo val 3'
 				) AS t (foo)
 			`,
-			expected: []*string{
-				testutil.PtrTo("foo val"),
-				nil,
-				testutil.PtrTo("foo val 3"),
+				expected: []*string{
+					testutil.PtrTo("foo val"),
+					nil,
+					testutil.PtrTo("foo val 3"),
+				},
 			},
-		},
-		{
-			name: "slice of ints",
-			query: `
+			{
+				name: "slice of ints",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 1
@@ -274,11 +272,11 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 3
 				) AS t (foo)
 			`,
-			expected: []int{1, 2, 3},
-		},
-		{
-			name: "slice of *ints",
-			query: `
+				expected: []int{1, 2, 3},
+			},
+			{
+				name: "slice of *ints",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 1
@@ -288,11 +286,11 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 3
 				) AS t (foo)
 			`,
-			expected: []*int{testutil.PtrTo(1), nil, testutil.PtrTo(3)},
-		},
-		{
-			name: "slice of sql.NullString",
-			query: `
+				expected: []*int{testutil.PtrTo(1), nil, testutil.PtrTo(3)},
+			},
+			{
+				name: "slice of sql.NullString",
+				query: `
 				SELECT *
 				FROM (
 					SELECT 'foo val'
@@ -302,15 +300,15 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT 'foo val 3'
 				) AS t (foo)
 			`,
-			expected: []sql.NullString{
-				{String: "foo val", Valid: true},
-				{String: "foo val 2", Valid: true},
-				{String: "foo val 3", Valid: true},
+				expected: []sql.NullString{
+					{String: "foo val", Valid: true},
+					{String: "foo val 2", Valid: true},
+					{String: "foo val 3", Valid: true},
+				},
 			},
-		},
-		{
-			name: "slice of CustomScan",
-			query: `
+			{
+				name: "slice of CustomScan",
+				query: `
 				SELECT *
 				FROM (
 					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}'
@@ -318,14 +316,14 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT '{"key1": "foo val 2", "key2": "bar val 2"}'
 				) AS t (foo)
 			`,
-			expected: []CustomScan{
-				{Key1: "foo val 1", Key2: "bar val 1"},
-				{Key1: "foo val 2", Key2: "bar val 2"},
+				expected: []CustomScan{
+					{Key1: "foo val 1", Key2: "bar val 1"},
+					{Key1: "foo val 2", Key2: "bar val 2"},
+				},
 			},
-		},
-		{
-			name: "slice of *CustomScan",
-			query: `
+			{
+				name: "slice of *CustomScan",
+				query: `
 				SELECT *
 				FROM (
 					SELECT '{"key1": "foo val 1", "key2": "bar val 1"}'
@@ -335,15 +333,14 @@ func TestScanner_ScanSlices(t *testing.T) {
 					SELECT '{"key1": "foo val 2", "key2": "bar val 2"}'
 				) AS t (foo)
 			`,
-			expected: []*CustomScan{
-				{Key1: "foo val 1", Key2: "bar val 1"},
-				nil,
-				{Key1: "foo val 2", Key2: "bar val 2"},
+				expected: []*CustomScan{
+					{Key1: "foo val 1", Key2: "bar val 1"},
+					nil,
+					{Key1: "foo val 2", Key2: "bar val 2"},
+				},
 			},
-		},
-	}
+		}
 
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				rows, err := conn.DB.Query(tc.query)
@@ -359,10 +356,9 @@ func TestScanner_ScanSlices(t *testing.T) {
 }
 
 func TestScanner_NoRows(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	query := `SELECT NULL LIMIT 0`
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		query := `SELECT NULL LIMIT 0`
 
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		t.Run("queryRow=false do not return error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
@@ -387,8 +383,8 @@ func TestScanner_NoRows(t *testing.T) {
 }
 
 func TestScanner_ScanStructMissingFields(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	query := `
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		query := `
 		SELECT
 			1         AS id,
 			'Alice'   AS name,
@@ -396,21 +392,13 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 			69420.42  AS salary,
 			TRUE      AS is_active`
 
-	type User struct {
-		Id       int
-		Name     string
-		Salary   float64
-		IsActive bool
-	}
+		type User struct {
+			Id       int
+			Name     string
+			Salary   float64
+			IsActive bool
+		}
 
-	expect := &User{
-		Id:       1,
-		Name:     "Alice",
-		Salary:   69420.42,
-		IsActive: true,
-	}
-
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		t.Run("missing field error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
@@ -423,6 +411,13 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 		})
 
 		t.Run("ignore missing fields", func(t *testing.T) {
+			expect := &User{
+				Id:       1,
+				Name:     "Alice",
+				Salary:   69420.42,
+				IsActive: true,
+			}
+
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
 			scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
@@ -436,8 +431,8 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 }
 
 func TestScanner_ScanStructNested(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	query := `
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		query := `
 		SELECT
 			1         AS id,
 			'Alice'   AS name,
@@ -447,31 +442,30 @@ func TestScanner_ScanStructNested(t *testing.T) {
 			1         AS profession_id,
 			'Dev'     AS profession_name`
 
-	type Profession struct {
-		ProfessionId   int
-		ProfessionName string
-	}
+		type Profession struct {
+			ProfessionId   int
+			ProfessionName string
+		}
 
-	type User struct {
-		Id         int
-		Name       string
-		Salary     float64
-		Profession *Profession
-		IsActive   bool
-	}
+		type User struct {
+			Id         int
+			Name       string
+			Salary     float64
+			Profession *Profession
+			IsActive   bool
+		}
 
-	expect := User{
-		Id:       1,
-		Name:     "Alice",
-		Salary:   69420.42,
-		IsActive: true,
-		Profession: &Profession{
-			ProfessionId:   1,
-			ProfessionName: "Dev",
-		},
-	}
+		expect := User{
+			Id:       1,
+			Name:     "Alice",
+			Salary:   69420.42,
+			IsActive: true,
+			Profession: &Profession{
+				ProfessionId:   1,
+				ProfessionName: "Dev",
+			},
+		}
 
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
 		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
@@ -484,8 +478,8 @@ func TestScanner_ScanStructNested(t *testing.T) {
 }
 
 func TestScanner_ScanStructEmbed(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	query := `
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		query := `
 		SELECT
 			1         AS id,
 			'Alice'   AS name,
@@ -495,31 +489,30 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 			1         AS profession_id,
 			'Dev'     AS profession_name`
 
-	type Profession struct {
-		ProfessionId   int
-		ProfessionName string
-	}
+		type Profession struct {
+			ProfessionId   int
+			ProfessionName string
+		}
 
-	type User struct {
-		Id     int
-		Name   string
-		Salary float64
-		*Profession
-		IsActive bool
-	}
+		type User struct {
+			Id     int
+			Name   string
+			Salary float64
+			*Profession
+			IsActive bool
+		}
 
-	expect := User{
-		Id:       1,
-		Name:     "Alice",
-		Salary:   69420.42,
-		IsActive: true,
-		Profession: &Profession{
-			ProfessionId:   1,
-			ProfessionName: "Dev",
-		},
-	}
+		expect := User{
+			Id:       1,
+			Name:     "Alice",
+			Salary:   69420.42,
+			IsActive: true,
+			Profession: &Profession{
+				ProfessionId:   1,
+				ProfessionName: "Dev",
+			},
+		}
 
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
 		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
@@ -532,20 +525,19 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 }
 
 func TestScanner_ScanMap(t *testing.T) {
-	multi := testutil.NewMultiConn(t)
-	query := `
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		query := `
 		SELECT
 			99         AS id,
 			'Alice'   AS name,
 			69420.42  AS salary`
 
-	expect := map[string]any{
-		"id":     int64(99),
-		"name":   "Alice",
-		"salary": "69420.42",
-	}
+		expect := map[string]any{
+			"id":     int64(99),
+			"name":   "Alice",
+			"salary": "69420.42",
+		}
 
-	multi.Run(t, func(t *testing.T, conn *testutil.Conn) {
 		t.Run("allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
@@ -720,9 +712,9 @@ func setupTestTable(t testing.TB, db *sql.DB) *testutil.TableHelper {
 	return th
 }
 
-// BenchmarkScan_MapSlice-12    	    1189	    938981 ns/op	  537100 B/op	   13785 allocs/op
+// BenchmarkScan_MapSlice-12    	    1216	    972108 ns/op	  537107 B/op	   13784 allocs/op
 func BenchmarkScan_MapSlice(b *testing.B) {
-	conn := testutil.NewMySQL(b)
+	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
 	th := setupTestTable(b, conn.DB)
 
@@ -738,9 +730,9 @@ func BenchmarkScan_MapSlice(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_StructSlice-12    	    1069	   1041931 ns/op	  265013 B/op	    8705 allocs/op
+// BenchmarkScan_StructSlice-12    	    1058	   1087626 ns/op	  265114 B/op	    8710 allocs/op
 func BenchmarkScan_StructSlice(b *testing.B) {
-	conn := testutil.NewMySQL(b)
+	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
 	th := setupTestTable(b, conn.DB)
 
@@ -766,7 +758,7 @@ func BenchmarkScan_StructSlice(b *testing.B) {
 
 // BenchmarkScan_Primitivelice-12    	    2820	    374166 ns/op	   65314 B/op	    2034 allocs/op
 func BenchmarkScan_Primitivelice(b *testing.B) {
-	conn := testutil.NewMySQL(b)
+	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
 	th := setupTestTable(b, conn.DB)
 
@@ -782,9 +774,9 @@ func BenchmarkScan_Primitivelice(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_Struct-12    	   10000	    116541 ns/op	    1833 B/op	      54 allocs/op
+// BenchmarkScan_Struct-12    	    9832	    111244 ns/op	    1930 B/op	      59 allocs/op
 func BenchmarkScan_Struct(b *testing.B) {
-	conn := testutil.NewMySQL(b)
+	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
 	th := setupTestTable(b, conn.DB)
 
@@ -807,9 +799,9 @@ func BenchmarkScan_Struct(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_Map-12    	   12676	     94575 ns/op	    1520 B/op	      36 allocs/op
+// BenchmarkScan_Map-12    	   10000	    107088 ns/op	    1754 B/op	      40 allocs/op
 func BenchmarkScan_Map(b *testing.B) {
-	conn := testutil.NewMySQL(b)
+	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
 	th := setupTestTable(b, conn.DB)
 

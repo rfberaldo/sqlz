@@ -1,25 +1,16 @@
 package testutil
 
 import (
-	"cmp"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode"
 
 	"github.com/rfberaldo/sqlz/internal/binds"
-)
-
-// Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,
-// otherwise fallback to these consts.
-const (
-	MYSQL_DSN    = "root:root@tcp(localhost:3306)/sqlz_test?parseTime=True"
-	POSTGRES_DSN = "postgres://postgres:root@localhost:5432/sqlz_test?sslmode=disable"
 )
 
 // PtrTo returns a pointer to the value v.
@@ -128,99 +119,4 @@ func NewTableHelper(t testing.TB, db *sql.DB, bind binds.Bind) *TableHelper {
 // Fmt replaces '%s' with table name, and transform MySQL query to the targeted driver.
 func (t *TableHelper) Fmt(query string) string {
 	return rebind(t.bind, fmt.Sprintf(query, t.tableName))
-}
-
-func NewDB(driverName, dataSourceName string) (*sql.DB, error) {
-	db, err := sql.Open(driverName, dataSourceName)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to %v: %w", driverName, err)
-	}
-
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("error pinging to %v: %w", driverName, err)
-	}
-
-	return db, nil
-}
-
-func NewMySQL(t testing.TB) *Conn {
-	conn := &Conn{
-		Name:       "MySQL",
-		DriverName: "mysql",
-		Bind:       binds.Question,
-	}
-
-	dsn := cmp.Or(os.Getenv("MYSQL_DSN"), MYSQL_DSN)
-	db, err := NewDB(conn.DriverName, dsn)
-	if err != nil {
-		if _, ok := os.LookupEnv("CI"); ok {
-			t.Fatal(err)
-		}
-		return conn
-	}
-
-	conn.DB = db
-	return conn
-}
-
-func NewPostgreSQL(t testing.TB) *Conn {
-	conn := &Conn{
-		Name:       "PostgreSQL",
-		DriverName: "pgx",
-		Bind:       binds.Dollar,
-	}
-
-	dsn := cmp.Or(os.Getenv("POSTGRES_DSN"), MYSQL_DSN)
-	db, err := NewDB(conn.DriverName, dsn)
-	if err != nil {
-		if _, ok := os.LookupEnv("CI"); ok {
-			t.Fatal(err)
-		}
-		return conn
-	}
-
-	conn.DB = db
-	return conn
-}
-
-type MultiConn []*Conn
-
-type Conn struct {
-	Name       string
-	DB         *sql.DB
-	Bind       binds.Bind
-	DriverName string
-}
-
-var multiConn MultiConn
-
-// NewMultiConn is a singleton to avoid creating multiple connections.
-func NewMultiConn(t testing.TB) MultiConn {
-	if multiConn != nil {
-		return multiConn
-	}
-
-	multiConn = append(multiConn, NewMySQL(t))
-	multiConn = append(multiConn, NewPostgreSQL(t))
-
-	if multiConn[0].DB == nil && multiConn[1].DB == nil {
-		t.Fatal("no databases connected")
-	}
-
-	return multiConn
-}
-
-func (conns MultiConn) Run(t *testing.T, fn func(t *testing.T, conn *Conn)) {
-	t.Parallel()
-	for _, conn := range conns {
-		t.Run(conn.Name, func(t *testing.T) {
-			t.Parallel()
-			if conn.DB != nil {
-				fn(t, conn)
-			} else {
-				t.Skip()
-			}
-		})
-	}
 }
