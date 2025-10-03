@@ -552,7 +552,8 @@ func TestConcurrency(t *testing.T) {
 	}
 }
 
-func BenchmarkParser(b *testing.B) {
+// BenchmarkParseNamed-12    	    2793	    390841 ns/op	  289148 B/op	      16 allocs/op
+func BenchmarkParseNamed(b *testing.B) {
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)
 	for range 1000 {
@@ -562,6 +563,36 @@ func BenchmarkParser(b *testing.B) {
 	input := sb.String()
 
 	for b.Loop() {
-		ParseNamed(binds.Question, input)
+		_, _ = ParseNamed(binds.Question, input)
+	}
+}
+
+// BenchmarkParseQuery-12    	    3672	    315014 ns/op	   49156 B/op	       1 allocs/op
+func BenchmarkParseQuery(b *testing.B) {
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)
+	for range 1000 {
+		sb.WriteString(`,(:id, :username, :email, :password, :age)`)
+	}
+
+	input := sb.String()
+
+	for b.Loop() {
+		_ = ParseQuery(binds.Question, input)
+	}
+}
+
+// BenchmarkParseIdents-12    	    3162	    377257 ns/op	  289147 B/op	      16 allocs/op
+func BenchmarkParseIdents(b *testing.B) {
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)
+	for range 1000 {
+		sb.WriteString(`,(:id, :username, :email, :password, :age)`)
+	}
+
+	input := sb.String()
+
+	for b.Loop() {
+		_ = ParseIdents(binds.Question, input)
 	}
 }
