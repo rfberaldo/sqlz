@@ -11,21 +11,12 @@ import (
 type Named struct {
 	bind      binds.Bind
 	structTag string
-
-	// cache refers to reflection caching
-	cacheIdxByKey    map[cacheKey]int
-	cacheLastFullKey string
-}
-
-type cacheKey struct {
-	fullKey string
-	currKey string
 }
 
 // Compile return a new query replacing named parameters with binds,
 // and a slice of ordered arguments.
 func Compile(bind binds.Bind, structTag, query string, arg any) (string, []any, error) {
-	n := &Named{bind: bind, structTag: structTag, cacheIdxByKey: make(map[cacheKey]int)}
+	n := &Named{bind, structTag}
 	return n.compile(query, arg)
 }
 
@@ -82,15 +73,4 @@ func (n *Named) process(query string, arg any, kind reflect.Kind) (string, []any
 	default:
 		return "", nil, err
 	}
-}
-
-func (n *Named) cacheIndexByKey(key string, i int) {
-	k := cacheKey{n.cacheLastFullKey, key}
-	n.cacheIdxByKey[k] = i
-}
-
-func (n *Named) getCachedIndexByKey(key string) (int, bool) {
-	k := cacheKey{n.cacheLastFullKey, key}
-	i, ok := n.cacheIdxByKey[k]
-	return i, ok
 }

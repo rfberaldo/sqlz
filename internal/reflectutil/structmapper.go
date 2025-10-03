@@ -26,11 +26,14 @@ func NewStructMapper(tag string, fieldNameMapper func(string) string) *StructMap
 // FieldByKey returns the struct field with the given key, must match struct tag or name.
 // Key is also used for caching, and should be unique, supports dot notation for nested structs.
 // It returns the zero [reflect.Value] if not found.
-// It panics if v is not an addressable struct.
+// It panics if v is not a struct or pointer to struct.
 func (sm *StructMapper) FieldByKey(key string, v reflect.Value) reflect.Value {
 	v = reflect.Indirect(v)
-	if !v.CanAddr() {
-		panic("sqlz: reflect.Value must be addressable")
+	if !v.IsValid() {
+		panic("sqlz: reflect.Value is a nil pointer")
+	}
+	if v.Kind() != reflect.Struct {
+		panic("sqlz: reflect.Value must be a struct or pointer to struct")
 	}
 
 	if index, ok := sm.indexByKey[key]; ok {
@@ -102,8 +105,8 @@ func walkStruct(tag string, sv StructValue, match func([]string) bool) StructVal
 
 		fieldValue.Value = Deref(fieldValue.Value)
 
-		// create instance in case of nil pointer
-		if IsNilStruct(fieldValue.Value) {
+		// create instance in case of an addressable nil pointer
+		if IsNilStruct(fieldValue.Value) && fieldValue.CanAddr() {
 			fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
 			fieldValue.Value = reflect.Indirect(fieldValue.Value)
 		}
