@@ -33,9 +33,8 @@ type Scanner struct {
 	structMapper        *reflectutil.StructMapper
 	ptrs                []any // slice of pointers for scan, used in all methods
 	values              []any // slice of values from rows, used in map scanning
+	noop                any   // ignored fields sink
 }
-
-var noOpField any // ignored fields sink
 
 type ScannerOptions struct {
 	// QueryRow enforces result to be a single row, only used for Scan method.
@@ -299,7 +298,7 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 			if !s.ignoreMissingFields {
 				return fmt.Errorf("sqlz/scan: field not found: '%s' (maybe unexported?)", col)
 			}
-			s.ptrs[i] = &noOpField
+			s.ptrs[i] = &s.noop
 			continue
 		}
 		s.ptrs[i] = fv.Addr().Interface()
