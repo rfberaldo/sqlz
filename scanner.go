@@ -104,7 +104,7 @@ func (s *Scanner) checkDuplicateColumns() error {
 }
 
 func (s *Scanner) checkDest(dest any) (reflect.Value, error) {
-	v := reflectutil.DerefValue(reflect.ValueOf(dest))
+	v := reflectutil.Deref(reflect.ValueOf(dest))
 	if !v.CanSet() {
 		return reflect.Value{}, fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
 	}
@@ -294,10 +294,10 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 	}
 
 	for i, col := range s.columns {
-		fv := s.structMapper.FieldByTagName(col, v)
+		fv := s.structMapper.FieldByKey(col, v)
 		if !fv.IsValid() {
 			if !s.ignoreMissingFields {
-				return fmt.Errorf("sqlz/scan: field not found: '%s'", col)
+				return fmt.Errorf("sqlz/scan: field not found: '%s' (maybe unexported?)", col)
 			}
 			s.ptrs[i] = &noOpField
 			continue

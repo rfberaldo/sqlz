@@ -96,28 +96,28 @@ func TestTypeOf(t *testing.T) {
 func TestDerefValue(t *testing.T) {
 	t.Run("basic value", func(t *testing.T) {
 		v := reflect.ValueOf(42)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, v.Interface(), got.Interface())
 	})
 
 	t.Run("single pointer", func(t *testing.T) {
 		x := 42
 		v := reflect.ValueOf(&x)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, x, got.Interface())
 	})
 
 	t.Run("slice", func(t *testing.T) {
 		x := []int{42}
 		v := reflect.ValueOf(x)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, x, got.Interface())
 	})
 
 	t.Run("pointer to slice", func(t *testing.T) {
 		x := []int{42}
 		v := reflect.ValueOf(&x)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, x, got.Interface())
 	})
 
@@ -127,14 +127,14 @@ func TestDerefValue(t *testing.T) {
 		p2 := &p1
 		p3 := &p2
 		v := reflect.ValueOf(p3)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, x, got.Interface())
 	})
 
 	t.Run("interface with basic value", func(t *testing.T) {
 		var i any = 42
 		v := reflect.ValueOf(i)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, 42, got.Interface())
 	})
 
@@ -142,14 +142,14 @@ func TestDerefValue(t *testing.T) {
 		x := 42
 		var i any = &x
 		v := reflect.ValueOf(i)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, x, got.Interface())
 	})
 
 	t.Run("nested interface with basic value", func(t *testing.T) {
 		var i any = any(42)
 		v := reflect.ValueOf(i)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, 42, got.Interface())
 	})
 
@@ -157,34 +157,34 @@ func TestDerefValue(t *testing.T) {
 		x := 42
 		var i any = &x
 		v := reflect.ValueOf(i)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.Equal(t, x, got.Interface())
 	})
 
 	t.Run("nil pointer", func(t *testing.T) {
 		var p *int
 		v := reflect.ValueOf(p)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.True(t, got.IsNil())
 	})
 
 	t.Run("nil pointer interface", func(t *testing.T) {
 		var v map[string]any
 		var i any = &v
-		got := DerefValue(reflect.ValueOf(i))
+		got := Deref(reflect.ValueOf(i))
 		assert.True(t, got.IsNil())
 	})
 
 	t.Run("nil interface", func(t *testing.T) {
 		var i any
 		v := reflect.ValueOf(i)
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.False(t, got.IsValid())
 	})
 
 	t.Run("invalid reflect.Value", func(t *testing.T) {
 		var v reflect.Value // zero Value
-		got := DerefValue(v)
+		got := Deref(v)
 		assert.False(t, got.IsValid())
 	})
 }

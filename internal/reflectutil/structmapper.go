@@ -5,52 +5,89 @@ import (
 	"strings"
 )
 
+// StructMapper is a helper to map struct fields with keys, usually column names.
 type StructMapper struct {
 	tag             string
 	fieldNameMapper func(string) string
 	indexByKey      map[string][]int
 }
 
-// NewStructMapper returns [StructMapper], it abstracts [reflect.Value] of [reflect.Struct] kind,
-// adds caching and method to find field by struct tag.
-// A new [StructMapper] should be called for each struct type, otherwise caching won't work.
-// fieldNameMapper is used to process the name of the field, if the tag was not found.
+// NewStructMapper returns a StructMapper, tag is the [reflect.StructTag] used to find fields.
+// Each struct type must have its own StructMapper, otherwise caching won't work properly.
+// fieldNameMapper is used to process the name of the field, if the struct tag was not found.
 func NewStructMapper(tag string, fieldNameMapper func(string) string) *StructMapper {
 	if fieldNameMapper == nil {
 		fieldNameMapper = func(s string) string { return strings.ToLower(s) }
 	}
+
 	return &StructMapper{tag, fieldNameMapper, make(map[string][]int)}
 }
 
-// FieldByTagName recursively finds a field in a struct by tag or name that satisfies match func.
-// Key will be used to find the field and for caching, should be unique.
-// Returns an invalid [reflect.Value] if not found. Panics if rval is not a struct or pointer to struct.
-func (v *StructMapper) FieldByTagName(key string, rval reflect.Value) reflect.Value {
-	rval = DerefValue(rval)
+// FieldByKey returns the struct field with the given key, must match struct tag or name.
+// Key is also used for caching, and should be unique, supports dot notation for nested structs.
+// It returns the zero [reflect.Value] if not found.
+// It panics if v is not an addressable struct.
+func (sm *StructMapper) FieldByKey(key string, v reflect.Value) reflect.Value {
+	v = reflect.Indirect(v)
+	if !v.CanAddr() {
+		panic("sqlz: reflect.Value must be addressable")
+	}
 
-	if index, ok := v.indexByKey[key]; ok {
-		if fv, err := rval.FieldByIndexErr(index); err == nil {
+	if index, ok := sm.indexByKey[key]; ok {
+		if fv, err := v.FieldByIndexErr(index); err == nil {
 			return fv
 		}
 	}
 
-	matcher := func(s string) bool {
-		return s == key || v.fieldNameMapper(s) == key
+	dotNotation := strings.ContainsRune(key, '.')
+	matcher := func(path []string) bool {
+		if !dotNotation {
+			s := path[len(path)-1]
+			return key == s || key == sm.fieldNameMapper(s)
+		}
+
+		keys := strings.Split(key, ".")
+		if len(keys) != len(path) {
+			return false
+		}
+		for i := range len(keys) {
+			if keys[i] != path[i] && keys[i] != sm.fieldNameMapper(path[i]) {
+				return false
+			}
+		}
+		return true
 	}
 
-	fv, index := walkStruct(v.tag, rval, matcher, []int{})
+	sv := StructValue{v, make([]int, 0, 1), make([]string, 0, 1)}
+	sv = walkStruct(sm.tag, sv, matcher)
 
-	if len(index) > 0 {
-		v.indexByKey[key] = index
+	if len(sv.index) > 0 {
+		sm.indexByKey[key] = sv.index
 	}
 
-	return fv
+	return sv.Value
 }
 
-func walkStruct(tag string, rval reflect.Value, match func(string) bool, index []int) (reflect.Value, []int) {
-	for i := range rval.NumField() {
-		field := rval.Type().Field(i)
-		fieldValue := rval.Field(i)
+type StructValue struct {
+	reflect.Value
+	index []int
+	path  []string
+}
+
+func (sv *StructValue) append(i int, s string) {
+	sv.index = append(sv.index, i)
+	sv.path = append(sv.path, s)
+}
+
+func (sv *StructValue) pop() {
+	sv.index = sv.index[:len(sv.index)-1]
+	sv.path = sv.path[:len(sv.path)-1]
+}
+
+func walkStruct(tag string, sv StructValue, match func([]string) bool) StructValue {
+	for i := range sv.NumField() {
+		field := sv.Type().Field(i)
+		fieldValue := StructValue{sv.Field(i), sv.index, sv.path}
 
 		if !field.IsExported() {
 			continue
@@ -58,29 +95,29 @@ func walkStruct(tag string, rval reflect.Value, match func(string) bool, index [
 
 		name := FieldName(field, tag)
 
-		if match(name) {
-			index = append(index, i)
-			return fieldValue, index
+		if match(append(fieldValue.path, name)) {
+			fieldValue.append(i, name)
+			return fieldValue
 		}
 
-		fieldValue = DerefValue(fieldValue)
+		fieldValue.Value = Deref(fieldValue.Value)
 
-		// create instance in case of nil struct
-		if IsNilStruct(fieldValue) {
+		// create instance in case of nil pointer
+		if IsNilStruct(fieldValue.Value) {
 			fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
-			fieldValue = DerefValue(fieldValue)
+			fieldValue.Value = reflect.Indirect(fieldValue.Value)
 		}
 
 		if fieldValue.Kind() == reflect.Struct {
-			index = append(index, i)
-			if v, idx := walkStruct(tag, fieldValue, match, index); v.IsValid() {
-				return v, idx
+			fieldValue.append(i, name)
+			if v := walkStruct(tag, fieldValue, match); v.IsValid() {
+				return v
 			}
-			index = index[:len(index)-1]
+			fieldValue.pop()
 		}
 	}
 
-	return reflect.Value{}, []int{}
+	return StructValue{}
 }
 
 // FieldName extracts the name for a struct field, prioritizing structTag.
