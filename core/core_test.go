@@ -1,4 +1,4 @@
-package sqlz
+package core
 
 import (
 	"context"
@@ -6,14 +6,38 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rfberaldo/sqlz/internal/testutil"
-	"github.com/stretchr/testify/assert"
-
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var ctx = context.Background()
+
+func TestResolveQuery_Nil(t *testing.T) {
+	query := "dummy"
+	q, args, err := resolveQuery(parser.BindQuestion, "", query, nil)
+	require.NoError(t, err)
+	assert.Equal(t, query, q)
+	assert.Equal(t, []any{nil}, args)
+
+	q, args, err = resolveQuery(parser.BindQuestion, "", query, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, query, q)
+	assert.Equal(t, []any{nil, nil}, args)
+
+	q, args, err = resolveQuery(parser.BindQuestion, "", query, 1, nil)
+	require.NoError(t, err)
+	assert.Equal(t, query, q)
+	assert.Equal(t, []any{1, nil}, args)
+
+	q, args, err = resolveQuery(parser.BindQuestion, "", query, nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, query, q)
+	assert.Equal(t, []any{nil, 1}, args)
+}
 
 func TestCore_BasicQueryMethods(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
@@ -25,11 +49,11 @@ func TestCore_BasicQueryMethods(t *testing.T) {
 		expected := "Hello World"
 		expectedSlice := []string{"Hello World"}
 
-		err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &ss, query)
+		err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &ss, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &s, query)
+		err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &s, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 	})
@@ -42,15 +66,15 @@ func TestCore_ShouldReturnErrorForWrongQuery(t *testing.T) {
 		const query = "WRONG QUERY"
 		const shouldContain = "WRONG"
 
-		_, err = Exec(ctx, conn.DB, conn.Bind, defaultStructTag, query)
+		_, err = Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, query)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, shouldContain)
 
-		err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &dst, query)
+		err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &dst, query)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, shouldContain)
 
-		err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &dst, query)
+		err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &dst, query)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, shouldContain)
 	})
@@ -66,7 +90,7 @@ func TestCore_ShouldReturnNotFoundOnQueryRow(t *testing.T) {
 		q := th.Fmt("SELECT * FROM %s")
 
 		var s any
-		err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &s, q)
+		err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &s, q)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, sql.ErrNoRows)
 	})
@@ -116,7 +140,7 @@ func TestCore_QueryArgs(t *testing.T) {
 			}
 			var users []User
 			q := th.Fmt("SELECT * FROM %s")
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q)
 			assert.NoError(t, err)
 			assert.Equal(t, 3, len(users))
 			assert.Equal(t, expected, users)
@@ -129,7 +153,7 @@ func TestCore_QueryArgs(t *testing.T) {
 			}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = ? OR id = ?`)
 			var users []User
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q, 2, 3)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q, 2, 3)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -143,7 +167,7 @@ func TestCore_QueryArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (?)`)
 			var users []User
 			ids := []int{2, 3}
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q, ids)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q, ids)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -156,7 +180,7 @@ func TestCore_QueryArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var users []User
 			arg := struct{ Id int }{Id: 2}
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q, arg)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q, arg)
 			assert.NoError(t, err)
 			assert.Equal(t, 1, len(users))
 			assert.Equal(t, expected, users)
@@ -169,7 +193,7 @@ func TestCore_QueryArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var users []User
 			arg := map[string]any{"id": 2}
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q, arg)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q, arg)
 			assert.NoError(t, err)
 			assert.Equal(t, 1, len(users))
 			assert.Equal(t, expected, users)
@@ -183,7 +207,7 @@ func TestCore_QueryArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (:ids)`)
 			var users []User
 			arg := map[string]any{"ids": []int{2, 3}}
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q, arg)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q, arg)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -192,7 +216,7 @@ func TestCore_QueryArgs(t *testing.T) {
 		t.Run("query should return length 0 if no result is found", func(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = 42`)
 			var users []User
-			err = Query(ctx, conn.DB, conn.Bind, defaultStructTag, &users, q)
+			err = Query(ctx, conn.DB, conn.Bind, DefaultStructTag, &users, q)
 			assert.NoError(t, err)
 			assert.Equal(t, 0, len(users))
 		})
@@ -239,7 +263,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 			expected := User{1, "Alice", 18, true, ts}
 			var user User
 			q := th.Fmt("SELECT * FROM %s LIMIT 1")
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -248,7 +272,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = ? AND active = ?`)
 			var user User
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q, 2, true)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q, 2, true)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -258,7 +282,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (?)`)
 			var user User
 			ids := []int{2}
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q, ids)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q, ids)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -268,7 +292,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := struct{ Id int }{Id: 2}
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q, arg)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q, arg)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -278,7 +302,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := map[string]any{"id": 2}
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q, arg)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q, arg)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -288,7 +312,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (:ids)`)
 			var user User
 			arg := map[string]any{"ids": []int{2}}
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q, arg)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q, arg)
 			assert.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -296,7 +320,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 		t.Run("query row should return error if no result is found", func(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = 42`)
 			var user User
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, sql.ErrNoRows)
 		})
@@ -308,7 +332,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 
 			q = th.Fmt(`SELECT * FROM %s WHERE id = 100`)
 			var user User
-			err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, q)
+			err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, q)
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "converting NULL to string is unsupported")
 		})
@@ -334,7 +358,7 @@ func TestCore_ExecArgs(t *testing.T) {
 			INSERT INTO %s (id, name, age)
 			VALUES (?,?,?),(?,?,?),(?,?,?)`)
 
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q,
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q,
 				1, "Alice", 18,
 				2, "Rob", 38,
 				3, "John", 4,
@@ -349,7 +373,7 @@ func TestCore_ExecArgs(t *testing.T) {
 		t.Run("1 arg struct should perform a named exec", func(t *testing.T) {
 			q := th.Fmt("DELETE FROM %s WHERE id = :id")
 			arg := struct{ Id int }{Id: 1}
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, arg)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, arg)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
@@ -360,7 +384,7 @@ func TestCore_ExecArgs(t *testing.T) {
 		t.Run("1 arg map should perform a named exec", func(t *testing.T) {
 			q := th.Fmt("DELETE FROM %s WHERE id = :id")
 			arg := map[string]any{"id": 2}
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, arg)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, arg)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
@@ -371,7 +395,7 @@ func TestCore_ExecArgs(t *testing.T) {
 		t.Run("1 arg int should perform a regular exec", func(t *testing.T) {
 			q := th.Fmt("DELETE FROM %s WHERE id = ?")
 			arg := 3
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, arg)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, arg)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
@@ -392,14 +416,14 @@ func TestCore_ExecArgs(t *testing.T) {
 				args[i] = Person{i + 1, "Name", 20, time.Now()}
 			}
 			q := th.Fmt(`INSERT INTO %s (id, name, age, created_at) VALUES (:id, :name, :age, :created_at)`)
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, args)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, args)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
 			assert.NoError(t, err)
 			assert.Equal(t, COUNT, int(rows))
 
-			re, err = Exec(ctx, conn.DB, conn.Bind, defaultStructTag, th.Fmt("DELETE FROM %s"))
+			re, err = Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, th.Fmt("DELETE FROM %s"))
 			assert.NoError(t, err)
 
 			rows, err = re.RowsAffected()
@@ -420,14 +444,14 @@ func TestCore_ExecArgs(t *testing.T) {
 				args[i] = &Person{i + 1, "Name", 20, time.Now()}
 			}
 			q := th.Fmt(`INSERT INTO %s (id, name, age, created_at) VALUES (:id, :name, :age, :created_at)`)
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, args)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, args)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
 			assert.NoError(t, err)
 			assert.Equal(t, COUNT, int(rows))
 
-			re, err = Exec(ctx, conn.DB, conn.Bind, defaultStructTag, th.Fmt("DELETE FROM %s"))
+			re, err = Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, th.Fmt("DELETE FROM %s"))
 			assert.NoError(t, err)
 
 			rows, err = re.RowsAffected()
@@ -442,7 +466,7 @@ func TestCore_ExecArgs(t *testing.T) {
 				args[i] = map[string]any{"id": i + 1, "name": "Name", "age": 20}
 			}
 			q := th.Fmt(`INSERT INTO %s (id, name, age) VALUES (:id, :name, :age)`)
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, args)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, args)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
@@ -453,7 +477,7 @@ func TestCore_ExecArgs(t *testing.T) {
 		t.Run("should be able to perform in clause using named args", func(t *testing.T) {
 			args := map[string]any{"ids": []int{10, 11, 12}}
 			q := th.Fmt(`DELETE FROM %s WHERE id IN (:ids)`)
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, args)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, args)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
@@ -464,7 +488,7 @@ func TestCore_ExecArgs(t *testing.T) {
 		t.Run("should be able to perform in clause using placeholder", func(t *testing.T) {
 			args := []int{20, 21, 22}
 			q := th.Fmt(`DELETE FROM %s WHERE id IN (?)`)
-			re, err := Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, args)
+			re, err := Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, args)
 			assert.NoError(t, err)
 
 			rows, err := re.RowsAffected()
@@ -551,12 +575,12 @@ func TestCore_NonEnglishCharacters(t *testing.T) {
 			{2, "Rob", "rob@google.com", "123456", 38, true},
 			{3, "John", "john@id.com", "123456", 24, false},
 		}
-		_, err = Exec(ctx, conn.DB, conn.Bind, defaultStructTag, q, args)
+		_, err = Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, q, args)
 		assert.NoError(t, err)
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
-		err = QueryRow(ctx, conn.DB, conn.Bind, defaultStructTag, &user, th.Fmt("SELECT * FROM %s LIMIT 1"))
+		err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, th.Fmt("SELECT * FROM %s LIMIT 1"))
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})

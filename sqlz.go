@@ -6,7 +6,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
+	"github.com/rfberaldo/sqlz/core"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 // DB is a database handle representing a pool of zero or more
@@ -14,7 +15,7 @@ import (
 // goroutines.
 type DB struct {
 	pool      *sql.DB
-	bind      binds.Bind
+	bind      parser.Bind
 	structTag string
 }
 
@@ -59,7 +60,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (db *DB) Query(ctx context.Context, dst any, query string, args ...any) error {
-	return Query(ctx, db.pool, db.bind, db.structTag, dst, query, args...)
+	return core.Query(ctx, db.pool, db.bind, db.structTag, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -72,7 +73,7 @@ func (db *DB) Query(ctx context.Context, dst any, query string, args ...any) err
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (db *DB) QueryRow(ctx context.Context, dst any, query string, args ...any) error {
-	return QueryRow(ctx, db.pool, db.bind, db.structTag, dst, query, args...)
+	return core.QueryRow(ctx, db.pool, db.bind, db.structTag, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -82,7 +83,7 @@ func (db *DB) QueryRow(ctx context.Context, dst any, query string, args ...any) 
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return Exec(ctx, db.pool, db.bind, db.structTag, query, args...)
+	return core.Exec(ctx, db.pool, db.bind, db.structTag, query, args...)
 }
 
 // Tx is an in-progress database transaction, representing a single connection.
@@ -94,7 +95,7 @@ func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, 
 // transaction fail with [sql.ErrTxDone].
 type Tx struct {
 	conn      *sql.Tx
-	bind      binds.Bind
+	bind      parser.Bind
 	structTag string
 }
 
@@ -120,7 +121,7 @@ func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (tx *Tx) Query(ctx context.Context, dst any, query string, args ...any) error {
-	return Query(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
+	return core.Query(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
@@ -133,7 +134,7 @@ func (tx *Tx) Query(ctx context.Context, dst any, query string, args ...any) err
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (tx *Tx) QueryRow(ctx context.Context, dst any, query string, args ...any) error {
-	return QueryRow(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
+	return core.QueryRow(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -144,5 +145,5 @@ func (tx *Tx) QueryRow(ctx context.Context, dst any, query string, args ...any) 
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (tx *Tx) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return Exec(ctx, tx.conn, tx.bind, tx.structTag, query, args...)
+	return core.Exec(ctx, tx.conn, tx.bind, tx.structTag, query, args...)
 }

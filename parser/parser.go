@@ -8,15 +8,25 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/rfberaldo/sqlz/internal/binds"
 )
 
 const EOF = 0
 
+// Bind represent the placeholder used by different drivers.
+type Bind byte
+
+const (
+	BindUnknown  Bind = iota
+	BindAt            // placeholder '@p1'
+	BindColon         // placeholder ':name'
+	BindDollar        // placeholder '$1'
+	BindQuestion      // placeholder '?'
+)
+
+// Parser is an SQL query parser that parses named queries into native queries.
 type Parser struct {
 	input        string
-	bind         binds.Bind
+	bind         Bind
 	position     int
 	readPosition int
 	ch           rune
@@ -25,12 +35,12 @@ type Parser struct {
 	bindCount    int
 	output       strings.Builder
 
-	// the slice length by ident index which have an `IN` clause.
+	// the slice length by ident index which have an "IN" clause.
 	// if there's items in this map we have to duplicate placeholder by count.
 	inClauseCountByIndex map[int]int
 }
 
-func (p *Parser) parseNamed(skipIdents bool) (string, []string) {
+func (p *Parser) parse(skipIdents bool) (string, []string) {
 	p.read()
 	p.output.Grow(len(p.input)) // max will be len(input)
 
@@ -102,15 +112,15 @@ func (p *Parser) tryReadIdent(skipIdents bool) {
 		p.bindCount++
 
 		switch p.bind {
-		case binds.Question:
+		case BindQuestion:
 			p.output.WriteRune('?')
-		case binds.Colon:
+		case BindColon:
 			p.output.WriteRune(':')
 			p.output.WriteString(ident)
-		case binds.At:
+		case BindAt:
 			p.output.WriteString("@p")
 			p.output.WriteString(strconv.Itoa(p.bindCount))
-		case binds.Dollar:
+		case BindDollar:
 			p.output.WriteRune('$')
 			p.output.WriteString(strconv.Itoa(p.bindCount))
 		}
@@ -137,7 +147,8 @@ func (p *Parser) peek() rune {
 	return r
 }
 
-func (p *Parser) parseIn() string {
+func (p *Parser) parseIn(countByIndex map[int]int) string {
+	p.inClauseCountByIndex = countByIndex
 	p.read()
 	p.output.Grow(len(p.input) + 2) // min will be len(input)+2
 
@@ -182,7 +193,7 @@ func (p *Parser) tryReadPlaceholder() {
 	for i := range count {
 		p.bindCount++
 		p.output.WriteRune(placeholder)
-		if p.bind == binds.Colon {
+		if p.bind == BindColon {
 			p.output.WriteString(ident)
 		}
 		if isNumbered {
@@ -198,27 +209,27 @@ func (p *Parser) tryReadPlaceholder() {
 
 type strategyFn = func(ch rune) bool
 
-func getBindInfo(bind binds.Bind) (rune, strategyFn, bool) {
+func getBindInfo(bind Bind) (rune, strategyFn, bool) {
 	var placeholder rune
 	var readStrategy strategyFn
 	var isNumbered bool
 
 	switch bind {
-	case binds.At:
+	case BindAt:
 		placeholder = '@'
 		readStrategy = unicode.IsNumber
 		isNumbered = true
 
-	case binds.Dollar:
+	case BindDollar:
 		placeholder = '$'
 		readStrategy = unicode.IsNumber
 		isNumbered = true
 
-	case binds.Colon:
+	case BindColon:
 		placeholder = ':'
 		readStrategy = isIdentChar
 
-	case binds.Question:
+	case BindQuestion:
 		placeholder = '?'
 	}
 
@@ -234,15 +245,16 @@ func spreadSliceValues(args ...any) (map[int]int, []any, error) {
 	outArgs := make([]any, 0, len(args))
 
 	for i, arg := range args {
-		if shouldSpread(arg) {
-			refValue := reflect.ValueOf(arg)
-			length := refValue.Len()
+		argValue := reflect.Indirect(reflect.ValueOf(arg))
+
+		if shouldSpread(argValue) {
+			length := argValue.Len()
 			if length == 0 {
-				return nil, nil, fmt.Errorf("sqlz: empty slice passed to 'IN' clause")
+				return nil, nil, fmt.Errorf("sqlz/parser: empty slice passed to 'IN' clause")
 			}
 			inClauseCountByIndex[i] = length
 			for j := range length {
-				outArgs = append(outArgs, refValue.Index(j).Interface())
+				outArgs = append(outArgs, argValue.Index(j).Interface())
 			}
 			continue
 		}
@@ -253,23 +265,19 @@ func spreadSliceValues(args ...any) (map[int]int, []any, error) {
 	return inClauseCountByIndex, outArgs, nil
 }
 
-func shouldSpread(arg any) bool {
-	if arg == nil {
-		return false
-	}
+// byteSliceType is the [reflect.Type] of []byte
+var byteSliceType = reflect.TypeOf([]byte{})
 
-	v := reflect.ValueOf(arg)
-	t := v.Type()
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+func shouldSpread(argValue reflect.Value) bool {
+	if !argValue.IsValid() {
+		return false
 	}
 
 	// []byte is a [driver.Value] type so it should not be expanded
-	if t == reflect.TypeOf([]byte{}) {
+	if argValue.Type() == byteSliceType {
 		return false
 	}
 
-	// if it's slice then it's part of 'IN' clause and have to spread
-	kind := v.Kind()
-	return kind == reflect.Slice || kind == reflect.Array
+	// if it's slice then it's part of "IN" clause and have to spread
+	return argValue.Kind() == reflect.Slice
 }

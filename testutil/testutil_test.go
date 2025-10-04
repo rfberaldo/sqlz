@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
+	"github.com/rfberaldo/sqlz/parser"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,6 +24,6 @@ func TestToSnakeCase(t *testing.T) {
 func TestRebind(t *testing.T) {
 	input := "SELECT * FROM user WHERE id = ? AND age = ?"
 	expected := "SELECT * FROM user WHERE id = $1 AND age = $2"
-	got := rebind(binds.Dollar, input)
+	got := rebind(parser.BindDollar, input)
 	assert.Equal(t, expected, got)
 }
