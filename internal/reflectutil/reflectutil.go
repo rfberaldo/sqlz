@@ -1,6 +1,7 @@
 package reflectutil
 
 import (
+	"fmt"
 	"reflect"
 )
 
@@ -17,11 +18,11 @@ const (
 	SliceStruct    = Slice | Struct
 )
 
-func TypeOf(v any) Type {
-	return typeOf(reflect.TypeOf(v))
+func TypeOfAny(v any) Type {
+	return TypeOf(reflect.TypeOf(v))
 }
 
-func typeOf(t reflect.Type) Type {
+func TypeOf(t reflect.Type) Type {
 	switch t.Kind() {
 	case reflect.Map:
 		return Map
@@ -30,12 +31,12 @@ func typeOf(t reflect.Type) Type {
 		return Struct
 
 	case reflect.Slice:
-		if et := typeOf(t.Elem()); et > 0 {
+		if et := TypeOf(t.Elem()); et > 0 {
 			return Slice | et
 		}
 
 	case reflect.Pointer:
-		return typeOf(t.Elem())
+		return TypeOf(t.Elem())
 
 	case
 		reflect.Bool,
@@ -60,6 +61,29 @@ func typeOf(t reflect.Type) Type {
 	}
 
 	return Invalid
+}
+
+func (t Type) String() string {
+	switch t {
+	case Invalid:
+		return "invalid"
+	case Primitive:
+		return "primitive"
+	case Map:
+		return "map"
+	case Struct:
+		return "struct"
+	case Slice:
+		return "slice"
+	case SlicePrimitive:
+		return "[]primitive"
+	case SliceMap:
+		return "[]map"
+	case SliceStruct:
+		return "[]struct"
+	}
+
+	panic(fmt.Errorf("sqlz/reflectutil: unexpected type %d", t))
 }
 
 // Deref recursively de-references a [reflect.Value], nil pointers are preserved.
