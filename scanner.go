@@ -118,7 +118,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		return err
 	}
 
-	destType := reflectutil.TypeOf(dest)
+	destType := reflectutil.TypeOfAny(dest)
 
 	if destType == reflectutil.Invalid {
 		return fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)

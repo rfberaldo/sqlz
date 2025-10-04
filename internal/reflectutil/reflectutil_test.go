@@ -7,93 +7,95 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTypeOf(t *testing.T) {
+func TestTypeOfAny(t *testing.T) {
 	t.Run("map", func(t *testing.T) {
 		var v map[string]any
-		got := TypeOf(v)
-		assert.Equal(t, Map, got)
+		assert.Equal(t, Map, TypeOfAny(v))
 	})
 
 	t.Run("pointer to map", func(t *testing.T) {
 		var v *map[string]any
-		got := TypeOf(v)
-		assert.Equal(t, Map, got)
+		assert.Equal(t, Map, TypeOfAny(v))
 	})
 
 	t.Run("struct", func(t *testing.T) {
 		var v struct{}
-		got := TypeOf(v)
-		assert.Equal(t, Struct, got)
+		assert.Equal(t, Struct, TypeOfAny(v))
 	})
 
 	t.Run("pointer to struct", func(t *testing.T) {
 		var v *struct{}
-		got := TypeOf(v)
-		assert.Equal(t, Struct, got)
+		assert.Equal(t, Struct, TypeOfAny(v))
 	})
 
 	t.Run("primitive", func(t *testing.T) {
 		var v string
-		got := TypeOf(v)
-		assert.Equal(t, Primitive, got)
+		assert.Equal(t, Primitive, TypeOfAny(v))
 	})
 
 	t.Run("pointer to primitive", func(t *testing.T) {
 		var v *string
-		got := TypeOf(v)
-		assert.Equal(t, Primitive, got)
+		assert.Equal(t, Primitive, TypeOfAny(v))
 	})
 
 	t.Run("slice struct", func(t *testing.T) {
 		var v []struct{}
-		got := TypeOf(v)
-		assert.Equal(t, SliceStruct, got)
+		assert.Equal(t, SliceStruct, TypeOfAny(v))
 	})
 
 	t.Run("slice pointer to struct", func(t *testing.T) {
 		var v []*struct{}
-		got := TypeOf(v)
-		assert.Equal(t, SliceStruct, got)
+		assert.Equal(t, SliceStruct, TypeOfAny(v))
 	})
 
 	t.Run("slice map", func(t *testing.T) {
 		var v []map[string]any
-		got := TypeOf(v)
-		assert.Equal(t, SliceMap, got)
+		assert.Equal(t, SliceMap, TypeOfAny(v))
 	})
 
 	t.Run("slice pointer to map", func(t *testing.T) {
 		var v []*map[string]any
-		got := TypeOf(v)
-		assert.Equal(t, SliceMap, got)
+		assert.Equal(t, SliceMap, TypeOfAny(v))
 	})
 
 	t.Run("slice primitive", func(t *testing.T) {
 		var v []string
-		got := TypeOf(v)
-		assert.Equal(t, SlicePrimitive, got)
+		assert.Equal(t, SlicePrimitive, TypeOfAny(v))
 	})
 
 	t.Run("slice pointer to primitive", func(t *testing.T) {
 		var v []*string
-		got := TypeOf(v)
-		assert.Equal(t, SlicePrimitive, got)
+		assert.Equal(t, SlicePrimitive, TypeOfAny(v))
+	})
+
+	t.Run("slice of slice primitive", func(t *testing.T) {
+		var v [][]string
+		assert.Equal(t, SlicePrimitive, TypeOfAny(v))
+	})
+
+	t.Run("slice of slice struct", func(t *testing.T) {
+		var v [][]struct{}
+		assert.Equal(t, SliceStruct, TypeOfAny(v))
 	})
 
 	t.Run("invalid", func(t *testing.T) {
 		var v func()
-		got := TypeOf(v)
-		assert.Equal(t, Invalid, got)
+		assert.Equal(t, Invalid, TypeOfAny(v))
 	})
 
 	t.Run("slice invalid", func(t *testing.T) {
 		var v []func()
-		got := TypeOf(v)
-		assert.Equal(t, Invalid, got)
+		assert.Equal(t, Invalid, TypeOfAny(v))
+	})
+
+	t.Run("custom type", func(t *testing.T) {
+		type Id int
+		var id Id
+		assert.Equal(t, Primitive, TypeOfAny(id))
 	})
 }
 
-func TestDerefValue(t *testing.T) {
+func TestDeref(t *testing.T) {
 	t.Run("basic value", func(t *testing.T) {
 		v := reflect.ValueOf(42)
 		got := Deref(v)
