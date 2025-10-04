@@ -93,6 +93,20 @@ func TestTypeOfAny(t *testing.T) {
 		var id Id
 		assert.Equal(t, Primitive, TypeOfAny(id))
 	})
+
+	t.Run("slice of interface", func(t *testing.T) {
+		var id []any
+		assert.Equal(t, SlicePrimitive, TypeOfAny(id))
+	})
+
+	t.Run("interface", func(t *testing.T) {
+		var id any
+		assert.Equal(t, Primitive, TypeOfAny(id))
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		assert.Equal(t, Primitive, TypeOfAny(nil))
+	})
 }
 
 func TestDeref(t *testing.T) {
