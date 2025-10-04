@@ -5,6 +5,9 @@ import (
 	"reflect"
 )
 
+// Type is similar to [reflect.Kind], but adds support for type of slices.
+// [reflect.Func], [reflect.Chan], [reflect.Array] and [reflect.UnsafePointer] are considered Invalid.
+// Nil is considered Primitive.
 type Type uint8
 
 const (
@@ -18,11 +21,17 @@ const (
 	SliceStruct    = Slice | Struct
 )
 
-func TypeOfAny(v any) Type {
-	return TypeOf(reflect.TypeOf(v))
+// TypeOfAny recursively returns the Type of arg, nil is considered Primitive.
+func TypeOfAny(arg any) Type {
+	return TypeOf(reflect.TypeOf(arg))
 }
 
+// TypeOf recursively returns the Type of t, nil is considered Primitive.
 func TypeOf(t reflect.Type) Type {
+	if t == nil {
+		return Primitive
+	}
+
 	switch t.Kind() {
 	case reflect.Map:
 		return Map
