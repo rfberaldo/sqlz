@@ -1,11 +1,20 @@
-package sqlz
+package core
 
 import (
+	"cmp"
 	"database/sql"
 	"fmt"
 	"reflect"
 
-	"github.com/rfberaldo/sqlz/internal/reflectutil"
+	"github.com/rfberaldo/sqlz/reflectutil"
+)
+
+var (
+	// mapType is the [reflect.Type] of map[string]any
+	mapType = reflect.TypeOf(map[string]any{})
+
+	// scannerType is [reflect.Type] of [sql.Scanner]
+	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 )
 
 // RowScanner defines the minimal interface for iterating over
@@ -65,10 +74,7 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 		opts = &ScannerOptions{}
 	}
 
-	if opts.StructTag == "" {
-		opts.StructTag = defaultStructTag
-	}
-
+	opts.StructTag = cmp.Or(opts.StructTag, DefaultStructTag)
 	if opts.FieldNameMapper == nil {
 		opts.FieldNameMapper = SnakeCaseMapper
 	}
@@ -167,7 +173,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 			if reflectutil.IsNilMap(destValue) {
 				destValue.Set(reflect.MakeMap(mapType))
 			}
-			m, errMap := assertMap(destValue.Interface())
+			m, errMap := AssertMap(destValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
@@ -176,7 +182,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		case reflectutil.SliceMap:
 			elValue := destValue.Index(destValue.Len() - 1)
 			elValue.Set(reflect.MakeMap(mapType))
-			m, errMap := assertMap(elValue.Interface())
+			m, errMap := AssertMap(elValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
@@ -254,6 +260,10 @@ func (s *Scanner) setMapPtrs() {
 	for i := range s.values {
 		s.ptrs[i] = &s.values[i]
 	}
+}
+
+func isScannable(v reflect.Type) bool {
+	return reflect.PointerTo(v).Implements(scannerType) || v.Implements(scannerType)
 }
 
 // ScanStruct scans a single row into dest, if dest is not a struct it panics.

@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
-	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -149,36 +147,36 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, idents := ParseNamed(binds.At, tt.input)
+			query, idents := Parse(BindAt, tt.input)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(binds.At, tt.input)
+			query = ParseQuery(BindAt, tt.input)
 			assert.Equal(t, tt.expectedAt, query)
-			idents = ParseIdents(binds.At, tt.input)
+			idents = ParseIdents(BindAt, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
-			query, idents = ParseNamed(binds.Colon, tt.input)
+			query, idents = Parse(BindColon, tt.input)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(binds.Colon, tt.input)
+			query = ParseQuery(BindColon, tt.input)
 			assert.Equal(t, tt.expectedColon, query)
-			idents = ParseIdents(binds.Colon, tt.input)
+			idents = ParseIdents(BindColon, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
-			query, idents = ParseNamed(binds.Dollar, tt.input)
+			query, idents = Parse(BindDollar, tt.input)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(binds.Dollar, tt.input)
+			query = ParseQuery(BindDollar, tt.input)
 			assert.Equal(t, tt.expectedDollar, query)
-			idents = ParseIdents(binds.Dollar, tt.input)
+			idents = ParseIdents(BindDollar, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 
-			query, idents = ParseNamed(binds.Question, tt.input)
+			query, idents = Parse(BindQuestion, tt.input)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedIdents, idents)
-			query = ParseQuery(binds.Question, tt.input)
+			query = ParseQuery(BindQuestion, tt.input)
 			assert.Equal(t, tt.expectedQuestion, query)
-			idents = ParseIdents(binds.Question, tt.input)
+			idents = ParseIdents(BindQuestion, tt.input)
 			assert.Equal(t, tt.expectedIdents, idents)
 		})
 	}
@@ -274,22 +272,22 @@ func TestParseInClause(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseInNamed(binds.At, tt.input, tt.inputArgs)
+			query, args, err := ParseInClause(BindAt, tt.input, tt.inputArgs...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = ParseInNamed(binds.Colon, tt.input, tt.inputArgs)
+			query, args, err = ParseInClause(BindColon, tt.input, tt.inputArgs...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = ParseInNamed(binds.Dollar, tt.input, tt.inputArgs)
+			query, args, err = ParseInClause(BindDollar, tt.input, tt.inputArgs...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedArgs, args)
 
-			query, args, err = ParseInNamed(binds.Question, tt.input, tt.inputArgs)
+			query, args, err = ParseInClause(BindQuestion, tt.input, tt.inputArgs...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -394,7 +392,7 @@ func TestParseIn_Question(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseIn(binds.Question, tt.input, tt.args...)
+			query, args, err := ParseInClauseNative(BindQuestion, tt.input, tt.args...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
 				assert.Equal(t, tt.expectedOutput, query)
@@ -509,17 +507,21 @@ func TestParseIn_Numbered(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseIn(binds.Dollar, tt.input, tt.args...)
+			query, args, err := ParseInClauseNative(BindDollar, tt.input, tt.args...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
 				assert.Equal(t, tt.expectedOutput, query)
 				assert.Equal(t, tt.expectedArgs, args)
 			}
 
-			query, args, err = ParseIn(binds.At, testutil.DollarToAt(tt.input), tt.args...)
+			dollarToAt := func(q string) string {
+				return strings.ReplaceAll(q, "$", "@")
+			}
+
+			query, args, err = ParseInClauseNative(BindAt, dollarToAt(tt.input), tt.args...)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
-				assert.Equal(t, testutil.DollarToAt(tt.expectedOutput), query)
+				assert.Equal(t, dollarToAt(tt.expectedOutput), query)
 				assert.Equal(t, tt.expectedArgs, args)
 			}
 		})
@@ -532,20 +534,20 @@ func TestParseIn_Colon(t *testing.T) {
 	expected := "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids)"
 	expectedArgs := []any{"Alice", 4, 8, 16}
 
-	query, args, err := ParseIn(binds.Colon, input, inputArgs...)
+	query, args, err := ParseInClauseNative(BindColon, input, inputArgs...)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, query)
 	assert.Equal(t, expectedArgs, args)
 }
 
-func TestConcurrency(t *testing.T) {
+func TestParseNamed_Concurrency(t *testing.T) {
 	input := "SELECT * FROM user WHERE id = :id"
 	expectedQuery := "SELECT * FROM user WHERE id = ?"
 	expectedIdents := []string{"id"}
 
 	for range 1000 {
 		go func() {
-			query, idents := ParseNamed(binds.Question, input)
+			query, idents := Parse(BindQuestion, input)
 			assert.Equal(t, expectedQuery, query)
 			assert.Equal(t, expectedIdents, idents)
 		}()
@@ -563,7 +565,7 @@ func BenchmarkParseNamed(b *testing.B) {
 	input := sb.String()
 
 	for b.Loop() {
-		_, _ = ParseNamed(binds.Question, input)
+		_, _ = Parse(BindQuestion, input)
 	}
 }
 
@@ -578,7 +580,7 @@ func BenchmarkParseQuery(b *testing.B) {
 	input := sb.String()
 
 	for b.Loop() {
-		_ = ParseQuery(binds.Question, input)
+		_ = ParseQuery(BindQuestion, input)
 	}
 }
 
@@ -593,6 +595,6 @@ func BenchmarkParseIdents(b *testing.B) {
 	input := sb.String()
 
 	for b.Loop() {
-		_ = ParseIdents(binds.Question, input)
+		_ = ParseIdents(BindQuestion, input)
 	}
 }

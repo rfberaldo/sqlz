@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rfberaldo/sqlz"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 var (
@@ -47,7 +48,7 @@ func ExampleNew_options() {
 func ExampleRegister() {
 	customDriver := (&sql.DB{}).Driver() // replace with your driver
 	sql.Register("sqlcustom", customDriver)
-	sqlz.Register("sqlcustom", sqlz.BindQuestion)
+	sqlz.Register("sqlcustom", parser.BindQuestion)
 
 	db := sqlz.MustConnect("sqlcustom", ":memory:")
 

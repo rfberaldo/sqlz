@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/rfberaldo/sqlz"
-	"github.com/rfberaldo/sqlz/internal/binds"
-	"github.com/rfberaldo/sqlz/internal/testutil"
+	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/testutil"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -54,7 +54,7 @@ func TestContextCancellation(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
-		if conn.Bind == binds.Dollar {
+		if conn.Bind == parser.BindDollar {
 			q = "SELECT PG_SLEEP(1)"
 		}
 
@@ -118,7 +118,7 @@ func TestTxContextCancellation(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
-		if conn.Bind == binds.Dollar {
+		if conn.Bind == parser.BindDollar {
 			q = "SELECT PG_SLEEP(1)"
 		}
 

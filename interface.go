@@ -6,14 +6,21 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
+	"github.com/rfberaldo/sqlz/core"
+	"github.com/rfberaldo/sqlz/parser"
 )
-
-const defaultStructTag = "db"
 
 // Options are optional configs for sqlz.
 type Options struct {
+	// StructTag is the reflection tag that will be used to map struct fields.
 	StructTag string
+
+	// FieldNameMapper is a func that process a struct field name to the database column.
+	// It is only used when the struct tag is not found.
+	FieldNameMapper func(string) string
+
+	// IgnoreMissingFields makes scan to ignore missing struct fields instead of returning error.
+	IgnoreMissingFields bool
 }
 
 // New returns a [DB] instance using an existing [sql.DB].
@@ -26,14 +33,14 @@ type Options struct {
 //	pool, err := sql.Open("sqlite3", ":memory:")
 //	db := sqlz.New("sqlite3", pool, nil)
 func New(driverName string, db *sql.DB, opts *Options) *DB {
-	bind := binds.BindByDriver(driverName)
-	if bind == binds.Unknown {
-		panic(fmt.Sprintf("sqlz: unable to find bind for %q, register with [sqlz.Register]", driverName))
+	bind := BindByDriver(driverName)
+	if bind == parser.BindUnknown {
+		panic(fmt.Errorf("sqlz: unable to find bind for '%s', register with [sqlz.Register]", driverName))
 	}
 
-	structTag := defaultStructTag
+	structTag := core.DefaultStructTag
 	if opts != nil {
-		structTag = cmp.Or(opts.StructTag, defaultStructTag)
+		structTag = cmp.Or(opts.StructTag, core.DefaultStructTag)
 	}
 
 	return &DB{db, bind, structTag}
@@ -58,7 +65,7 @@ func Connect(driverName, dataSourceName string) (*DB, error) {
 	err = db.Ping()
 	if err != nil {
 		db.Close()
-		return nil, fmt.Errorf("sqlz: unable to ping: %w", err)
+		return nil, fmt.Errorf("sqlz: unable to ping connection: %w", err)
 	}
 
 	return New(driverName, db, nil), nil
@@ -76,17 +83,4 @@ func MustConnect(driverName, dataSourceName string) *DB {
 // IsNotFound is a helper to check if err contains [sql.ErrNoRows].
 func IsNotFound(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
-}
-
-const (
-	BindAt       = binds.At
-	BindColon    = binds.Colon
-	BindDollar   = binds.Dollar
-	BindQuestion = binds.Question
-)
-
-// Register adds a new driver name and its bind to be
-// available to [New] and [Connect]. If name is empty, it panics.
-func Register(name string, bind binds.Bind) {
-	binds.Register(name, binds.Bind(bind))
 }

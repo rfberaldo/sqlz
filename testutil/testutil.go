@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 // PtrTo returns a pointer to the value v.
@@ -54,12 +54,12 @@ func slugify(name string) string {
 	return strings.Trim(sb.String(), "_")
 }
 
-func rebind(bindTo binds.Bind, query string) string {
+func rebind(bindTo parser.Bind, query string) string {
 	switch bindTo {
-	case binds.Question:
+	case parser.BindQuestion:
 		return query
 
-	case binds.Dollar:
+	case parser.BindDollar:
 		return QuestionToDollar(query)
 	}
 
@@ -82,11 +82,6 @@ func QuestionToDollar(query string) string {
 	return sb.String()
 }
 
-// DollarToAt replaces all `$` with `@`.
-func DollarToAt(query string) string {
-	return strings.ReplaceAll(query, "$", "@")
-}
-
 // PrettyPrint marshal and print arg, only works with exported fields.
 func PrettyPrint(arg any) {
 	data, err := json.MarshalIndent(arg, "", "  ")
@@ -99,14 +94,14 @@ func PrettyPrint(arg any) {
 type TableHelper struct {
 	tb        testing.TB
 	db        *sql.DB
-	bind      binds.Bind
+	bind      parser.Bind
 	tableName string
 }
 
 // NewTableHelper returns a [TableHelper] which is a helper for dealing with
 // dynamic generated tables, it runs a cleanup func that drops the table.
 // db is only used to run cleanup.
-func NewTableHelper(t testing.TB, db *sql.DB, bind binds.Bind) *TableHelper {
+func NewTableHelper(t testing.TB, db *sql.DB, bind parser.Bind) *TableHelper {
 	tableName := slugify(t.Name())
 
 	t.Cleanup(func() {

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 // Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,
@@ -26,7 +26,7 @@ var (
 type Conn struct {
 	Name       string
 	DB         *sql.DB
-	Bind       binds.Bind
+	Bind       parser.Bind
 	DriverName string
 	Err        error
 }
@@ -57,7 +57,7 @@ func GetMySQL(t testing.TB) *Conn {
 	mysqlConn.CompareAndSwap(nil, &Conn{
 		Name:       "MySQL",
 		DriverName: driverName,
-		Bind:       binds.Question,
+		Bind:       parser.BindQuestion,
 		DB:         db,
 		Err:        err,
 	})
@@ -84,7 +84,7 @@ func GetPostgreSQL(t testing.TB) *Conn {
 	postgresConn.CompareAndSwap(nil, &Conn{
 		Name:       "PostgreSQL",
 		DriverName: driverName,
-		Bind:       binds.Dollar,
+		Bind:       parser.BindDollar,
 		DB:         db,
 		Err:        err,
 	})

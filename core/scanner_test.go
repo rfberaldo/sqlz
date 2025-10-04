@@ -1,4 +1,4 @@
-package sqlz_test
+package core_test
 
 import (
 	"database/sql"
@@ -9,11 +9,12 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/rfberaldo/sqlz"
-	"github.com/rfberaldo/sqlz/internal/binds"
-	"github.com/rfberaldo/sqlz/internal/reflectutil"
-	"github.com/rfberaldo/sqlz/internal/testutil"
-	"github.com/rfberaldo/sqlz/internal/testutil/mock"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/rfberaldo/sqlz/core"
+	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/reflectutil"
+	"github.com/rfberaldo/sqlz/testutil"
+	"github.com/rfberaldo/sqlz/testutil/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -151,7 +152,7 @@ func TestScanner_Scan(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				rows, err := conn.DB.Query(tc.query)
 				require.NoError(t, err)
-				scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{QueryRow: true})
+				scanner, err := core.NewScanner(rows, &core.ScannerOptions{QueryRow: true})
 				require.NoError(t, err)
 				dst := allocDest(tc.expected)
 				scanner.Scan(dst)
@@ -345,7 +346,7 @@ func TestScanner_ScanSlices(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				rows, err := conn.DB.Query(tc.query)
 				require.NoError(t, err)
-				scanner, err := sqlz.NewScanner(rows, nil)
+				scanner, err := core.NewScanner(rows, nil)
 				require.NoError(t, err)
 				dst := allocDest(tc.expected)
 				scanner.Scan(dst)
@@ -362,7 +363,7 @@ func TestScanner_NoRows(t *testing.T) {
 		t.Run("queryRow=false do not return error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := sqlz.NewScanner(rows, nil)
+			scanner, err := core.NewScanner(rows, nil)
 			require.NoError(t, err)
 			var tmp string
 			err = scanner.Scan(&tmp)
@@ -372,7 +373,7 @@ func TestScanner_NoRows(t *testing.T) {
 		t.Run("queryRow=true return error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{QueryRow: true})
+			scanner, err := core.NewScanner(rows, &core.ScannerOptions{QueryRow: true})
 			require.NoError(t, err)
 			var tmp string
 			err = scanner.Scan(&tmp)
@@ -402,7 +403,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 		t.Run("missing field error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := sqlz.NewScanner(rows, nil)
+			scanner, err := core.NewScanner(rows, nil)
 			require.NoError(t, err)
 			var user User
 			err = scanner.Scan(&user)
@@ -420,7 +421,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
+			scanner, err := core.NewScanner(rows, &core.ScannerOptions{IgnoreMissingFields: true})
 			require.NoError(t, err)
 			var user *User
 			err = scanner.Scan(&user)
@@ -468,7 +469,7 @@ func TestScanner_ScanStructNested(t *testing.T) {
 
 		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
-		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
+		scanner, err := core.NewScanner(rows, &core.ScannerOptions{IgnoreMissingFields: true})
 		require.NoError(t, err)
 		var user User
 		err = scanner.Scan(&user)
@@ -515,7 +516,7 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 
 		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
-		scanner, err := sqlz.NewScanner(rows, &sqlz.ScannerOptions{IgnoreMissingFields: true})
+		scanner, err := core.NewScanner(rows, &core.ScannerOptions{IgnoreMissingFields: true})
 		require.NoError(t, err)
 		var user User
 		err = scanner.Scan(&user)
@@ -541,7 +542,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		t.Run("allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := sqlz.NewScanner(rows, nil)
+			scanner, err := core.NewScanner(rows, nil)
 			require.NoError(t, err)
 			user := make(map[string]any)
 			err = scanner.Scan(&user)
@@ -552,7 +553,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		t.Run("non allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := sqlz.NewScanner(rows, nil)
+			scanner, err := core.NewScanner(rows, nil)
 			require.NoError(t, err)
 			var user map[string]any
 			err = scanner.Scan(&user)
@@ -563,8 +564,8 @@ func TestScanner_ScanMap(t *testing.T) {
 }
 
 func TestScanner_CheckDest(t *testing.T) {
-	newScanner := func() *sqlz.Scanner {
-		scanner, err := sqlz.NewScanner(&mock.Rows{
+	newScanner := func() *core.Scanner {
+		scanner, err := core.NewScanner(&mock.Rows{
 			ColumnsFunc: func() ([]string, error) {
 				return []string{"user"}, nil
 			},
@@ -677,7 +678,7 @@ func TestScanner_CheckDest(t *testing.T) {
 }
 
 func TestScanner_DuplicateColumns(t *testing.T) {
-	_, err := sqlz.NewScanner(&mock.Rows{
+	_, err := core.NewScanner(&mock.Rows{
 		ColumnsFunc: func() ([]string, error) {
 			return []string{"user", "user"}, nil
 		},
@@ -687,7 +688,7 @@ func TestScanner_DuplicateColumns(t *testing.T) {
 }
 
 func setupTestTable(t testing.TB, db *sql.DB) *testutil.TableHelper {
-	th := testutil.NewTableHelper(t, db, binds.Question)
+	th := testutil.NewTableHelper(t, db, parser.BindQuestion)
 	query := th.Fmt(`
 		CREATE TABLE %s (
 			id int auto_increment NOT NULL,
@@ -722,7 +723,7 @@ func BenchmarkScan_MapSlice(b *testing.B) {
 		var m []map[string]any
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
 		require.NoError(b, err)
-		scanner, err := sqlz.NewScanner(rows, nil)
+		scanner, err := core.NewScanner(rows, nil)
 		require.NoError(b, err)
 		err = scanner.Scan(&m)
 		require.NoError(b, err)
@@ -748,7 +749,7 @@ func BenchmarkScan_StructSlice(b *testing.B) {
 		var users []User
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
 		require.NoError(b, err)
-		scanner, err := sqlz.NewScanner(rows, nil)
+		scanner, err := core.NewScanner(rows, nil)
 		require.NoError(b, err)
 		err = scanner.Scan(&users)
 		require.NoError(b, err)
@@ -766,7 +767,7 @@ func BenchmarkScan_Primitivelice(b *testing.B) {
 		var names []string
 		rows, err := conn.DB.Query(th.Fmt("SELECT name FROM %s"))
 		require.NoError(b, err)
-		scanner, err := sqlz.NewScanner(rows, nil)
+		scanner, err := core.NewScanner(rows, nil)
 		require.NoError(b, err)
 		err = scanner.Scan(&names)
 		require.NoError(b, err)
@@ -792,7 +793,7 @@ func BenchmarkScan_Struct(b *testing.B) {
 		var user User
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s LIMIT 1"))
 		require.NoError(b, err)
-		scanner, err := sqlz.NewScanner(rows, nil)
+		scanner, err := core.NewScanner(rows, nil)
 		require.NoError(b, err)
 		err = scanner.Scan(&user)
 		require.NoError(b, err)
@@ -809,7 +810,7 @@ func BenchmarkScan_Map(b *testing.B) {
 		m := make(map[string]any)
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s LIMIT 1"))
 		require.NoError(b, err)
-		scanner, err := sqlz.NewScanner(rows, nil)
+		scanner, err := core.NewScanner(rows, nil)
 		require.NoError(b, err)
 		err = scanner.Scan(&m)
 		require.NoError(b, err)
