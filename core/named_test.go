@@ -1,14 +1,14 @@
-package named
+package core
 
 import (
 	"testing"
 
-	"github.com/rfberaldo/sqlz/internal/binds"
-	"github.com/rfberaldo/sqlz/internal/testutil"
+	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNamed(t *testing.T) {
+func TestProcessNamed(t *testing.T) {
 	type basicStruct struct {
 		Identifier int    `db:"id"`
 		FullName   string `db:"name"`
@@ -49,16 +49,17 @@ func TestNamed(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		inputQuery       string
-		inputArg         any
-		structTag        string
-		expectedAt       string
-		expectedColon    string
-		expectedDollar   string
-		expectedQuestion string
-		expectedArgs     []any
-		expectError      bool
+		name              string
+		inputQuery        string
+		inputArg          any
+		structTag         string
+		expectedAt        string
+		expectedColon     string
+		expectedDollar    string
+		expectedQuestion  string
+		expectedArgs      []any
+		expectError       bool
+		expectErrContains string
 	}{
 		{
 			name:             "map with named parameters",
@@ -80,20 +81,6 @@ func TestNamed(t *testing.T) {
 			expectedDollar:   `INSERT INTO user (id, username, email, password, age) VALUES ($1, $2, $3, $4, $5)`,
 			expectedQuestion: `INSERT INTO user (id, username, email, password, age) VALUES (?, ?, ?, ?, ?)`,
 			expectedArgs:     []any{1, "user123", "user@example.com", "abc123", 18},
-			expectError:      false,
-		},
-		{
-			name:       "insert query with array of map",
-			inputQuery: `INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`,
-			inputArg: [2]map[string]any{
-				{"id": 1, "username": "user123", "email": "user@example.com", "password": "abc123", "age": 18},
-				{"id": 2, "username": "user456", "email": "user2@example.com", "password": "abc456", "age": 19},
-			},
-			expectedAt:       `INSERT INTO user (id, username, email, password, age) VALUES (@p1, @p2, @p3, @p4, @p5),(@p6, @p7, @p8, @p9, @p10)`,
-			expectedColon:    `INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age),(:id, :username, :email, :password, :age)`,
-			expectedDollar:   `INSERT INTO user (id, username, email, password, age) VALUES ($1, $2, $3, $4, $5),($6, $7, $8, $9, $10)`,
-			expectedQuestion: `INSERT INTO user (id, username, email, password, age) VALUES (?, ?, ?, ?, ?),(?, ?, ?, ?, ?)`,
-			expectedArgs:     []any{1, "user123", "user@example.com", "abc123", 18, 2, "user456", "user2@example.com", "abc456", 19},
 			expectError:      false,
 		},
 		{
@@ -296,22 +283,25 @@ func TestNamed(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:        "invalid argument type",
-			inputQuery:  "SELECT * FROM user WHERE id = :id",
-			inputArg:    123, // Not a struct, map, array, or slice
-			expectError: true,
+			name:              "invalid argument type",
+			inputQuery:        "SELECT * FROM user WHERE id = :id",
+			inputArg:          123, // Not a struct, map, array, or slice
+			expectError:       true,
+			expectErrContains: "unsupported arg type",
 		},
 		{
-			name:        "missing args",
-			inputQuery:  "SELECT * FROM user WHERE id = :id",
-			inputArg:    nil,
-			expectError: true,
+			name:              "nil argument",
+			inputQuery:        "SELECT * FROM user WHERE id = :id",
+			inputArg:          nil,
+			expectError:       true,
+			expectErrContains: "argument in named query is nil pointer",
 		},
 		{
-			name:        "empty query",
-			inputQuery:  "",
-			inputArg:    map[string]any{"id": 1},
-			expectError: true,
+			name:         "empty query",
+			inputQuery:   "",
+			inputArg:     map[string]any{"id": 1},
+			expectedArgs: []any{},
+			expectError:  false,
 		},
 		{
 			name:       "missing named parameter in struct",
@@ -331,25 +321,41 @@ func TestNamed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := Compile(binds.At, tt.structTag, tt.inputQuery, tt.inputArg)
+			cfg := &NamedOptions{Bind: parser.BindAt, StructTag: tt.structTag}
+			query, args, err := ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedArgs, args)
+			if tt.expectErrContains != "" {
+				assert.ErrorContains(t, err, tt.expectErrContains)
+			}
 
-			query, args, err = Compile(binds.Colon, tt.structTag, tt.inputQuery, tt.inputArg)
+			cfg = &NamedOptions{Bind: parser.BindColon, StructTag: tt.structTag}
+			query, args, err = ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedArgs, args)
+			if tt.expectErrContains != "" {
+				assert.ErrorContains(t, err, tt.expectErrContains)
+			}
 
-			query, args, err = Compile(binds.Dollar, tt.structTag, tt.inputQuery, tt.inputArg)
+			cfg = &NamedOptions{Bind: parser.BindDollar, StructTag: tt.structTag}
+			query, args, err = ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedArgs, args)
+			if tt.expectErrContains != "" {
+				assert.ErrorContains(t, err, tt.expectErrContains)
+			}
 
-			query, args, err = Compile(binds.Question, tt.structTag, tt.inputQuery, tt.inputArg)
+			cfg = &NamedOptions{Bind: parser.BindQuestion, StructTag: tt.structTag}
+			query, args, err = ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedArgs, args)
+			if tt.expectErrContains != "" {
+				assert.ErrorContains(t, err, tt.expectErrContains)
+			}
 		})
 	}
 }
@@ -382,47 +388,12 @@ func TestConcurrency(t *testing.T) {
 
 	for range 1000 {
 		go func() {
-			query, args, err := Compile(binds.Question, "db", inputQuery, persons)
+			query, args, err := ProcessNamed(inputQuery, persons, nil)
 			assert.Equal(t, expectedQuery, query)
 			assert.Equal(t, expectedArgs, args)
 			assert.NoError(t, err)
 		}()
 	}
-}
-
-func TestSnakeCaseMapper(t *testing.T) {
-	got := SnakeCaseMapper("Id")
-	assert.Equal(t, "id", got)
-
-	got = SnakeCaseMapper("ID")
-	assert.Equal(t, "id", got)
-
-	got = SnakeCaseMapper("UserID")
-	assert.Equal(t, "user_id", got)
-
-	got = SnakeCaseMapper("CreatedAt")
-	assert.Equal(t, "created_at", got)
-
-	got = SnakeCaseMapper("Created_at")
-	assert.Equal(t, "created_at", got)
-
-	got = SnakeCaseMapper("Created_At")
-	assert.Equal(t, "created_at", got)
-
-	got = SnakeCaseMapper("_createdAt")
-	assert.Equal(t, "_created_at", got)
-
-	got = SnakeCaseMapper("__createdAt")
-	assert.Equal(t, "__created_at", got)
-
-	got = SnakeCaseMapper("Created42At")
-	assert.Equal(t, "created42_at", got)
-
-	got = SnakeCaseMapper("あcreated42At")
-	assert.Equal(t, "あcreated42_at", got)
-
-	got = SnakeCaseMapper("Createdあ42At")
-	assert.Equal(t, "createdあ42_at", got)
 }
 
 func TestExpandInsertSyntax(t *testing.T) {
@@ -518,7 +489,7 @@ func BenchmarkNamedMap(b *testing.B) {
 	}
 
 	for b.Loop() {
-		_, _, err := Compile(binds.Question, "db", input, args)
+		_, _, err := ProcessNamed(input, args, nil)
 		assert.NoError(b, err)
 	}
 }
@@ -539,7 +510,7 @@ func BenchmarkNamedStruct(b *testing.B) {
 	}
 
 	for b.Loop() {
-		_, _, err := Compile(binds.Question, "db", input, args)
+		_, _, err := ProcessNamed(input, args, nil)
 		assert.NoError(b, err)
 	}
 }
