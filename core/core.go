@@ -117,6 +117,6 @@ func resolveQuery(bind parser.Bind, structTag string, query string, args ...any)
 
 	default:
 		// must be a native query, just parse for possible "IN" clauses
-		return parser.ParseInClauseNative(bind, query, args...)
+		return parser.ParseInClause(bind, query, args)
 	}
 }

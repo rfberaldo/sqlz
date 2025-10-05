@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParse(t *testing.T) {
@@ -182,119 +183,6 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestParseInClause(t *testing.T) {
-	tests := []struct {
-		name             string
-		input            string
-		inputArgs        []any
-		expectedArgs     []any
-		expectedAt       string
-		expectedColon    string
-		expectedDollar   string
-		expectedQuestion string
-		expectError      bool
-	}{
-		{
-			name:        "no named parameters",
-			input:       "SELECT * FROM user WHERE id = 1",
-			inputArgs:   nil,
-			expectError: true,
-		},
-		{
-			name:             "one IN parameter",
-			input:            "SELECT * FROM user WHERE id IN (:ids)",
-			inputArgs:        []any{[]int{3, 4, 5}},
-			expectedArgs:     []any{3, 4, 5},
-			expectedAt:       "SELECT * FROM user WHERE id IN (@p1,@p2,@p3)",
-			expectedColon:    "SELECT * FROM user WHERE id IN (:ids,:ids,:ids)",
-			expectedDollar:   "SELECT * FROM user WHERE id IN ($1,$2,$3)",
-			expectedQuestion: "SELECT * FROM user WHERE id IN (?,?,?)",
-		},
-		{
-			name:             "one IN parameter with one 1-len slice",
-			input:            "SELECT * FROM user WHERE id IN (:ids)",
-			inputArgs:        []any{[]int{32}},
-			expectedArgs:     []any{32},
-			expectedAt:       "SELECT * FROM user WHERE id IN (@p1)",
-			expectedColon:    "SELECT * FROM user WHERE id IN (:ids)",
-			expectedDollar:   "SELECT * FROM user WHERE id IN ($1)",
-			expectedQuestion: "SELECT * FROM user WHERE id IN (?)",
-		},
-		{
-			name:             "multiple named parameters and one IN parameter",
-			input:            "SELECT * FROM user WHERE name = :name AND id IN (:ids) AND email = :email",
-			inputArgs:        []any{"Alice", []int{4, 8, 16}, "alice@inchains.com"},
-			expectedArgs:     []any{"Alice", 4, 8, 16, "alice@inchains.com"},
-			expectedAt:       "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4) AND email = @p5",
-			expectedColon:    "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids) AND email = :email",
-			expectedDollar:   "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4) AND email = $5",
-			expectedQuestion: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND email = ?",
-		},
-		{
-			name:             "multiple named parameters and IN parameter",
-			input:            "SELECT * FROM user WHERE name = :name AND id IN (:ids) AND email = :email AND company IN (:companies)",
-			inputArgs:        []any{"Alice", []int{4, 8, 16}, "alice@inchains.com", []string{"The Band", "Wonderland"}},
-			expectedArgs:     []any{"Alice", 4, 8, 16, "alice@inchains.com", "The Band", "Wonderland"},
-			expectedAt:       "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4) AND email = @p5 AND company IN (@p6,@p7)",
-			expectedColon:    "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids) AND email = :email AND company IN (:companies,:companies)",
-			expectedDollar:   "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4) AND email = $5 AND company IN ($6,$7)",
-			expectedQuestion: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND email = ? AND company IN (?,?)",
-		},
-		{
-			name:             "should not spread []byte",
-			input:            "SELECT * FROM user WHERE name = :name AND id IN (:ids) AND json = :json",
-			inputArgs:        []any{"Alice", []int{4, 8, 16}, []byte{4, 8, 16}},
-			expectedArgs:     []any{"Alice", 4, 8, 16, []byte{4, 8, 16}},
-			expectedAt:       "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4) AND json = @p5",
-			expectedColon:    "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids) AND json = :json",
-			expectedDollar:   "SELECT * FROM user WHERE name = $1 AND id IN ($2,$3,$4) AND json = $5",
-			expectedQuestion: "SELECT * FROM user WHERE name = ? AND id IN (?,?,?) AND json = ?",
-		},
-		{
-			name:        "an empty slice",
-			input:       "SELECT * FROM user WHERE id IN (:ids)",
-			inputArgs:   []any{[]int{}},
-			expectError: true,
-		},
-		{
-			name:        "wrong number of idents",
-			input:       "SELECT * FROM user WHERE id IN (:ids) AND name = :name",
-			inputArgs:   []any{[]int{2}},
-			expectError: true,
-		},
-		{
-			name:        "empty input",
-			input:       "",
-			inputArgs:   nil,
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseInClause(BindAt, tt.input, tt.inputArgs...)
-			assert.Equal(t, tt.expectError, err != nil, err)
-			assert.Equal(t, tt.expectedAt, query)
-			assert.Equal(t, tt.expectedArgs, args)
-
-			query, args, err = ParseInClause(BindColon, tt.input, tt.inputArgs...)
-			assert.Equal(t, tt.expectError, err != nil, err)
-			assert.Equal(t, tt.expectedColon, query)
-			assert.Equal(t, tt.expectedArgs, args)
-
-			query, args, err = ParseInClause(BindDollar, tt.input, tt.inputArgs...)
-			assert.Equal(t, tt.expectError, err != nil, err)
-			assert.Equal(t, tt.expectedDollar, query)
-			assert.Equal(t, tt.expectedArgs, args)
-
-			query, args, err = ParseInClause(BindQuestion, tt.input, tt.inputArgs...)
-			assert.Equal(t, tt.expectError, err != nil, err)
-			assert.Equal(t, tt.expectedQuestion, query)
-			assert.Equal(t, tt.expectedArgs, args)
-		})
-	}
-}
-
 func TestParseIn_Question(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -392,7 +280,7 @@ func TestParseIn_Question(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseInClauseNative(BindQuestion, tt.input, tt.args...)
+			query, args, err := ParseInClause(BindQuestion, tt.input, tt.args)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
 				assert.Equal(t, tt.expectedOutput, query)
@@ -402,7 +290,7 @@ func TestParseIn_Question(t *testing.T) {
 	}
 }
 
-func TestParseIn_Numbered(t *testing.T) {
+func TestParseIn_Dollar(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
@@ -507,21 +395,125 @@ func TestParseIn_Numbered(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := ParseInClauseNative(BindDollar, tt.input, tt.args...)
-			assert.Equal(t, tt.expectError, err != nil, err)
+			query, args, err := ParseInClause(BindDollar, tt.input, tt.args)
+			require.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
 				assert.Equal(t, tt.expectedOutput, query)
 				assert.Equal(t, tt.expectedArgs, args)
 			}
+		})
+	}
+}
 
-			dollarToAt := func(q string) string {
-				return strings.ReplaceAll(q, "$", "@")
-			}
+func TestParseIn_At(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		args           []any
+		expectedOutput string
+		expectedArgs   []any
+		expectError    bool
+	}{
+		{
+			name:           "no bind vars and no arg",
+			input:          "SELECT * FROM user WHERE id = 1",
+			args:           nil,
+			expectedOutput: "SELECT * FROM user WHERE id = 1",
+			expectedArgs:   nil,
+			expectError:    false,
+		},
+		{
+			name:           "one bind var but no slice",
+			input:          "SELECT * FROM user WHERE id = @p1",
+			args:           []any{8},
+			expectedOutput: "SELECT * FROM user WHERE id = @p1",
+			expectedArgs:   []any{8},
+			expectError:    false,
+		},
+		{
+			name:           "one bind var with slice",
+			input:          "SELECT * FROM user WHERE id IN (@p1)",
+			args:           []any{[]int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE id IN (@p1,@p2,@p3)",
+			expectedArgs:   []any{4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:           "one bind var with 1-len slice",
+			input:          "SELECT * FROM user WHERE id IN (@p1)",
+			args:           []any{[]int{4}},
+			expectedOutput: "SELECT * FROM user WHERE id IN (@p1)",
+			expectedArgs:   []any{4},
+			expectError:    false,
+		},
+		{
+			name:           "two bind var and one slice",
+			input:          "SELECT * FROM user WHERE name = @p1 AND id IN (@p2)",
+			args:           []any{"Alice", []int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4)",
+			expectedArgs:   []any{"Alice", 4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:           "multiple bind var and two slices",
+			input:          "SELECT * FROM user WHERE name = @p1 AND id IN (@p2) AND band_id IN (@p3)",
+			args:           []any{"Alice", []int{4, 8, 16}, []int{8, 16, 32, 64}},
+			expectedOutput: "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4) AND band_id IN (@p5,@p6,@p7,@p8)",
+			expectedArgs:   []any{"Alice", 4, 8, 16, 8, 16, 32, 64},
+			expectError:    false,
+		},
+		{
+			name:           "multiple bind var and one escaped",
+			input:          "SELECT * FROM user WHERE name = '@@p' AND id IN (@p1) AND band_id IN (@p2)",
+			args:           []any{[]int{4, 8, 16}, []int{8, 16, 32, 64}},
+			expectedOutput: "SELECT * FROM user WHERE name = '@p' AND id IN (@p1,@p2,@p3) AND band_id IN (@p4,@p5,@p6,@p7)",
+			expectedArgs:   []any{4, 8, 16, 8, 16, 32, 64},
+			expectError:    false,
+		},
+		{
+			name:           "big numbers on placeholder",
+			input:          "SELECT * FROM user WHERE name = @p999 AND id IN (@p1000)",
+			args:           []any{"Alice", []int{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE name = @p1 AND id IN (@p2,@p3,@p4)",
+			expectedArgs:   []any{"Alice", 4, 8, 16},
+			expectError:    false,
+		},
+		{
+			name:           "should not spread []byte",
+			input:          "SELECT * FROM user WHERE json = @p1",
+			args:           []any{[]byte{4, 8, 16}},
+			expectedOutput: "SELECT * FROM user WHERE json = @p1",
+			expectedArgs:   []any{[]byte{4, 8, 16}},
+			expectError:    false,
+		},
+		{
+			name:        "wrong number of placeholders",
+			input:       "SELECT * FROM user WHERE name = @p1 AND id IN (@p2)",
+			args:        []any{4, []int{8, 16, 32, 64}, 8},
+			expectError: true,
+		},
+		{
+			name:        "empty slice expects error",
+			input:       "SELECT * FROM user WHERE id IN (@p1)",
+			args:        []any{[]int{}},
+			expectError: true,
+		},
+		{
+			name:           "empty input",
+			input:          "",
+			args:           nil,
+			expectedOutput: "",
+			expectedArgs:   nil,
+			expectError:    false,
+		},
+	}
 
-			query, args, err = ParseInClauseNative(BindAt, dollarToAt(tt.input), tt.args...)
-			assert.Equal(t, tt.expectError, err != nil, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, args, err := ParseInClause(BindAt, tt.input, tt.args)
+			require.Equal(t, tt.expectError, err != nil, err)
 			if !tt.expectError {
-				assert.Equal(t, dollarToAt(tt.expectedOutput), query)
+				assert.Equal(t, tt.expectedOutput, query)
 				assert.Equal(t, tt.expectedArgs, args)
 			}
 		})
@@ -534,7 +526,7 @@ func TestParseIn_Colon(t *testing.T) {
 	expected := "SELECT * FROM user WHERE name = :name AND id IN (:ids,:ids,:ids)"
 	expectedArgs := []any{"Alice", 4, 8, 16}
 
-	query, args, err := ParseInClauseNative(BindColon, input, inputArgs...)
+	query, args, err := ParseInClause(BindColon, input, inputArgs)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, query)
 	assert.Equal(t, expectedArgs, args)

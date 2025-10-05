@@ -2,7 +2,6 @@ package core
 
 import (
 	"cmp"
-	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -67,38 +66,33 @@ func (n *namedQuery) process(query string, arg any) (string, []any, error) {
 }
 
 func (n *namedQuery) processOne(query string, argValue reflect.Value, kind reflect.Kind) (string, []any, error) {
-	q, idents := parser.Parse(n.bind, query)
-	args := make([]any, 0, len(idents))
+	query, idents := parser.Parse(n.bind, query)
 	var err error
 
 	switch kind {
 	case reflect.Map:
-		args, err = n.mapMap(idents, argValue)
+		err = n.mapMap(idents, argValue)
 
 	case reflect.Struct:
-		args, err = n.mapStruct(idents, argValue)
+		err = n.mapStruct(idents, argValue)
 	}
 
 	if err != nil {
 		return "", nil, err
 	}
 
-	qq, args, err := parser.ParseInClause(n.bind, query, args...)
+	query, n.args, err = parser.ParseInClause(n.bind, query, n.args)
 	if err != nil {
-		// if there's no "IN" clause, return the previously-parsed query.
-		if errors.Is(err, parser.ErrNoInClause) {
-			return q, args, nil
-		}
 		return "", nil, err
 	}
 
-	return qq, args, nil
+	return query, n.args, nil
 }
 
 // mapStruct return all the values from arg, following the idents order.
 // Returned values can be used in a query if they do not have "IN" clause,
 // in other words, values can not be slices.
-func (n *namedQuery) mapStruct(idents []string, argValue reflect.Value) ([]any, error) {
+func (n *namedQuery) mapStruct(idents []string, argValue reflect.Value) error {
 	if n.args == nil {
 		n.args = make([]any, 0, len(idents))
 	}
@@ -107,7 +101,7 @@ func (n *namedQuery) mapStruct(idents []string, argValue reflect.Value) ([]any, 
 	for _, ident := range idents {
 		v := n.structMapper.FieldByKey(ident, argValue)
 		if !v.IsValid() {
-			return nil, fmt.Errorf("sqlz: field not found: '%s' (maybe unexported?)", ident)
+			return fmt.Errorf("sqlz: field not found: '%s' (maybe unexported?)", ident)
 		}
 
 		v = reflect.Indirect(v)
@@ -118,16 +112,16 @@ func (n *namedQuery) mapStruct(idents []string, argValue reflect.Value) ([]any, 
 		}
 	}
 
-	return n.args, nil
+	return nil
 }
 
 // mapMap return all the values from arg, following the idents order.
 // Returned values can be used in a query if they do not have "IN" clause,
 // in other words, values can not be slices.
-func (n *namedQuery) mapMap(idents []string, argValue reflect.Value) ([]any, error) {
+func (n *namedQuery) mapMap(idents []string, argValue reflect.Value) error {
 	m, err := AssertMap(argValue.Interface())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if n.args == nil {
@@ -138,14 +132,14 @@ func (n *namedQuery) mapMap(idents []string, argValue reflect.Value) ([]any, err
 	for _, ident := range idents {
 		value, ok := GetMapValue(ident, m)
 		if !ok {
-			return nil, fmt.Errorf("sqlz: could not find '%s' in %+v", ident, m)
+			return fmt.Errorf("sqlz: could not find '%s' in %+v", ident, m)
 		}
 		n.args = append(n.args, value)
 	}
-	return n.args, nil
+	return nil
 }
 
-type mapperFn = func(idents []string, argValue reflect.Value) ([]any, error)
+type mapperFunc = func(idents []string, argValue reflect.Value) error
 
 func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) (string, []any, error) {
 	if sliceValue.Len() == 0 {
@@ -169,7 +163,7 @@ func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) (strin
 	}
 }
 
-func (n *namedQuery) sliceValues(query string, sliceValue reflect.Value, mapper mapperFn) (string, []any, error) {
+func (n *namedQuery) sliceValues(query string, sliceValue reflect.Value, mapper mapperFunc) (string, []any, error) {
 	idents := parser.ParseIdents(n.bind, query)
 	args, err := n.sliceArgs(idents, sliceValue, mapper)
 	if err != nil {
@@ -187,15 +181,14 @@ func (n *namedQuery) sliceValues(query string, sliceValue reflect.Value, mapper 
 	return parser.ParseQuery(n.bind, q), args, err
 }
 
-func (n *namedQuery) sliceArgs(idents []string, sliceValue reflect.Value, mapper mapperFn) ([]any, error) {
+func (n *namedQuery) sliceArgs(idents []string, sliceValue reflect.Value, mapper mapperFunc) ([]any, error) {
 	outArgs := make([]any, 0, len(idents)*sliceValue.Len())
 	for i := range sliceValue.Len() {
-		args, err := mapper(idents, sliceValue.Index(i))
-		if err != nil {
+		if err := mapper(idents, sliceValue.Index(i)); err != nil {
 			return nil, err
 		}
 
-		outArgs = append(outArgs, args...)
+		outArgs = append(outArgs, n.args...)
 	}
 
 	return outArgs, nil

@@ -2,49 +2,49 @@ package parser
 
 import (
 	"fmt"
+	"reflect"
 )
 
-// Parse return a new query replacing named parameters with binds,
-// and a slice of ordered identifiers.
-func Parse(bind Bind, input string) (string, []string) {
-	p := &Parser{bind: bind, input: input}
+// Parse transforms a named query into native query, respecting the bind param,
+// returning the transformed query and a slice of identifiers.
+func Parse(bind Bind, query string) (string, []string) {
+	p := &Parser{bind: bind, input: query}
 	return p.parse(false)
 }
 
 // ParseQuery is like [Parse], but only return the query.
-func ParseQuery(bind Bind, input string) string {
-	p := &Parser{bind: bind, input: input}
+func ParseQuery(bind Bind, query string) string {
+	p := &Parser{bind: bind, input: query}
 	output, _ := p.parse(true)
 	return output
 }
 
-// ParseIdents is like [Parse], but only return a slice of ordered identifiers.
-func ParseIdents(bind Bind, input string) []string {
-	p := &Parser{bind: bind, input: input}
+// ParseIdents is like [Parse], but only return a slice of identifiers.
+func ParseIdents(bind Bind, query string) []string {
+	p := &Parser{bind: bind, input: query}
 	_, idents := p.parse(false)
 	return idents
 }
 
-var ErrNoInClause = fmt.Errorf("no in clause, no slices to spread")
-
-// ParseInClause is like [Parse], but also receives a slice of args,
-// the args are spread if they have slices, which are used within "IN" clause.
-func ParseInClause(bind Bind, input string, args ...any) (string, []any, error) {
-	countByIndex, spreadArgs, err := spreadSliceValues(args...)
+// ParseInClause expands any binds in the query, respecting the bind param,
+// that correspond to a slice in args to the length of that slice,
+// and then appends those slice elements to a new arglist.
+func ParseInClause(bind Bind, query string, args []any) (string, []any, error) {
+	countByIndex, spreadArgs, err := spreadSlices(args)
 	if err != nil {
 		return "", nil, err
 	}
 
 	if len(countByIndex) == 0 {
-		return "", args, ErrNoInClause
+		return query, args, nil
 	}
 
 	p := &Parser{
 		bind:                 bind,
-		input:                input,
+		input:                query,
 		inClauseCountByIndex: countByIndex,
 	}
-	output, _ := p.parse(true)
+	output := p.parseInNative()
 
 	if len(spreadArgs) != p.bindCount {
 		return "", nil, fmt.Errorf(
@@ -56,26 +56,44 @@ func ParseInClause(bind Bind, input string, args ...any) (string, []any, error) 
 	return output, spreadArgs, nil
 }
 
-// ParseInClauseNative is like [ParseInClause], but for native (non-named) queries.
-func ParseInClauseNative(bind Bind, input string, args ...any) (string, []any, error) {
-	countByIndex, spreadArgs, err := spreadSliceValues(args...)
-	if err != nil {
-		return "", nil, err
+func spreadSlices(args []any) (map[int]int, []any, error) {
+	inClauseCountByIndex := make(map[int]int)
+	outArgs := make([]any, 0, len(args))
+
+	for i, arg := range args {
+		argValue := reflect.Indirect(reflect.ValueOf(arg))
+
+		if shouldSpread(argValue) {
+			length := argValue.Len()
+			if length == 0 {
+				return nil, nil, fmt.Errorf("sqlz/parser: empty slice passed to 'IN' clause")
+			}
+			inClauseCountByIndex[i] = length
+			for j := range length {
+				outArgs = append(outArgs, argValue.Index(j).Interface())
+			}
+			continue
+		}
+
+		outArgs = append(outArgs, arg)
 	}
 
-	if len(countByIndex) == 0 {
-		return input, args, nil
+	return inClauseCountByIndex, outArgs, nil
+}
+
+// byteSliceType is the [reflect.Type] of []byte
+var byteSliceType = reflect.TypeOf([]byte{})
+
+func shouldSpread(argValue reflect.Value) bool {
+	if !argValue.IsValid() {
+		return false
 	}
 
-	p := &Parser{bind: bind, input: input}
-	output := p.parseIn(countByIndex)
-
-	if len(spreadArgs) != p.bindCount {
-		return "", nil, fmt.Errorf(
-			"sqlz/parser: wrong number of arguments (bindvars=%v arguments=%v)",
-			p.bindCount, len(spreadArgs),
-		)
+	// []byte is a [driver.Value] type so it should not be expanded
+	if argValue.Type() == byteSliceType {
+		return false
 	}
 
-	return output, spreadArgs, nil
+	// if it's slice then it's part of "IN" clause and have to spread
+	return argValue.Kind() == reflect.Slice
 }
