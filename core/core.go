@@ -105,7 +105,7 @@ func resolveQuery(bind parser.Bind, structTag string, query string, args ...any)
 	case reflectutil.Struct, reflectutil.Map,
 		reflectutil.SliceStruct, reflectutil.SliceMap:
 		if len(args) > 1 {
-			return "", nil, fmt.Errorf("sqlz: too many arguments in %T", args)
+			return "", nil, fmt.Errorf("sqlz: too many arguments: want 1 got %d", len(args))
 		}
 		return ProcessNamed(query, args[0], &NamedOptions{
 			Bind:      bind,
@@ -113,7 +113,7 @@ func resolveQuery(bind parser.Bind, structTag string, query string, args ...any)
 		})
 
 	case reflectutil.Invalid:
-		panic(fmt.Errorf("sqlz: unsupported argument type: %T", args))
+		panic(fmt.Errorf("sqlz: unsupported argument type: %T", args[0]))
 
 	default:
 		// must be a native query, just parse for possible "IN" clauses

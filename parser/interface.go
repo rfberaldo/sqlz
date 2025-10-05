@@ -48,7 +48,7 @@ func ParseInClause(bind Bind, query string, args []any) (string, []any, error) {
 
 	if len(spreadArgs) != p.bindCount {
 		return "", nil, fmt.Errorf(
-			"sqlz/parser: wrong number of arguments (bindvars=%v arguments=%v)",
+			"sqlz/parser: arguments mismatch parsing 'IN' clause: bindvars %d arguments %d",
 			p.bindCount, len(spreadArgs),
 		)
 	}
