@@ -24,9 +24,9 @@ type NamedOptions struct {
 }
 
 type namedQuery struct {
-	bind         parser.Bind
-	structMapper *reflectutil.StructMapper
-	args         []any
+	bind     parser.Bind
+	stMapper *reflectutil.StructMapper
+	args     []any
 }
 
 func ProcessNamed(query string, arg any, opts *NamedOptions) (string, []any, error) {
@@ -42,7 +42,7 @@ func ProcessNamed(query string, arg any, opts *NamedOptions) (string, []any, err
 
 	return (&namedQuery{
 		bind: opts.Bind,
-		structMapper: reflectutil.NewStructMapper(
+		stMapper: reflectutil.NewStructMapper(
 			opts.StructTag,
 			opts.FieldNameMapper),
 	}).process(query, arg)
@@ -71,10 +71,10 @@ func (n *namedQuery) processOne(query string, argValue reflect.Value, kind refle
 
 	switch kind {
 	case reflect.Map:
-		err = n.mapMap(idents, argValue)
+		err = n.mapMapper(idents, argValue)
 
 	case reflect.Struct:
-		err = n.mapStruct(idents, argValue)
+		err = n.structMapper(idents, argValue)
 	}
 
 	if err != nil {
@@ -89,17 +89,15 @@ func (n *namedQuery) processOne(query string, argValue reflect.Value, kind refle
 	return query, n.args, nil
 }
 
-// mapStruct return all the values from arg, following the idents order.
-// Returned values can be used in a query if they do not have "IN" clause,
-// in other words, values can not be slices.
-func (n *namedQuery) mapStruct(idents []string, argValue reflect.Value) error {
+// structMapper maps idents to the argValue struct fields, returning their values,
+// computed mapperArgs may have slices, meaning an "IN" clause.
+func (n *namedQuery) structMapper(idents []string, argValue reflect.Value) error {
 	if n.args == nil {
 		n.args = make([]any, 0, len(idents))
 	}
-	n.args = n.args[:0]
 
 	for _, ident := range idents {
-		v := n.structMapper.FieldByKey(ident, argValue)
+		v := n.stMapper.FieldByKey(ident, argValue)
 		if !v.IsValid() {
 			return fmt.Errorf("sqlz: field not found: '%s' (maybe unexported?)", ident)
 		}
@@ -115,10 +113,9 @@ func (n *namedQuery) mapStruct(idents []string, argValue reflect.Value) error {
 	return nil
 }
 
-// mapMap return all the values from arg, following the idents order.
-// Returned values can be used in a query if they do not have "IN" clause,
-// in other words, values can not be slices.
-func (n *namedQuery) mapMap(idents []string, argValue reflect.Value) error {
+// mapMapper maps idents to the argValue map keys, returning their values,
+// computed mapperArgs may have slices, meaning an "IN" clause.
+func (n *namedQuery) mapMapper(idents []string, argValue reflect.Value) error {
 	m, err := AssertMap(argValue.Interface())
 	if err != nil {
 		return err
@@ -127,7 +124,6 @@ func (n *namedQuery) mapMap(idents []string, argValue reflect.Value) error {
 	if n.args == nil {
 		n.args = make([]any, 0, len(idents))
 	}
-	n.args = n.args[:0]
 
 	for _, ident := range idents {
 		value, ok := GetMapValue(ident, m)
@@ -153,54 +149,46 @@ func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) (strin
 
 	switch elValue.Kind() {
 	case reflect.Map:
-		return n.sliceValues(query, sliceValue, n.mapMap)
+		return n.sliceMapper(query, sliceValue, n.mapMapper)
 
 	case reflect.Struct:
-		return n.sliceValues(query, sliceValue, n.mapStruct)
+		return n.sliceMapper(query, sliceValue, n.structMapper)
 
 	default:
 		return "", nil, fmt.Errorf("sqlz: unsupported slice type: %s", sliceValue.Type())
 	}
 }
 
-func (n *namedQuery) sliceValues(query string, sliceValue reflect.Value, mapper mapperFunc) (string, []any, error) {
+func (n *namedQuery) sliceMapper(query string, sliceValue reflect.Value, mapper mapperFunc) (string, []any, error) {
 	idents := parser.ParseIdents(n.bind, query)
-	args, err := n.sliceArgs(idents, sliceValue, mapper)
-	if err != nil {
-		return "", nil, err
+	if n.args == nil {
+		n.args = make([]any, 0, len(idents)*sliceValue.Len())
+	}
+
+	for i := range sliceValue.Len() {
+		if err := mapper(idents, sliceValue.Index(i)); err != nil {
+			return "", nil, err
+		}
 	}
 
 	// if bind is '?', parse query before expanding
 	if n.bind == parser.BindQuestion {
 		q := parser.ParseQuery(n.bind, query)
 		q, err := expandInsertSyntax(q, sliceValue.Len())
-		return q, args, err
+		return q, n.args, err
 	}
 
 	q, err := expandInsertSyntax(query, sliceValue.Len())
-	return parser.ParseQuery(n.bind, q), args, err
-}
-
-func (n *namedQuery) sliceArgs(idents []string, sliceValue reflect.Value, mapper mapperFunc) ([]any, error) {
-	outArgs := make([]any, 0, len(idents)*sliceValue.Len())
-	for i := range sliceValue.Len() {
-		if err := mapper(idents, sliceValue.Index(i)); err != nil {
-			return nil, err
-		}
-
-		outArgs = append(outArgs, n.args...)
-	}
-
-	return outArgs, nil
+	return parser.ParseQuery(n.bind, q), n.args, err
 }
 
 var regValues = regexp.MustCompile(`(?i)\)\s*VALUES\s*\(`)
 
-// expandInsertSyntax multiply the last part of a INSERT query by length
-func expandInsertSyntax(query string, length int) (string, error) {
+// expandInsertSyntax multiply the 'VALUES' part of a INSERT query by count.
+func expandInsertSyntax(query string, count int) (string, error) {
 	loc := regValues.FindStringIndex(query)
 	if loc == nil {
-		return "", fmt.Errorf("sqlz: slice is only supported in INSERT query with \"VALUES\" clause")
+		return "", fmt.Errorf("sqlz: slice is only supported in INSERT query with 'VALUES' clause")
 	}
 
 	i := loc[1] - 1                   // position of '(' after 'VALUES'
@@ -211,21 +199,10 @@ func expandInsertSyntax(query string, length int) (string, error) {
 	j += i + 1
 
 	beginning := query[:j]
-	values := query[i:j]
+	values := strings.Repeat(","+query[i:j], count-1)
 	ending := query[j:]
 
-	length -= 1
-	var sb strings.Builder
-	sb.Grow(len(query) + (len(values)+1)*length)
-
-	sb.WriteString(beginning)
-	for range length {
-		sb.WriteByte(',')
-		sb.WriteString(values)
-	}
-	sb.WriteString(ending)
-
-	return sb.String(), nil
+	return beginning + values + ending, nil
 }
 
 // endingParensIndex find the ending parenthesis of a string starting with '(',
