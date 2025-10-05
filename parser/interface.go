@@ -81,19 +81,19 @@ func spreadSlices(args []any) (map[int]int, []any, error) {
 	return inClauseCountByIndex, outArgs, nil
 }
 
-// byteSliceType is the [reflect.Type] of []byte
-var byteSliceType = reflect.TypeOf([]byte{})
+func shouldSpread(v reflect.Value) bool {
+	if !v.IsValid() {
+		return false
+	}
 
-func shouldSpread(argValue reflect.Value) bool {
-	if !argValue.IsValid() {
+	if v.Kind() != reflect.Slice {
 		return false
 	}
 
 	// []byte is a [driver.Value] type so it should not be expanded
-	if argValue.Type() == byteSliceType {
+	if v.Type().Elem().Kind() == reflect.Uint8 {
 		return false
 	}
 
-	// if it's slice then it's part of "IN" clause and have to spread
-	return argValue.Kind() == reflect.Slice
+	return true
 }

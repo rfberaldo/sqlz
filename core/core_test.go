@@ -3,6 +3,9 @@ package core
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -583,5 +586,41 @@ func TestCore_NonEnglishCharacters(t *testing.T) {
 		err = QueryRow(ctx, conn.DB, conn.Bind, DefaultStructTag, &user, th.Fmt("SELECT * FROM %s LIMIT 1"))
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
+	})
+}
+
+type Email string
+
+// Value implements [driver.Valuer].
+func (p Email) Value() (driver.Value, error) {
+	if !strings.ContainsRune(string(p), '@') {
+		return driver.Value(""), fmt.Errorf("'%s' is not a valid email", p)
+	}
+	return driver.Value(string(p)), nil
+}
+
+func TestCore_ValuerInterface(t *testing.T) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
+		_, err := conn.DB.Exec(th.Fmt(`
+			CREATE TABLE IF NOT EXISTS %s (name VARCHAR(255), email VARCHAR(255))`,
+		))
+		require.NoError(t, err)
+
+		type T struct {
+			Name  string
+			Email Email
+		}
+
+		query := th.Fmt("INSERT INTO %s (name, email) VALUES (:name, :email)")
+
+		data := T{Name: "Alice", Email: "alice@wonderland.com"}
+		_, err = Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, query, data)
+		require.NoError(t, err)
+
+		data.Email = "aliceatwonderland.com"
+		_, err = Exec(ctx, conn.DB, conn.Bind, DefaultStructTag, query, data)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "not a valid email")
 	})
 }

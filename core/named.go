@@ -89,6 +89,21 @@ func (n *namedQuery) processOne(query string, argValue reflect.Value, kind refle
 	return query, n.args, nil
 }
 
+func (n *namedQuery) structValue(v reflect.Value) any {
+	v = reflect.Indirect(v)
+	if !v.IsValid() {
+		return nil
+	}
+
+	// not testing pointer receiver, as [driver.Valuer] must have value receiver
+	if v.Type().Implements(valuerType) {
+		return v.Interface()
+	}
+
+	// this helps allocating less than necessary
+	return reflectutil.TypedValue(v)
+}
+
 // structMapper maps idents to the argValue struct fields, returning their values,
 // computed mapperArgs may have slices, meaning an "IN" clause.
 func (n *namedQuery) structMapper(idents []string, argValue reflect.Value) error {
@@ -102,12 +117,7 @@ func (n *namedQuery) structMapper(idents []string, argValue reflect.Value) error
 			return fmt.Errorf("sqlz: field not found: '%s' (maybe unexported?)", ident)
 		}
 
-		v = reflect.Indirect(v)
-		if v.IsValid() {
-			n.args = append(n.args, v.Interface())
-		} else {
-			n.args = append(n.args, nil)
-		}
+		n.args = append(n.args, n.structValue(v))
 	}
 
 	return nil

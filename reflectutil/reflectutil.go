@@ -118,3 +118,31 @@ func IsNilStruct(v reflect.Value) bool {
 func IsNilMap(v reflect.Value) bool {
 	return v.Kind() == reflect.Map && v.IsNil()
 }
+
+// TypedValue returns v's value using typed functions,
+// like Bool(), String(), etc; fallsback to Interface().
+func TypedValue(v reflect.Value) any {
+	switch v.Kind() {
+	case reflect.Bool:
+		return v.Bool()
+
+	case reflect.String:
+		return v.String()
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return int(v.Int())
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return uint(v.Uint())
+
+	case reflect.Float32, reflect.Float64:
+		return v.Float()
+
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return v.Bytes() // []byte
+		}
+	}
+
+	return v.Interface()
+}
