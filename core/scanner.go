@@ -9,14 +9,6 @@ import (
 	"github.com/rfberaldo/sqlz/reflectutil"
 )
 
-var (
-	// mapType is the [reflect.Type] of map[string]any
-	mapType = reflect.TypeOf(map[string]any{})
-
-	// scannerType is [reflect.Type] of [sql.Scanner]
-	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-)
-
 // RowScanner defines the minimal interface for iterating over
 // and scanning database query results. It is satisfied by [sql.Rows].
 type RowScanner interface {
@@ -262,8 +254,8 @@ func (s *Scanner) setMapPtrs() {
 	}
 }
 
-func isScannable(v reflect.Type) bool {
-	return reflect.PointerTo(v).Implements(scannerType) || v.Implements(scannerType)
+func isScannable(t reflect.Type) bool {
+	return reflect.PointerTo(t).Implements(scannerType) || t.Implements(scannerType)
 }
 
 // ScanStruct scans a single row into dest, if dest is not a struct it panics.

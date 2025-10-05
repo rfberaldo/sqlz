@@ -1,12 +1,26 @@
 package core
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 )
 
 const DefaultStructTag = "db"
+
+var (
+	// mapType is the [reflect.Type] of map[string]any
+	mapType = reflect.TypeFor[map[string]any]()
+
+	// scannerType is [reflect.Type] of [sql.Scanner]
+	scannerType = reflect.TypeFor[sql.Scanner]()
+
+	// valuerType is [reflect.Type] of [driver.Valuer]
+	valuerType = reflect.TypeFor[driver.Valuer]()
+)
 
 // Assert validates if arg is a map[string]any.
 func AssertMap(arg any) (map[string]any, error) {
