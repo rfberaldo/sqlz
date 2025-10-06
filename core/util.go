@@ -12,9 +12,6 @@ import (
 const DefaultStructTag = "db"
 
 var (
-	// mapType is the [reflect.Type] of map[string]any
-	mapType = reflect.TypeFor[map[string]any]()
-
 	// scannerType is [reflect.Type] of [sql.Scanner]
 	scannerType = reflect.TypeFor[sql.Scanner]()
 

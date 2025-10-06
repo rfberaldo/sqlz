@@ -178,7 +178,7 @@ func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) error 
 		return fmt.Errorf("sqlz/named: slice is zero length: %s", sliceValue.Type())
 	}
 
-	elType := reflectutil.DerefType(sliceValue.Type().Elem())
+	elType := reflectutil.Deref(sliceValue.Type().Elem())
 	switch elType.Kind() {
 	case reflect.Map:
 		return n.bindSliceArgs(query, sliceValue, n.bindMapArgs)

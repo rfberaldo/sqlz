@@ -16,7 +16,7 @@ type structMapper struct {
 // StructFieldMap maps the structType fields, tag is the struct tag to search for,
 // and nameMapper is used to map field names in case the tag was not found.
 func StructFieldMap(structType reflect.Type, tag string, nameMapper func(string) string) map[string][]int {
-	structType = DerefType(structType)
+	structType = Deref(structType)
 	if structType.Kind() != reflect.Struct {
 		panic(fmt.Errorf("sqlz/reflectutil: reflect.Type must be a struct or pointer to struct, got %s", structType))
 	}
@@ -61,7 +61,7 @@ func (sm *structMapper) traverse(t reflect.Type) {
 
 		for i := range parent.t.NumField() {
 			field := parent.t.Field(i)
-			fieldType := DerefType(field.Type)
+			fieldType := Deref(field.Type)
 			curr := parent.spawn(fieldType)
 
 			if !field.IsExported() {
@@ -115,7 +115,7 @@ func FieldTag(field reflect.StructField, structTag string) (string, bool) {
 	return "", false
 }
 
-// FieldByIndex returns the struct field from v, initializing any nested nil struct.
+// FieldByIndex returns the struct field from v, initializing any nested nil pointers.
 func FieldByIndex(v reflect.Value, index []int) reflect.Value {
 	v = reflect.Indirect(v)
 	if !v.IsValid() {
@@ -144,13 +144,8 @@ func initNested(v reflect.Value, index []int) {
 		return
 	}
 
-	v = reflect.Indirect(v)
-
 	fv := v.Field(index[0])
-	fv = Deref(fv)
-	if IsNilStruct(fv) {
-		fv.Set(reflect.New(fv.Type().Elem()))
-	}
+	fv = Init(fv)
 
 	initNested(fv, index[1:])
 }
