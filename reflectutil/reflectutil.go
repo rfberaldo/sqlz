@@ -95,7 +95,7 @@ func (t Type) String() string {
 	panic(fmt.Errorf("sqlz/reflectutil: unexpected type %d", t))
 }
 
-// Deref recursively de-references a [reflect.Value], nil pointers are preserved.
+// Deref recursively de-references a [reflect.Value], preserving nil pointers.
 func Deref(v reflect.Value) reflect.Value {
 	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
@@ -105,6 +105,13 @@ func Deref(v reflect.Value) reflect.Value {
 	}
 
 	return v
+}
+
+func DerefType(t reflect.Type) reflect.Type {
+	if t.Kind() == reflect.Pointer {
+		return DerefType(t.Elem())
+	}
+	return t
 }
 
 func IsNilStruct(v reflect.Value) bool {

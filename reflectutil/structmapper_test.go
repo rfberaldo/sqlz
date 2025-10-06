@@ -7,259 +7,138 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func tWalkStruct(key string, rval reflect.Value) StructValue {
-	dotNotation := strings.ContainsRune(key, '.')
-	return walkStruct("json", StructValue{Value: rval}, func(path []string) bool {
-		if !dotNotation {
-			s := path[len(path)-1]
-			return key == s || key == strings.ToLower(s)
-		}
-
-		keys := strings.Split(key, ".")
-		if len(keys) != len(path) {
-			return false
-		}
-		for i := range len(keys) {
-			if keys[i] != path[i] && keys[i] != strings.ToLower(path[i]) {
-				return false
-			}
-		}
-		return true
-	})
-}
-
-func TestWalkStruct(t *testing.T) {
-	type Work struct {
-		Company  string `json:",omitempty"`
-		JobTitle string `json:"job_title,omitempty"`
-		Salary   *float64
+func TestStructFieldMap(t *testing.T) {
+	type Person struct {
+		Id         int    `json:",omitempty"`
+		Name       string `json:",omitempty"`
+		unexported string
 	}
 
 	type User struct {
-		Id        int    `json:",omitempty"`
-		Username  string `json:",omitempty"`
-		Password  string
+		*Person
+		UserId    int       `json:"user_id,omitempty"`
+		Username  string    `json:",omitempty"`
 		Active    bool      `json:",omitempty"`
-		Work      *Work     `json:",omitempty"`
+		Parent    *Person   `json:",omitempty"`
 		CreatedAt time.Time `json:"created_at,omitzero"`
 	}
 
-	t.Run("without dot notation", func(t *testing.T) {
-		columnsIndex := map[string][]int{
-			"id":         {0},
-			"username":   {1},
-			"password":   {2},
-			"active":     {3},
-			"company":    {4, 0},
-			"job_title":  {4, 1},
-			"salary":     {4, 2},
-			"created_at": {5},
-		}
+	expect := map[string][]int{
+		"person.id":   {0, 0},
+		"person.name": {0, 1},
+		"id":          {0, 0},
+		"name":        {0, 1},
+		"user_id":     {1},
+		"username":    {2},
+		"active":      {3},
+		"parent":      {4},
+		"parent.id":   {4, 0},
+		"parent.name": {4, 1},
+		"created_at":  {5},
+	}
 
-		var user User
-		for col, idx := range columnsIndex {
-			rval := Deref(reflect.ValueOf(&user))
-			v := tWalkStruct(col, rval)
-
-			require.Equal(t, true, v.IsValid(), "Field '%s' not found", col)
-			require.Equal(t, idx, v.index)
-		}
-	})
-
-	t.Run("with dot notation", func(t *testing.T) {
-		columnsIndex := map[string][]int{
-			"id":             {0},
-			"username":       {1},
-			"password":       {2},
-			"active":         {3},
-			"work.company":   {4, 0},
-			"work.job_title": {4, 1},
-			"work.salary":    {4, 2},
-			"created_at":     {5},
-		}
-
-		var user User
-		for col, idx := range columnsIndex {
-			rval := Deref(reflect.ValueOf(&user))
-			v := tWalkStruct(col, rval)
-
-			require.Equal(t, true, v.IsValid(), "Field '%s' not found", col)
-			require.Equal(t, idx, v.index)
-		}
-	})
+	got := StructFieldMap(reflect.TypeFor[User](), "json", strings.ToLower)
+	assert.Equal(t, expect, got)
 }
 
-func TestWalkStruct_Embed(t *testing.T) {
-	type Work struct {
-		Company  string
-		JobTitle string
-		Salary   *float64
+func TestFieldByIndex(t *testing.T) {
+	type Person struct {
+		Id         int
+		Name       string
+		DeepParent *Person
 	}
 
 	type User struct {
-		Id       int
-		Username string
-		Password string
-		Active   bool
-		*Work
+		*Person
+		UserId    int
+		Username  string
+		Active    bool
+		Parent    Person
 		CreatedAt time.Time
 	}
 
-	t.Run("without dot notation", func(t *testing.T) {
-		columnsIndex := map[string][]int{
-			"id":        {0},
-			"username":  {1},
-			"password":  {2},
-			"active":    {3},
-			"company":   {4, 0},
-			"jobtitle":  {4, 1},
-			"salary":    {4, 2},
-			"createdat": {5},
-		}
-
+	t.Run("top level non nil", func(t *testing.T) {
 		var user User
-		for col, idx := range columnsIndex {
-			rval := Deref(reflect.ValueOf(&user))
-			v := tWalkStruct(col, rval)
+		got := FieldByIndex(reflect.ValueOf(&user), []int{1})
+		assert.True(t, got.IsValid())
+		assert.True(t, got.CanAddr())
 
-			require.Equal(t, true, v.IsValid(), "Field '%s' not found", col)
-			require.Equal(t, idx, v.index)
-		}
+		got.SetInt(69)
+		assert.Equal(t, user.UserId, 69)
 	})
 
-	t.Run("with dot notation", func(t *testing.T) {
-		columnsIndex := map[string][]int{
-			"id":            {0},
-			"username":      {1},
-			"password":      {2},
-			"active":        {3},
-			"work.company":  {4, 0},
-			"work.jobtitle": {4, 1},
-			"work.salary":   {4, 2},
-			"createdat":     {5},
-		}
-
+	t.Run("nested non nil", func(t *testing.T) {
 		var user User
-		for col, idx := range columnsIndex {
-			rval := Deref(reflect.ValueOf(&user))
-			v := tWalkStruct(col, rval)
+		got := FieldByIndex(reflect.ValueOf(&user), []int{4, 0})
+		assert.True(t, got.IsValid())
+		assert.True(t, got.CanAddr())
 
-			require.Equal(t, true, v.IsValid(), "Field '%s' not found", col)
-			require.Equal(t, idx, v.index)
-		}
+		got.SetInt(69)
+		assert.Equal(t, user.Parent.Id, 69)
+	})
+
+	t.Run("deep nested nil", func(t *testing.T) {
+		var user User
+		got := FieldByIndex(reflect.ValueOf(&user), []int{0, 2, 1})
+		assert.True(t, got.IsValid())
+		assert.True(t, got.CanAddr())
+
+		got.SetString("foo")
+		assert.Equal(t, user.DeepParent.Name, "foo")
 	})
 }
 
-func TestStructMapper_FieldByKey(t *testing.T) {
-	type Inner struct {
-		ID   int    `db:"id"`
-		Name string `db:"name"`
-	}
-
-	type Outer struct {
-		Inner      Inner
-		Ptr        *Inner
-		Exported   string
-		unexported string
-		Tagged     string `db:"custom_tag"`
-	}
-
-	sm := NewStructMapper("db", nil)
-
-	t.Run("by struct field name", func(t *testing.T) {
-		o := Outer{Exported: "foo"}
-		v := sm.FieldByKey("Exported", reflect.ValueOf(&o))
-		require.True(t, v.IsValid())
-		assert.Equal(t, "foo", v.String())
-	})
-
-	t.Run("by tag name", func(t *testing.T) {
-		o := Outer{Tagged: "bar"}
-		v := sm.FieldByKey("custom_tag", reflect.ValueOf(&o))
-		require.True(t, v.IsValid())
-		assert.Equal(t, "bar", v.String())
-	})
-
-	t.Run("case insensitive mapper", func(t *testing.T) {
-		sm2 := NewStructMapper("db", func(s string) string { return strings.ToUpper(s) })
-		o := Outer{Exported: "baz"}
-		v := sm2.FieldByKey("EXPORTED", reflect.ValueOf(&o))
-		require.True(t, v.IsValid())
-		assert.Equal(t, "baz", v.String())
-	})
-
-	t.Run("nested struct dot notation", func(t *testing.T) {
-		o := Outer{Inner: Inner{ID: 42}}
-		v := sm.FieldByKey("inner.id", reflect.ValueOf(&o))
-		require.True(t, v.IsValid())
-		assert.Equal(t, 42, int(v.Int()))
-	})
-
-	t.Run("pointer to struct auto init", func(t *testing.T) {
-		o := Outer{}
-		v := sm.FieldByKey("ptr.name", reflect.ValueOf(&o))
-		require.True(t, v.IsValid())
-		v.SetString("init-name")
-		assert.NotNil(t, o.Ptr)
-		assert.Equal(t, "init-name", o.Ptr.Name)
-	})
-
-	t.Run("unexported field skipped", func(t *testing.T) {
-		o := Outer{unexported: "foo"}
-		v := sm.FieldByKey("unexported", reflect.ValueOf(&o))
-		assert.False(t, v.IsValid())
-	})
-
-	t.Run("not found returns zero reflect.Value", func(t *testing.T) {
-		o := Outer{}
-		v := sm.FieldByKey("does_not_exist", reflect.ValueOf(&o))
-		assert.False(t, v.IsValid())
-	})
-
-	t.Run("cache is used", func(t *testing.T) {
-		o := Outer{Tagged: "cached"}
-		v1 := sm.FieldByKey("custom_tag", reflect.ValueOf(&o))
-		v2 := sm.FieldByKey("custom_tag", reflect.ValueOf(&o))
-		assert.Equal(t, v1, v2)
-	})
-}
-
-func TestFieldName(t *testing.T) {
+func TestFieldTag(t *testing.T) {
 	type Sample struct {
 		NoTag      string
 		WithTag    string `db:"colname"`
-		WithOmit   string `db:"colname,omitempty"`
+		WithOmit   string `db:"omitme,omitempty"`
 		WithIgnore string `db:"-"`
+		EmptyTag   string `db:""`
 	}
 
-	rtype := reflect.TypeOf(Sample{})
+	typ := reflect.TypeOf(Sample{})
 
-	t.Run("no tag falls back to name", func(t *testing.T) {
-		f, _ := rtype.FieldByName("NoTag")
-		assert.Equal(t, "NoTag", FieldName(f, "db"))
+	t.Run("tag not found", func(t *testing.T) {
+		f, _ := typ.FieldByName("NoTag")
+		tag, ok := FieldTag(f, "db")
+		assert.False(t, ok)
+		assert.Empty(t, tag)
 	})
 
-	t.Run("uses tag value", func(t *testing.T) {
-		f, _ := rtype.FieldByName("WithTag")
-		assert.Equal(t, "colname", FieldName(f, "db"))
+	t.Run("tag found", func(t *testing.T) {
+		f, _ := typ.FieldByName("WithTag")
+		tag, ok := FieldTag(f, "db")
+		assert.True(t, ok)
+		assert.Equal(t, "colname", tag)
 	})
 
-	t.Run("tag with omitempty stripped", func(t *testing.T) {
-		f, _ := rtype.FieldByName("WithOmit")
-		assert.Equal(t, "colname", FieldName(f, "db"))
+	t.Run("tag with omitempty", func(t *testing.T) {
+		f, _ := typ.FieldByName("WithOmit")
+		tag, ok := FieldTag(f, "db")
+		assert.True(t, ok)
+		assert.Equal(t, "omitme", tag)
 	})
 
-	t.Run("tag with dash falls back to name", func(t *testing.T) {
-		f, _ := rtype.FieldByName("WithIgnore")
-		assert.Equal(t, "WithIgnore", FieldName(f, "db"))
+	t.Run("tag with dash", func(t *testing.T) {
+		f, _ := typ.FieldByName("WithIgnore")
+		tag, ok := FieldTag(f, "db")
+		assert.False(t, ok)
+		assert.Empty(t, tag)
+	})
+
+	t.Run("tag empty string", func(t *testing.T) {
+		f, _ := typ.FieldByName("EmptyTag")
+		tag, ok := FieldTag(f, "db")
+		assert.False(t, ok)
+		assert.Empty(t, tag)
 	})
 }
 
-// BenchmarkStructMapper_FieldByKey-12    	  440548	      2789 ns/op	     264 B/op	       8 allocs/op
-func BenchmarkStructMapper_FieldByKey(b *testing.B) {
+// BenchmarkStructFieldMap-12    	  493293	      2143 ns/op	    1928 B/op	      37 allocs/op
+func BenchmarkStructFieldMap(b *testing.B) {
 	type Person struct {
 		Name    string
 		Surname string
@@ -275,23 +154,8 @@ func BenchmarkStructMapper_FieldByKey(b *testing.B) {
 		CreatedAt time.Time
 	}
 
-	columns := []string{
-		"id",
-		"username",
-		"password",
-		"name",
-		"surname",
-		"age",
-		"active",
-		"createdat",
-	}
-	sm := NewStructMapper("json", nil)
-
 	for b.Loop() {
 		var user User
-		for _, col := range columns {
-			v := sm.FieldByKey(col, reflect.ValueOf(&user))
-			require.Equal(b, true, v.IsValid(), "Field: %s", col)
-		}
+		_ = StructFieldMap(reflect.TypeOf(user), "json", strings.ToLower)
 	}
 }

@@ -690,7 +690,7 @@ func TestScanner_DuplicateColumns(t *testing.T) {
 func setupTestTable(t testing.TB, db *sql.DB) *testutil.TableHelper {
 	th := testutil.NewTableHelper(t, db, parser.BindQuestion)
 	query := th.Fmt(`
-		CREATE TABLE %s (
+		CREATE TABLE IF NOT EXISTS %s (
 			id int auto_increment NOT NULL,
 			name varchar(100) NULL,
 			age int NULL,
@@ -713,7 +713,7 @@ func setupTestTable(t testing.TB, db *sql.DB) *testutil.TableHelper {
 	return th
 }
 
-// BenchmarkScan_MapSlice-12    	    1216	    972108 ns/op	  537107 B/op	   13784 allocs/op
+// BenchmarkScan_MapSlice-12    	    1218	    945176 ns/op	  537053 B/op	   13783 allocs/op
 func BenchmarkScan_MapSlice(b *testing.B) {
 	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
@@ -731,7 +731,7 @@ func BenchmarkScan_MapSlice(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_StructSlice-12    	    1058	   1087626 ns/op	  265114 B/op	    8710 allocs/op
+// BenchmarkScan_StructSlice-12    	    1134	   1102095 ns/op	  265426 B/op	    8704 allocs/op
 func BenchmarkScan_StructSlice(b *testing.B) {
 	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
@@ -757,7 +757,7 @@ func BenchmarkScan_StructSlice(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_Primitivelice-12    	    2820	    374166 ns/op	   65314 B/op	    2034 allocs/op
+// BenchmarkScan_Primitivelice-12    	    3057	    367244 ns/op	   65268 B/op	    2032 allocs/op
 func BenchmarkScan_Primitivelice(b *testing.B) {
 	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
@@ -775,7 +775,7 @@ func BenchmarkScan_Primitivelice(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_Struct-12    	    9832	    111244 ns/op	    1930 B/op	      59 allocs/op
+// BenchmarkScan_Struct-12    	    9909	    107451 ns/op	    2243 B/op	      53 allocs/op
 func BenchmarkScan_Struct(b *testing.B) {
 	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)
@@ -800,7 +800,7 @@ func BenchmarkScan_Struct(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_Map-12    	   10000	    107088 ns/op	    1754 B/op	      40 allocs/op
+// BenchmarkScan_Map-12    	   10000	    108140 ns/op	    1690 B/op	      38 allocs/op
 func BenchmarkScan_Map(b *testing.B) {
 	conn := testutil.GetMySQL(b)
 	require.NotNil(b, conn.DB)

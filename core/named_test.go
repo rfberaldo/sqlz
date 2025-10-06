@@ -287,14 +287,14 @@ func TestProcessNamed(t *testing.T) {
 			inputQuery:        "SELECT * FROM user WHERE id = :id",
 			inputArg:          123, // Not a struct, map, array, or slice
 			expectError:       true,
-			expectErrContains: "unsupported arg type",
+			expectErrContains: "unsupported argument type",
 		},
 		{
 			name:              "nil argument",
 			inputQuery:        "SELECT * FROM user WHERE id = :id",
 			inputArg:          nil,
 			expectError:       true,
-			expectErrContains: "argument in named query is nil pointer",
+			expectErrContains: "argument is nil pointer",
 		},
 		{
 			name:         "empty query",
