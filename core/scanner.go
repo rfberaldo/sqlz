@@ -27,11 +27,13 @@ type RowScanner interface {
 // ScanMap and ScanStruct, these methods do not loop over or close rows,
 // nor can they be mixed.
 type Scanner struct {
+	rows                RowScanner
 	columns             []string
 	queryRow            bool
 	ignoreMissingFields bool
-	rows                RowScanner
-	structMapper        *reflectutil.StructMapper
+	structTag           string
+	fieldIndexByKey     map[string][]int
+	fieldNameMapper     func(string) string
 	ptrs                []any // slice of pointers for scan, used in all methods
 	values              []any // slice of values from rows, used in map scanning
 	noop                any   // ignored fields sink
@@ -76,10 +78,8 @@ func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
 		rows:                rows,
 		queryRow:            opts.QueryRow,
 		ignoreMissingFields: opts.IgnoreMissingFields,
-		structMapper: reflectutil.NewStructMapper(
-			opts.StructTag,
-			opts.FieldNameMapper,
-		),
+		structTag:           opts.StructTag,
+		fieldNameMapper:     opts.FieldNameMapper,
 	}
 
 	if err := scanner.checkDuplicateColumns(); err != nil {
@@ -294,14 +294,25 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 		s.ptrs = make([]any, len(s.columns))
 	}
 
+	if s.fieldIndexByKey == nil {
+		s.fieldIndexByKey = reflectutil.StructFieldMap(
+			v.Type(), s.structTag, s.fieldNameMapper,
+		)
+	}
+
 	for i, col := range s.columns {
-		fv := s.structMapper.FieldByKey(col, v)
-		if !fv.IsValid() {
+		index, ok := s.fieldIndexByKey[col]
+		if !ok {
 			if !s.ignoreMissingFields {
 				return fmt.Errorf("sqlz/scan: field not found: '%s' (maybe unexported?)", col)
 			}
 			s.ptrs[i] = &s.noop
 			continue
+		}
+
+		fv := reflectutil.FieldByIndex(v, index)
+		if !fv.IsValid() {
+			return fmt.Errorf("sqlz/scan: invalid field: '%s'", col)
 		}
 		s.ptrs[i] = fv.Addr().Interface()
 	}

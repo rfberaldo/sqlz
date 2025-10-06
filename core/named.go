@@ -24,9 +24,14 @@ type NamedOptions struct {
 }
 
 type namedQuery struct {
-	bind     parser.Bind
-	stMapper *reflectutil.StructMapper
-	args     []any
+	bind            parser.Bind
+	structTag       string
+	fieldNameMapper func(string) string
+	fieldIndexByKey map[string][]int
+
+	// result
+	query string
+	args  []any
 }
 
 func ProcessNamed(query string, arg any, opts *NamedOptions) (string, []any, error) {
@@ -40,18 +45,23 @@ func ProcessNamed(query string, arg any, opts *NamedOptions) (string, []any, err
 		opts.FieldNameMapper = SnakeCaseMapper
 	}
 
-	return (&namedQuery{
-		bind: opts.Bind,
-		stMapper: reflectutil.NewStructMapper(
-			opts.StructTag,
-			opts.FieldNameMapper),
-	}).process(query, arg)
+	n := &namedQuery{
+		bind:            opts.Bind,
+		structTag:       opts.StructTag,
+		fieldNameMapper: opts.FieldNameMapper,
+	}
+
+	if err := n.process(query, arg); err != nil {
+		return "", nil, err
+	}
+
+	return n.query, n.args, nil
 }
 
-func (n *namedQuery) process(query string, arg any) (string, []any, error) {
+func (n *namedQuery) process(query string, arg any) error {
 	argValue := reflect.Indirect(reflect.ValueOf(arg))
 	if !argValue.IsValid() {
-		return "", nil, fmt.Errorf("sqlz: argument in named query is nil pointer")
+		return fmt.Errorf("sqlz/named: argument is nil pointer")
 	}
 
 	switch kind := argValue.Kind(); kind {
@@ -62,31 +72,31 @@ func (n *namedQuery) process(query string, arg any) (string, []any, error) {
 		return n.processSlice(query, argValue)
 	}
 
-	return "", nil, fmt.Errorf("sqlz: unsupported arg type: %T", arg)
+	return fmt.Errorf("sqlz/named: unsupported argument type: %T", arg)
 }
 
-func (n *namedQuery) processOne(query string, argValue reflect.Value, kind reflect.Kind) (string, []any, error) {
+func (n *namedQuery) processOne(query string, argValue reflect.Value, kind reflect.Kind) error {
 	query, idents := parser.Parse(n.bind, query)
 	var err error
 
 	switch kind {
 	case reflect.Map:
-		err = n.mapMapper(idents, argValue)
+		err = n.bindMapArgs(idents, argValue)
 
 	case reflect.Struct:
-		err = n.structMapper(idents, argValue)
+		err = n.bindStructArgs(idents, argValue)
 	}
 
 	if err != nil {
-		return "", nil, err
+		return err
 	}
 
-	query, n.args, err = parser.ParseInClause(n.bind, query, n.args)
+	n.query, n.args, err = parser.ParseInClause(n.bind, query, n.args)
 	if err != nil {
-		return "", nil, err
+		return err
 	}
 
-	return query, n.args, nil
+	return nil
 }
 
 func (n *namedQuery) structValue(v reflect.Value) any {
@@ -104,28 +114,44 @@ func (n *namedQuery) structValue(v reflect.Value) any {
 	return reflectutil.TypedValue(v)
 }
 
-// structMapper maps idents to the argValue struct fields, returning their values,
-// computed mapperArgs may have slices, meaning an "IN" clause.
-func (n *namedQuery) structMapper(idents []string, argValue reflect.Value) error {
+// bindStructArgs maps idents to the argValue struct fields, binding their values,
+// binded args may have slices, meaning an "IN" clause.
+func (n *namedQuery) bindStructArgs(idents []string, argValue reflect.Value) error {
+	argValue = reflect.Indirect(argValue)
+	if !argValue.IsValid() {
+		return fmt.Errorf("sqlz/named: argument is nil pointer")
+	}
+
 	if n.args == nil {
 		n.args = make([]any, 0, len(idents))
 	}
 
-	for _, ident := range idents {
-		v := n.stMapper.FieldByKey(ident, argValue)
-		if !v.IsValid() {
-			return fmt.Errorf("sqlz: field not found: '%s' (maybe unexported?)", ident)
-		}
+	if n.fieldIndexByKey == nil {
+		n.fieldIndexByKey = reflectutil.StructFieldMap(
+			argValue.Type(),
+			n.structTag,
+			n.fieldNameMapper,
+		)
+	}
 
+	for _, ident := range idents {
+		index, ok := n.fieldIndexByKey[ident]
+		if !ok {
+			return fmt.Errorf("sqlz/named: field not found: '%s' (maybe unexported?)", ident)
+		}
+		v, err := argValue.FieldByIndexErr(index)
+		if err != nil {
+			return fmt.Errorf("sqlz/named: field is nil pointer: '%s'", ident)
+		}
 		n.args = append(n.args, n.structValue(v))
 	}
 
 	return nil
 }
 
-// mapMapper maps idents to the argValue map keys, returning their values,
-// computed mapperArgs may have slices, meaning an "IN" clause.
-func (n *namedQuery) mapMapper(idents []string, argValue reflect.Value) error {
+// bindMapArgs maps idents to the argValue map keys, binding their values,
+// binded args may have slices, meaning an "IN" clause.
+func (n *namedQuery) bindMapArgs(idents []string, argValue reflect.Value) error {
 	m, err := AssertMap(argValue.Interface())
 	if err != nil {
 		return err
@@ -138,58 +164,62 @@ func (n *namedQuery) mapMapper(idents []string, argValue reflect.Value) error {
 	for _, ident := range idents {
 		value, ok := GetMapValue(ident, m)
 		if !ok {
-			return fmt.Errorf("sqlz: could not find '%s' in %+v", ident, m)
+			return fmt.Errorf("sqlz/named: could not find '%s' in %+v", ident, m)
 		}
 		n.args = append(n.args, value)
 	}
 	return nil
 }
 
-type mapperFunc = func(idents []string, argValue reflect.Value) error
+type binderFunc = func(idents []string, argValue reflect.Value) error
 
-func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) (string, []any, error) {
+func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) error {
 	if sliceValue.Len() == 0 {
-		return "", nil, fmt.Errorf("sqlz: slice is zero length: %s", sliceValue.Type())
+		return fmt.Errorf("sqlz/named: slice is zero length: %s", sliceValue.Type())
 	}
 
-	elValue := reflect.Indirect(sliceValue.Index(0))
-	if !elValue.IsValid() {
-		return "", nil, fmt.Errorf("sqlz: slice contains nil pointers: %s", sliceValue.Type())
-	}
-
-	switch elValue.Kind() {
+	elType := reflectutil.DerefType(sliceValue.Type().Elem())
+	switch elType.Kind() {
 	case reflect.Map:
-		return n.sliceMapper(query, sliceValue, n.mapMapper)
+		return n.bindSliceArgs(query, sliceValue, n.bindMapArgs)
 
 	case reflect.Struct:
-		return n.sliceMapper(query, sliceValue, n.structMapper)
+		return n.bindSliceArgs(query, sliceValue, n.bindStructArgs)
 
 	default:
-		return "", nil, fmt.Errorf("sqlz: unsupported slice type: %s", sliceValue.Type())
+		return fmt.Errorf("sqlz/named: unsupported slice type: %s", sliceValue.Type())
 	}
 }
 
-func (n *namedQuery) sliceMapper(query string, sliceValue reflect.Value, mapper mapperFunc) (string, []any, error) {
+func (n *namedQuery) bindSliceArgs(query string, sliceValue reflect.Value, binder binderFunc) error {
 	idents := parser.ParseIdents(n.bind, query)
 	if n.args == nil {
 		n.args = make([]any, 0, len(idents)*sliceValue.Len())
 	}
 
 	for i := range sliceValue.Len() {
-		if err := mapper(idents, sliceValue.Index(i)); err != nil {
-			return "", nil, err
+		if err := binder(idents, sliceValue.Index(i)); err != nil {
+			return err
 		}
 	}
 
+	var err error
+
 	// if bind is '?', parse query before expanding
 	if n.bind == parser.BindQuestion {
-		q := parser.ParseQuery(n.bind, query)
-		q, err := expandInsertSyntax(q, sliceValue.Len())
-		return q, n.args, err
+		n.query = parser.ParseQuery(n.bind, query)
+		n.query, err = expandInsertSyntax(n.query, sliceValue.Len())
+		return err
 	}
 
-	q, err := expandInsertSyntax(query, sliceValue.Len())
-	return parser.ParseQuery(n.bind, q), n.args, err
+	n.query, err = expandInsertSyntax(query, sliceValue.Len())
+	if err != nil {
+		return err
+	}
+
+	n.query = parser.ParseQuery(n.bind, n.query)
+
+	return nil
 }
 
 var regValues = regexp.MustCompile(`(?i)\)\s*VALUES\s*\(`)
@@ -198,19 +228,19 @@ var regValues = regexp.MustCompile(`(?i)\)\s*VALUES\s*\(`)
 func expandInsertSyntax(query string, count int) (string, error) {
 	loc := regValues.FindStringIndex(query)
 	if loc == nil {
-		return "", fmt.Errorf("sqlz: slice is only supported in INSERT query with 'VALUES' clause")
+		return "", fmt.Errorf("sqlz/named: slice is only supported in INSERT query with 'VALUES' clause")
 	}
 
-	i := loc[1] - 1                   // position of '(' after 'VALUES'
-	j := endingParensIndex(query[i:]) // position of ending ')'
-	if j == -1 {
-		return "", fmt.Errorf("sqlz: could not parse batch INSERT, missing ending parenthesis")
+	openIdx := loc[1] - 1
+	closeIdx := endingParensIndex(query[openIdx:])
+	if closeIdx == -1 {
+		return "", fmt.Errorf("sqlz/named: could not parse batch INSERT, missing ending parenthesis")
 	}
-	j += i + 1
+	closeIdx += openIdx + 1
 
-	beginning := query[:j]
-	values := strings.Repeat(","+query[i:j], count-1)
-	ending := query[j:]
+	beginning := query[:closeIdx]
+	values := strings.Repeat(","+query[openIdx:closeIdx], count-1)
+	ending := query[closeIdx:]
 
 	return beginning + values + ending, nil
 }

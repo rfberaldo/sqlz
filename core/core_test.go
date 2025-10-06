@@ -87,7 +87,7 @@ func TestCore_ShouldReturnNotFoundOnQueryRow(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
-		_, err := conn.DB.Exec(th.Fmt(`CREATE TABLE %s (id INT PRIMARY KEY)`))
+		_, err := conn.DB.Exec(th.Fmt(`CREATE TABLE IF NOT EXISTS %s (id INT PRIMARY KEY)`))
 		assert.NoError(t, err)
 
 		q := th.Fmt("SELECT * FROM %s")
@@ -104,7 +104,7 @@ func TestCore_QueryArgs(t *testing.T) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
-			CREATE TABLE %s (
+			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				username VARCHAR(255),
 				age INT,
@@ -231,7 +231,7 @@ func TestCore_QueryRowArgs(t *testing.T) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
-			CREATE TABLE %s (
+			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				username VARCHAR(255),
 				age INT,
@@ -347,7 +347,7 @@ func TestCore_ExecArgs(t *testing.T) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
-			CREATE TABLE %s (
+			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				name VARCHAR(255),
 				age INT,
@@ -506,7 +506,7 @@ func TestCore_CustomStructTag(t *testing.T) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
-			CREATE TABLE %s (
+			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				username VARCHAR(255),
 				email VARCHAR(255),
@@ -550,7 +550,7 @@ func TestCore_NonEnglishCharacters(t *testing.T) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := conn.DB.Exec(th.Fmt(`
-			CREATE TABLE %s (
+			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				名前 VARCHAR(255),
 				email VARCHAR(255),

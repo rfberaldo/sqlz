@@ -1,133 +1,106 @@
 package reflectutil
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 )
 
-// StructMapper is a helper to map struct fields with keys, usually column names.
-type StructMapper struct {
-	tag             string
-	fieldNameMapper func(string) string
-	indexByKey      map[string][]int
+// structMapper is a helper to map struct fields index by tag/name.
+type structMapper struct {
+	tag        string
+	nameMapper func(string) string
+	indexByKey map[string][]int
 }
 
-// NewStructMapper returns a StructMapper, tag is the [reflect.StructTag] used to find fields.
-// Each struct type must have its own StructMapper, otherwise caching won't work properly.
-// fieldNameMapper is used to process the name of the field, if the struct tag was not found.
-func NewStructMapper(tag string, fieldNameMapper func(string) string) *StructMapper {
-	if fieldNameMapper == nil {
-		fieldNameMapper = func(s string) string { return strings.ToLower(s) }
+// StructFieldMap maps the structType fields, tag is the struct tag to search for,
+// and nameMapper is used to map field names in case the tag was not found.
+func StructFieldMap(structType reflect.Type, tag string, nameMapper func(string) string) map[string][]int {
+	structType = DerefType(structType)
+	if structType.Kind() != reflect.Struct {
+		panic(fmt.Errorf("sqlz/reflectutil: reflect.Type must be a struct or pointer to struct, got %s", structType))
 	}
 
-	return &StructMapper{tag, fieldNameMapper, make(map[string][]int)}
+	sm := &structMapper{tag, nameMapper, make(map[string][]int)}
+	sm.traverse(structType)
+
+	return sm.indexByKey
 }
 
-// FieldByKey returns the struct field with the given key, must match struct tag or name.
-// Key is also used for caching, and should be unique, supports dot notation for nested structs.
-// It returns the zero [reflect.Value] if not found.
-// It panics if v is not a struct or pointer to struct.
-func (sm *StructMapper) FieldByKey(key string, v reflect.Value) reflect.Value {
-	v = reflect.Indirect(v)
-	if !v.IsValid() {
-		panic("sqlz: reflect.Value is a nil pointer")
-	}
-	if v.Kind() != reflect.Struct {
-		panic("sqlz: reflect.Value must be a struct or pointer to struct")
-	}
-
-	if index, ok := sm.indexByKey[key]; ok {
-		if fv, err := v.FieldByIndexErr(index); err == nil {
-			return fv
-		}
-	}
-
-	dotNotation := strings.ContainsRune(key, '.')
-	matcher := func(path []string) bool {
-		if !dotNotation {
-			s := path[len(path)-1]
-			return key == s || key == sm.fieldNameMapper(s)
-		}
-
-		keys := strings.Split(key, ".")
-		if len(keys) != len(path) {
-			return false
-		}
-		for i := range len(keys) {
-			if keys[i] != path[i] && keys[i] != sm.fieldNameMapper(path[i]) {
-				return false
-			}
-		}
-		return true
-	}
-
-	sv := StructValue{v, make([]int, 0, 1), make([]string, 0, 1)}
-	sv = walkStruct(sm.tag, sv, matcher)
-
-	if len(sv.index) > 0 {
-		sm.indexByKey[key] = sv.index
-	}
-
-	return sv.Value
-}
-
-type StructValue struct {
-	reflect.Value
+type node struct {
+	t     reflect.Type
+	path  strings.Builder
 	index []int
-	path  []string
 }
 
-func (sv *StructValue) append(i int, s string) {
-	sv.index = append(sv.index, i)
-	sv.path = append(sv.path, s)
+func (n *node) writePath(s string) {
+	if n.path.Len() > 0 {
+		n.path.WriteRune('.')
+	}
+	n.path.WriteString(s)
 }
 
-func (sv *StructValue) pop() {
-	sv.index = sv.index[:len(sv.index)-1]
-	sv.path = sv.path[:len(sv.path)-1]
+func (n node) spawn(t reflect.Type) node {
+	return node{
+		t,
+		n.path,
+		append(make([]int, 0, len(n.index)+1), n.index...),
+	}
 }
 
-func walkStruct(tag string, sv StructValue, match func([]string) bool) StructValue {
-	for i := range sv.NumField() {
-		field := sv.Type().Field(i)
-		fieldValue := StructValue{sv.Field(i), sv.index, sv.path}
+// traverse maps the struct field indexes, using BFS algorithm starting on t.
+func (sm *structMapper) traverse(t reflect.Type) {
+	queue := append(
+		make([]node, 0, t.NumField()),
+		node{t: t, index: make([]int, 0, 1)},
+	)
 
-		if !field.IsExported() {
-			continue
-		}
+	for len(queue) > 0 {
+		parent := queue[0]
+		queue = queue[1:]
 
-		name := FieldName(field, tag)
+		for i := range parent.t.NumField() {
+			field := parent.t.Field(i)
+			fieldType := DerefType(field.Type)
+			curr := parent.spawn(fieldType)
 
-		if match(append(fieldValue.path, name)) {
-			fieldValue.append(i, name)
-			return fieldValue
-		}
-
-		fieldValue.Value = Deref(fieldValue.Value)
-
-		// create instance in case of an addressable nil pointer
-		if IsNilStruct(fieldValue.Value) && fieldValue.CanAddr() {
-			fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
-			fieldValue.Value = reflect.Indirect(fieldValue.Value)
-		}
-
-		if fieldValue.Kind() == reflect.Struct {
-			fieldValue.append(i, name)
-			if v := walkStruct(tag, fieldValue, match); v.IsValid() {
-				return v
+			if !field.IsExported() {
+				continue
 			}
-			fieldValue.pop()
+
+			name, ok := FieldTag(field, sm.tag)
+			if !ok {
+				name = sm.nameMapper(field.Name)
+			}
+
+			curr.index = append(curr.index, field.Index...)
+			curr.writePath(name)
+
+			if fieldType.Kind() == reflect.Struct {
+				queue = append(queue, curr)
+
+				if field.Anonymous {
+					continue
+				}
+			}
+
+			if _, exists := sm.indexByKey[name]; !exists {
+				sm.indexByKey[name] = curr.index
+			}
+
+			key := curr.path.String()
+			if _, exists := sm.indexByKey[key]; !exists {
+				sm.indexByKey[key] = curr.index
+			}
 		}
 	}
-
-	return StructValue{}
 }
 
-// FieldName extracts the name for a struct field, prioritizing structTag.
-func FieldName(field reflect.StructField, structTag string) string {
+// FieldTag returns the tag from a struct field, removing any optional args.
+func FieldTag(field reflect.StructField, structTag string) (string, bool) {
 	tagValue, ok := field.Tag.Lookup(structTag)
 	if !ok {
-		return field.Name
+		return "", false
 	}
 
 	// check for possible comma as in "...,omitempty"
@@ -136,8 +109,48 @@ func FieldName(field reflect.StructField, structTag string) string {
 	}
 
 	if tagValue != "" && tagValue != "-" {
-		return tagValue
+		return tagValue, true
 	}
 
-	return field.Name
+	return "", false
+}
+
+// FieldByIndex returns the struct field from v, initializing any nested nil struct.
+func FieldByIndex(v reflect.Value, index []int) reflect.Value {
+	v = reflect.Indirect(v)
+	if !v.IsValid() {
+		panic("sqlz/reflectutil: reflect.Value is nil pointer")
+	}
+
+	if v.Kind() != reflect.Struct {
+		panic(fmt.Errorf("sqlz/reflectutil: reflect.Value must a struct: %s", v.Type()))
+	}
+
+	if !v.CanAddr() {
+		panic(fmt.Errorf("sqlz/reflectutil: reflect.Value must be an addressable struct: %s", v.Type()))
+	}
+
+	fv, err := v.FieldByIndexErr(index)
+	if err == nil {
+		return fv
+	}
+
+	initNested(v, index)
+	return v.FieldByIndex(index)
+}
+
+func initNested(v reflect.Value, index []int) {
+	if len(index) == 0 {
+		return
+	}
+
+	v = reflect.Indirect(v)
+
+	fv := v.Field(index[0])
+	fv = Deref(fv)
+	if IsNilStruct(fv) {
+		fv.Set(reflect.New(fv.Type().Elem()))
+	}
+
+	initNested(fv, index[1:])
 }

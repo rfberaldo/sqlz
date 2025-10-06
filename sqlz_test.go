@@ -208,7 +208,7 @@ func TestTransaction(t *testing.T) {
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
 
 		_, err := db.Exec(ctx, th.Fmt(`
-			CREATE TABLE %s (
+			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				name VARCHAR(255),
 				age INT

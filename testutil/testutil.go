@@ -103,7 +103,7 @@ type TableHelper struct {
 // db is only used to run cleanup.
 func NewTableHelper(t testing.TB, db *sql.DB, bind parser.Bind) *TableHelper {
 	tableName := slugify(t.Name())
-
+	db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	t.Cleanup(func() {
 		db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	})
