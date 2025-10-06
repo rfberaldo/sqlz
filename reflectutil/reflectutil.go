@@ -95,35 +95,36 @@ func (t Type) String() string {
 	panic(fmt.Errorf("sqlz/reflectutil: unexpected type %d", t))
 }
 
-// Deref recursively de-references a [reflect.Value], preserving nil pointers.
-func Deref(v reflect.Value) reflect.Value {
-	if v.Kind() == reflect.Pointer {
-		if v.IsNil() {
-			return v
-		}
-		return Deref(v.Elem())
-	}
-
-	return v
-}
-
-func DerefType(t reflect.Type) reflect.Type {
+// Deref follows the pointer from a [reflect.Type].
+func Deref(t reflect.Type) reflect.Type {
 	if t.Kind() == reflect.Pointer {
-		return DerefType(t.Elem())
+		return t.Elem()
 	}
 	return t
 }
 
-func IsNilStruct(v reflect.Value) bool {
-	if v.Kind() != reflect.Pointer {
-		return false
+// Init returns v initialized if it's not.
+// If v is nil pointer but is not addressable, it returns the nil pointer.
+func Init(v reflect.Value) reflect.Value {
+	for v.Kind() == reflect.Pointer && !v.IsNil() {
+		v = v.Elem()
 	}
 
-	return v.IsNil() && v.Type().Elem().Kind() == reflect.Struct
-}
+	if !v.CanSet() {
+		return v
+	}
 
-func IsNilMap(v reflect.Value) bool {
-	return v.Kind() == reflect.Map && v.IsNil()
+	switch v.Kind() {
+	case reflect.Pointer:
+		v.Set(reflect.New(v.Type().Elem()))
+		return v.Elem()
+
+	case reflect.Map:
+		v.Set(reflect.MakeMap(v.Type()))
+		return v
+	}
+
+	return v
 }
 
 // TypedValue returns v's value using typed functions,

@@ -109,98 +109,70 @@ func TestTypeOfAny(t *testing.T) {
 	})
 }
 
-func TestDeref(t *testing.T) {
-	t.Run("basic value", func(t *testing.T) {
+func TestInit(t *testing.T) {
+	t.Run("non-pointer value returned as-is", func(t *testing.T) {
 		v := reflect.ValueOf(42)
-		got := Deref(v)
-		assert.Equal(t, v.Interface(), got.Interface())
+		got := Init(v)
+		assert.Equal(t, v, got)
+		assert.Equal(t, int64(42), got.Int())
 	})
 
-	t.Run("single pointer", func(t *testing.T) {
-		x := 42
-		v := reflect.ValueOf(&x)
-		got := Deref(v)
-		assert.Equal(t, x, got.Interface())
-	})
-
-	t.Run("slice", func(t *testing.T) {
-		x := []int{42}
-		v := reflect.ValueOf(x)
-		got := Deref(v)
-		assert.Equal(t, x, got.Interface())
-	})
-
-	t.Run("pointer to slice", func(t *testing.T) {
-		x := []int{42}
-		v := reflect.ValueOf(&x)
-		got := Deref(v)
-		assert.Equal(t, x, got.Interface())
-	})
-
-	t.Run("multiple pointers", func(t *testing.T) {
-		x := 42
-		p1 := &x
-		p2 := &p1
-		p3 := &p2
-		v := reflect.ValueOf(p3)
-		got := Deref(v)
-		assert.Equal(t, x, got.Interface())
-	})
-
-	t.Run("interface with basic value", func(t *testing.T) {
-		var i any = 42
-		v := reflect.ValueOf(i)
-		got := Deref(v)
-		assert.Equal(t, 42, got.Interface())
-	})
-
-	t.Run("interface with pointer", func(t *testing.T) {
-		x := 42
-		var i any = &x
-		v := reflect.ValueOf(i)
-		got := Deref(v)
-		assert.Equal(t, x, got.Interface())
-	})
-
-	t.Run("nested interface with basic value", func(t *testing.T) {
-		var i any = any(42)
-		v := reflect.ValueOf(i)
-		got := Deref(v)
-		assert.Equal(t, 42, got.Interface())
-	})
-
-	t.Run("nested interface with pointer", func(t *testing.T) {
-		x := 42
-		var i any = &x
-		v := reflect.ValueOf(i)
-		got := Deref(v)
-		assert.Equal(t, x, got.Interface())
-	})
-
-	t.Run("nil pointer", func(t *testing.T) {
+	t.Run("nil pointer gets initialized", func(t *testing.T) {
 		var p *int
+		v := reflect.ValueOf(&p) // addressable nil pointer
+		got := Init(v)
+		assert.True(t, got.IsValid())
+		assert.Equal(t, reflect.Int, got.Kind())
+		assert.NotNil(t, p)
+	})
+
+	t.Run("already initialized pointer chain dereferences to value", func(t *testing.T) {
+		i := 99
+		p := &i
+		v := reflect.ValueOf(&p) // **int but already set
+		got := Init(v)
+		assert.Equal(t, 99, int(got.Int()))
+	})
+
+	t.Run("cannot set value remains unchanged", func(t *testing.T) {
+		p := new(int)
 		v := reflect.ValueOf(p)
-		got := Deref(v)
-		assert.True(t, got.IsNil())
+		assert.False(t, v.CanSet())
+		got := Init(v)
+		assert.Equal(t, v.Elem(), got)
 	})
 
-	t.Run("nil pointer interface", func(t *testing.T) {
-		var v map[string]any
-		var i any = &v
-		got := Deref(reflect.ValueOf(i))
-		assert.True(t, got.IsNil())
+	t.Run("nil map", func(t *testing.T) {
+		var m map[string]any
+		v := reflect.ValueOf(&m)
+		got := Init(v)
+		assert.False(t, got.IsNil())
+		assert.Equal(t, v.Elem(), got)
 	})
 
-	t.Run("nil interface", func(t *testing.T) {
-		var i any
-		v := reflect.ValueOf(i)
-		got := Deref(v)
-		assert.False(t, got.IsValid())
-	})
+	t.Run("pointer to struct gets properly initialized", func(t *testing.T) {
+		type Inner struct {
+			ID   int
+			Name string
+		}
 
-	t.Run("invalid reflect.Value", func(t *testing.T) {
-		var v reflect.Value // zero Value
-		got := Deref(v)
-		assert.False(t, got.IsValid())
+		type Outer struct {
+			Inner *Inner
+		}
+
+		var o Outer
+		v := reflect.ValueOf(&o).Elem().FieldByName("Inner")
+		assert.True(t, v.IsNil())
+
+		got := Init(v)
+		assert.True(t, got.IsValid())
+		assert.Equal(t, reflect.Struct, got.Kind())
+		assert.NotNil(t, o.Inner)
+
+		// Verify that the struct can now be used
+		got.FieldByName("ID").SetInt(42)
+		got.FieldByName("Name").SetString("Alice")
+		assert.Equal(t, 42, o.Inner.ID)
+		assert.Equal(t, "Alice", o.Inner.Name)
 	})
 }

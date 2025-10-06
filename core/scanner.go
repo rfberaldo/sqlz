@@ -100,8 +100,8 @@ func (s *Scanner) checkDuplicateColumns() error {
 	return nil
 }
 
-func (s *Scanner) checkDest(dest any) (reflect.Value, error) {
-	v := reflectutil.Deref(reflect.ValueOf(dest))
+func (s *Scanner) initDest(dest any) (reflect.Value, error) {
+	v := reflectutil.Init(reflect.ValueOf(dest))
 	if !v.CanSet() {
 		return reflect.Value{}, fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
 	}
@@ -111,7 +111,7 @@ func (s *Scanner) checkDest(dest any) (reflect.Value, error) {
 // Scan automatically iterates over rows and scans results into dest.
 // Scan can only run once, after it is done [sql.Rows] are closed.
 func (s *Scanner) Scan(dest any) (err error) {
-	destValue, err := s.checkDest(dest)
+	destValue, err := s.initDest(dest)
 	if err != nil {
 		return err
 	}
@@ -162,9 +162,6 @@ func (s *Scanner) Scan(dest any) (err error) {
 			err = s.ScanStruct(elValue.Addr().Interface())
 
 		case reflectutil.Map:
-			if reflectutil.IsNilMap(destValue) {
-				destValue.Set(reflect.MakeMap(mapType))
-			}
 			m, errMap := AssertMap(destValue.Interface())
 			if errMap != nil {
 				return errMap
@@ -173,7 +170,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 
 		case reflectutil.SliceMap:
 			elValue := destValue.Index(destValue.Len() - 1)
-			elValue.Set(reflect.MakeMap(mapType))
+			elValue = reflectutil.Init(elValue)
 			m, errMap := AssertMap(elValue.Interface())
 			if errMap != nil {
 				return errMap
@@ -261,7 +258,7 @@ func isScannable(t reflect.Type) bool {
 // ScanStruct scans a single row into dest, if dest is not a struct it panics.
 // Must be called after [Scanner.NextRow].
 func (s *Scanner) ScanStruct(dest any) error {
-	destValue, err := s.checkDest(dest)
+	destValue, err := s.initDest(dest)
 	if err != nil {
 		return err
 	}
@@ -269,13 +266,6 @@ func (s *Scanner) ScanStruct(dest any) error {
 	// if dest implements [sql.Scanner], just pass directly to [sql.Rows.Scan].
 	if isScannable(destValue.Type()) {
 		return s.ScanRow(dest)
-	}
-
-	if reflectutil.IsNilStruct(destValue) {
-		if !destValue.CanSet() {
-			return fmt.Errorf("sqlz/scan: destination is a non addressable nil pointer: %T", dest)
-		}
-		destValue.Set(reflect.New(destValue.Type().Elem()))
 	}
 
 	if err := s.setStructPtrs(destValue); err != nil {

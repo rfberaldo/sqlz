@@ -12,7 +12,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rfberaldo/sqlz/core"
 	"github.com/rfberaldo/sqlz/parser"
-	"github.com/rfberaldo/sqlz/reflectutil"
 	"github.com/rfberaldo/sqlz/testutil"
 	"github.com/rfberaldo/sqlz/testutil/mock"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +46,7 @@ func allocDest(dest any) any {
 
 func derefDest(dest any) any {
 	v := reflect.ValueOf(dest)
-	return reflectutil.Deref(v).Interface()
+	return reflect.Indirect(v).Interface()
 }
 
 func TestScanner_Scan(t *testing.T) {
