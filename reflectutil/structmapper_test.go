@@ -43,6 +43,27 @@ func TestStructFieldMap(t *testing.T) {
 	assert.Equal(t, expect, got)
 }
 
+func TestStructFieldMap_circular(t *testing.T) {
+	type Person struct {
+		Parent *Person
+	}
+
+	expect := make(map[string][]int)
+	for i := range 255 {
+		key := "parent"
+		idx := []int{0}
+		for range i {
+			idx = append(idx, 0)
+			key += ".parent"
+		}
+		expect[key] = idx
+	}
+
+	got := StructFieldMap(reflect.TypeFor[Person](), "json", strings.ToLower)
+	assert.Equal(t, 255, len(got))
+	assert.Equal(t, expect, got)
+}
+
 func TestFieldByIndex(t *testing.T) {
 	type Person struct {
 		Id         int
