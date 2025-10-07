@@ -20,7 +20,7 @@ var (
 )
 
 // Assert validates if arg is a map[string]any.
-func AssertMap(arg any) (map[string]any, error) {
+func assertMap(arg any) (map[string]any, error) {
 	m, ok := arg.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("sqlz: map must be of type map[string]any, got %T", arg)
@@ -28,8 +28,8 @@ func AssertMap(arg any) (map[string]any, error) {
 	return m, nil
 }
 
-// GetMapValue recursively find the map value of a dot notation key string.
-func GetMapValue(key string, m map[string]any) (any, bool) {
+// getMapValue recursively find the map value of a dot notation key string.
+func getMapValue(key string, m map[string]any) (any, bool) {
 	if !strings.Contains(key, ".") {
 		value, ok := m[key]
 		return value, ok
@@ -46,7 +46,7 @@ func GetMapValue(key string, m map[string]any) (any, bool) {
 		return nil, false
 	}
 
-	return GetMapValue(splits[1], nestedMap)
+	return getMapValue(splits[1], nestedMap)
 }
 
 func SnakeCaseMapper(str string) string {

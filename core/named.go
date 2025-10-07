@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rfberaldo/sqlz/internal/reflectutil"
 	"github.com/rfberaldo/sqlz/parser"
-	"github.com/rfberaldo/sqlz/reflectutil"
 )
 
 type NamedOptions struct {
@@ -152,7 +152,7 @@ func (n *namedQuery) bindStructArgs(idents []string, argValue reflect.Value) err
 // bindMapArgs maps idents to the argValue map keys, binding their values,
 // binded args may have slices, meaning an "IN" clause.
 func (n *namedQuery) bindMapArgs(idents []string, argValue reflect.Value) error {
-	m, err := AssertMap(argValue.Interface())
+	m, err := assertMap(argValue.Interface())
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (n *namedQuery) bindMapArgs(idents []string, argValue reflect.Value) error 
 	}
 
 	for _, ident := range idents {
-		value, ok := GetMapValue(ident, m)
+		value, ok := getMapValue(ident, m)
 		if !ok {
 			return fmt.Errorf("sqlz/named: could not find '%s' in %+v", ident, m)
 		}

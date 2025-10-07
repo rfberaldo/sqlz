@@ -14,13 +14,6 @@ import (
 type Options struct {
 	// StructTag is the reflection tag that will be used to map struct fields.
 	StructTag string
-
-	// FieldNameMapper is a func that process a struct field name to the database column.
-	// It is only used when the struct tag is not found.
-	FieldNameMapper func(string) string
-
-	// IgnoreMissingFields makes scan to ignore missing struct fields instead of returning error.
-	IgnoreMissingFields bool
 }
 
 // New returns a [DB] instance using an existing [sql.DB].

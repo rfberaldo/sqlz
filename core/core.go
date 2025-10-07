@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rfberaldo/sqlz/internal/reflectutil"
 	"github.com/rfberaldo/sqlz/parser"
-	"github.com/rfberaldo/sqlz/reflectutil"
 )
 
 // Querier can be [sql.DB], [sql.Tx] or [sql.Conn]

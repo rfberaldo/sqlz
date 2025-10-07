@@ -18,49 +18,49 @@ func TestGetMapValue(t *testing.T) {
 	}
 
 	t.Run("simple key found", func(t *testing.T) {
-		v, ok := GetMapValue("id", data)
+		v, ok := getMapValue("id", data)
 		assert.True(t, ok)
 		assert.Equal(t, 42, v)
 	})
 
 	t.Run("simple key not found", func(t *testing.T) {
-		v, ok := GetMapValue("missing", data)
+		v, ok := getMapValue("missing", data)
 		assert.False(t, ok)
 		assert.Nil(t, v)
 	})
 
 	t.Run("nested key one level", func(t *testing.T) {
-		v, ok := GetMapValue("meta.age", data)
+		v, ok := getMapValue("meta.age", data)
 		assert.True(t, ok)
 		assert.Equal(t, 30, v)
 	})
 
 	t.Run("nested key two levels", func(t *testing.T) {
-		v, ok := GetMapValue("meta.info.country", data)
+		v, ok := getMapValue("meta.info.country", data)
 		assert.True(t, ok)
 		assert.Equal(t, "BR", v)
 	})
 
 	t.Run("nested key not found", func(t *testing.T) {
-		v, ok := GetMapValue("meta.unknown", data)
+		v, ok := getMapValue("meta.unknown", data)
 		assert.False(t, ok)
 		assert.Nil(t, v)
 	})
 
 	t.Run("intermediate not a map", func(t *testing.T) {
-		v, ok := GetMapValue("email.something", data)
+		v, ok := getMapValue("email.something", data)
 		assert.False(t, ok)
 		assert.Nil(t, v)
 	})
 
 	t.Run("deeply nested missing branch", func(t *testing.T) {
-		v, ok := GetMapValue("meta.info.city.name", data)
+		v, ok := getMapValue("meta.info.city.name", data)
 		assert.False(t, ok)
 		assert.Nil(t, v)
 	})
 
 	t.Run("nested root missing", func(t *testing.T) {
-		v, ok := GetMapValue("unknown.key", data)
+		v, ok := getMapValue("unknown.key", data)
 		assert.False(t, ok)
 		assert.Nil(t, v)
 	})

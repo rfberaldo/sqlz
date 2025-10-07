@@ -3,8 +3,8 @@ package core
 import (
 	"testing"
 
+	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/rfberaldo/sqlz/parser"
-	"github.com/rfberaldo/sqlz/testutil"
 	"github.com/stretchr/testify/assert"
 )
 

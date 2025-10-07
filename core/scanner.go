@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rfberaldo/sqlz/reflectutil"
+	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
 
 // RowScanner defines the minimal interface for iterating over
@@ -162,7 +162,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 			err = s.ScanStruct(elValue.Addr().Interface())
 
 		case reflectutil.Map:
-			m, errMap := AssertMap(destValue.Interface())
+			m, errMap := assertMap(destValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
@@ -171,7 +171,7 @@ func (s *Scanner) Scan(dest any) (err error) {
 		case reflectutil.SliceMap:
 			elValue := destValue.Index(destValue.Len() - 1)
 			elValue = reflectutil.Init(elValue)
-			m, errMap := AssertMap(elValue.Interface())
+			m, errMap := assertMap(elValue.Interface())
 			if errMap != nil {
 				return errMap
 			}
