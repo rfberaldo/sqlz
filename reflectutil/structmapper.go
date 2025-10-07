@@ -29,39 +29,43 @@ func StructFieldMap(structType reflect.Type, tag string, nameMapper func(string)
 
 type node struct {
 	t     reflect.Type
-	path  strings.Builder
+	path  []string
 	index []int
 }
 
-func (n *node) writePath(s string) {
-	if n.path.Len() > 0 {
-		n.path.WriteRune('.')
-	}
-	n.path.WriteString(s)
-}
-
-func (n node) spawn(t reflect.Type) node {
+func (n *node) spawn(t reflect.Type) node {
 	return node{
 		t,
-		n.path,
+		append(make([]string, 0, len(n.path)+1), n.path...),
 		append(make([]int, 0, len(n.index)+1), n.index...),
 	}
 }
 
 // traverse maps the struct field indexes, using BFS algorithm starting on t.
 func (sm *structMapper) traverse(t reflect.Type) {
+	visited := make(map[reflect.Type]uint8)
 	queue := append(
 		make([]node, 0, t.NumField()),
-		node{t: t, index: make([]int, 0, 1)},
+		node{t, make([]string, 0, 1), make([]int, 0, 1)},
 	)
 
 	for len(queue) > 0 {
 		parent := queue[0]
 		queue = queue[1:]
 
+		if count := visited[parent.t]; count == 255 {
+			continue
+		}
+
 		for i := range parent.t.NumField() {
 			field := parent.t.Field(i)
 			fieldType := Deref(field.Type)
+
+			// circular reference
+			if fieldType == parent.t {
+				visited[fieldType]++
+			}
+
 			curr := parent.spawn(fieldType)
 
 			if !field.IsExported() {
@@ -74,7 +78,7 @@ func (sm *structMapper) traverse(t reflect.Type) {
 			}
 
 			curr.index = append(curr.index, field.Index...)
-			curr.writePath(name)
+			curr.path = append(curr.path, name)
 
 			if fieldType.Kind() == reflect.Struct {
 				queue = append(queue, curr)
@@ -88,7 +92,7 @@ func (sm *structMapper) traverse(t reflect.Type) {
 				sm.indexByKey[name] = curr.index
 			}
 
-			key := curr.path.String()
+			key := strings.Join(curr.path, ".")
 			if _, exists := sm.indexByKey[key]; !exists {
 				sm.indexByKey[key] = curr.index
 			}
