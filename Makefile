@@ -1,5 +1,5 @@
 test:
-	go test ./... -race -count 1
+	go test ./... -race -cover -count 1
 
 update-deps:
 	go get -u ./...
