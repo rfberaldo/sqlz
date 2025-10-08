@@ -39,7 +39,7 @@ type Options struct {
 func New(driverName string, db *sql.DB, opts *Options) *DB {
 	bind := BindByDriver(driverName)
 	if bind == parser.BindUnknown {
-		panic(fmt.Errorf("sqlz: unable to find bind for '%s', register with [sqlz.Register]", driverName))
+		panic(fmt.Errorf("sqlz: unable to find bind for '%s', register using [sqlz.Register]", driverName))
 	}
 
 	if opts == nil {
@@ -132,41 +132,54 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	return &Tx{tx, db.base}, nil
 }
 
-// Select executes a query that returns rows, typically a SELECT.
-// Returned rows will be scanned to dest.
-// The args are for any placeholder parameters in the query.
+// Select executes a query that can return multiple rows, results are scanned to dest.
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
 //
-// The default placeholder depends on the driver.
-// It also supports for named queries, in the format of a colon
-// followed by the key of a map or struct.
-// Example:
-//
-//	var users []User
-//	arg := map[string]any{"country": "Brazil"}
-//	db.Select(ctx, &data, "SELECT * FROM user WHERE country = :country", arg)
-func (db *DB) Query(ctx context.Context, dest any, query string, args ...any) error {
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (db *DB) Select(ctx context.Context, dest any, query string, args ...any) error {
 	return db.base.selectz(ctx, db.pool, dest, query, args...)
 }
 
-// QueryRow executes a query that is expected to return at most one row.
-// If the query selects no rows, will return an error which IsNotFound(err) is true.
-// Otherwise, scans the first row and discards the rest.
-// Returned rows will be scanned to dest.
-// The args are for any placeholder parameters in the query.
+// Query executes a query that can return multiple rows.
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
 //
-// The default placeholder depends on the driver.
-// The placeholder for any driver can be in the format of a colon
-// followed by the key of the map or struct, e.g. :id, :name, etc.
-func (db *DB) QueryRow(ctx context.Context, dest any, query string, args ...any) error {
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (db *DB) Query(ctx context.Context, query string, args ...any) (*Scanner, error) {
+	return db.base.query(ctx, db.pool, query, args...)
+}
+
+// Get executes a query that is expected to return at most one row, results are scanned to dest.
+// If the query selects no rows, it returns [sql.ErrNoRows].
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
+//
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (db *DB) Get(ctx context.Context, dest any, query string, args ...any) error {
 	return db.base.get(ctx, db.pool, dest, query, args...)
 }
 
-// Exec executes a query without returning any rows.
-// The args are for any placeholder parameters in the query.
+// QueryRow executes a query that is expected to return at most one row.
+// If the query selects no rows, the [Scanner] will return [sql.ErrNoRows].
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
 //
-// The default placeholder depends on the driver.
-// The placeholder for any driver can be in the format of a colon
-// followed by the key of the map or struct, e.g. :id, :name, etc.
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (db *DB) QueryRow(ctx context.Context, dest any, query string, args ...any) (*Scanner, error) {
+	return db.base.queryRow(ctx, db.pool, query, args...)
+}
+
+// Exec executes a query without returning any rows.
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
+//
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
 func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return db.base.exec(ctx, db.pool, query, args...)
 }
@@ -197,37 +210,54 @@ func (tx *Tx) Commit() error { return tx.conn.Commit() }
 // nor will it have been committed to the database.
 func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 
-// Query executes a query that returns rows, typically a SELECT.
-// Returned rows will be scanned to dest.
-// The args are for any placeholder parameters in the query.
+// Select executes a query that can return multiple rows, results are scanned to dest.
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
 //
-// The default placeholder depends on the driver.
-// The placeholder for any driver can be in the format of a colon
-// followed by the key of the map or struct, e.g. :id, :name, etc.
-func (tx *Tx) Query(ctx context.Context, dest any, query string, args ...any) error {
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (tx *Tx) Select(ctx context.Context, dest any, query string, args ...any) error {
 	return tx.base.selectz(ctx, tx.conn, dest, query, args...)
 }
 
-// QueryRow executes a query that is expected to return at most one row.
-// If the query selects no rows, will return an error which IsNotFound(err) is true.
-// Otherwise, scans the first row and discards the rest.
-// Returned rows will be scanned to dest.
-// The args are for any placeholder parameters in the query.
+// Query executes a query that can return multiple rows.
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
 //
-// The default placeholder depends on the driver.
-// The placeholder for any driver can be in the format of a colon
-// followed by the key of the map or struct, e.g. :id, :name, etc.
-func (tx *Tx) QueryRow(ctx context.Context, dest any, query string, args ...any) error {
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (tx *Tx) Query(ctx context.Context, query string, args ...any) (*Scanner, error) {
+	return tx.base.query(ctx, tx.conn, query, args...)
+}
+
+// Get executes a query that is expected to return at most one row, results are scanned to dest.
+// If the query selects no rows, it returns [sql.ErrNoRows].
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
+//
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (tx *Tx) Get(ctx context.Context, dest any, query string, args ...any) error {
 	return tx.base.get(ctx, tx.conn, dest, query, args...)
 }
 
-// Exec executes a query without returning any rows.
-// The args are for any placeholder parameters in the query.
-// If args is an array, it will expand query and args for a batch INSERT.
+// QueryRow executes a query that is expected to return at most one row.
+// If the query selects no rows, the [Scanner] will return [sql.ErrNoRows].
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
 //
-// The default placeholder depends on the driver.
-// The placeholder for any driver can be in the format of a colon
-// followed by the key of the map or struct, e.g. :id, :name, etc.
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+func (tx *Tx) QueryRow(ctx context.Context, dest any, query string, args ...any) (*Scanner, error) {
+	return tx.base.queryRow(ctx, tx.conn, query, args...)
+}
+
+// Exec executes a query without returning any rows.
+// The args are for any placeholder parameters in the query,
+// the default placeholder depends on the driver.
+//
+// Named queries works for all drivers, allowing the use of struct field names or
+// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
 func (tx *Tx) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return tx.base.exec(ctx, tx.conn, query, args...)
 }
