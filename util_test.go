@@ -66,43 +66,36 @@ func TestGetMapValue(t *testing.T) {
 	})
 }
 
-func TestSnakeCaseMapper(t *testing.T) {
-	got := SnakeCaseMapper("Id")
-	assert.Equal(t, "id", got)
+func TestToSnakeCase(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect string
+	}{
+		{name: "empty", input: "", expect: ""},
+		{name: "lowercase", input: "user", expect: "user"},
+		{name: "single uppercase", input: "A", expect: "a"},
+		{name: "two uppercase", input: "ID", expect: "id"},
+		{name: "pascal case", input: "UserName", expect: "user_name"},
+		{name: "camel case", input: "userName", expect: "user_name"},
+		{name: "acronym start", input: "HTTPServer", expect: "http_server"},
+		{name: "acronym end", input: "GetHTTP", expect: "get_http"},
+		{name: "acronym middle", input: "HTTPStatusCode", expect: "http_status_code"},
+		{name: "acronym surrounded", input: "XMLHTTPRequest", expect: "xmlhttp_request"},
+		{name: "mixed", input: "UserIDNumber", expect: "user_id_number"},
+		{name: "single letter prefix", input: "XValue", expect: "x_value"},
+		{name: "multi caps boundary", input: "MyURLParser", expect: "my_url_parser"},
+		{name: "digit inside", input: "JSON2XMLData", expect: "json2_xml_data"},
+		{name: "digit end", input: "User2", expect: "user2"},
+		{name: "digit start", input: "2User", expect: "2_user"},
+		{name: "already snake", input: "already_snake_case", expect: "already_snake_case"},
+		{name: "mixed with snake", input: "User_Name", expect: "user_name"},
+	}
 
-	got = SnakeCaseMapper("ID")
-	assert.Equal(t, "id", got)
-
-	got = SnakeCaseMapper("UserID")
-	assert.Equal(t, "user_id", got)
-
-	got = SnakeCaseMapper("CreatedAt")
-	assert.Equal(t, "created_at", got)
-
-	got = SnakeCaseMapper("Created_at")
-	assert.Equal(t, "created_at", got)
-
-	got = SnakeCaseMapper("Created_At")
-	assert.Equal(t, "created_at", got)
-
-	got = SnakeCaseMapper("_createdAt")
-	assert.Equal(t, "_created_at", got)
-
-	got = SnakeCaseMapper("createdAt_")
-	assert.Equal(t, "created_at_", got)
-
-	got = SnakeCaseMapper("__createdAt")
-	assert.Equal(t, "__created_at", got)
-
-	got = SnakeCaseMapper("createdAt__")
-	assert.Equal(t, "created_at__", got)
-
-	got = SnakeCaseMapper("Created42At")
-	assert.Equal(t, "created42_at", got)
-
-	got = SnakeCaseMapper("あcreated42At")
-	assert.Equal(t, "あcreated42_at", got)
-
-	got = SnakeCaseMapper("Createdあ42At")
-	assert.Equal(t, "createdあ42_at", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ToSnakeCase(tc.input)
+			assert.Equal(t, tc.expect, got)
+		})
+	}
 }
