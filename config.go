@@ -20,6 +20,6 @@ func (cfg *config) defaults() {
 	cfg.structTag = cmp.Or(cfg.structTag, defaultStructTag)
 
 	if cfg.fieldNameTransformer == nil {
-		cfg.fieldNameTransformer = SnakeCaseMapper
+		cfg.fieldNameTransformer = ToSnakeCase
 	}
 }

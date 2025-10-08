@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const defaultStructTag = "db"
@@ -49,19 +50,43 @@ func getMapValue(key string, m map[string]any) (any, bool) {
 	return getMapValue(splits[1], nestedMap)
 }
 
-func SnakeCaseMapper(str string) string {
+// ToSnakeCase transforms a string to snake case.
+func ToSnakeCase(s string) string {
 	var sb strings.Builder
-	sb.Grow(len(str))
+	sb.Grow(len(s) + 4)
 
-	var lastCh rune
-	for i, ch := range str {
-		isValidLastCh := unicode.IsLower(lastCh) || unicode.IsNumber(lastCh)
-		if i > 0 && isValidLastCh && unicode.IsUpper(ch) {
-			sb.WriteByte('_')
+	position := 0
+
+	read := func() (rune, bool) {
+		if position >= len(s) {
+			return 0, false
 		}
 
-		sb.WriteRune(unicode.ToLower(ch))
-		lastCh = ch
+		r, size := utf8.DecodeRuneInString(s[position:])
+		position += size
+		return r, true
+	}
+
+	peek := func() rune {
+		r, _ := utf8.DecodeRuneInString(s[position:])
+		return r
+	}
+
+	var prev rune
+	for {
+		r, ok := read()
+		if !ok {
+			break
+		}
+
+		if prev != 0 && prev != '_' && unicode.IsUpper(r) {
+			if unicode.IsLower(prev) || unicode.IsNumber(prev) || unicode.IsLower(peek()) {
+				sb.WriteRune('_')
+			}
+		}
+
+		prev = r
+		sb.WriteRune(unicode.ToLower(r))
 	}
 
 	return sb.String()
