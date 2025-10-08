@@ -1,6 +1,9 @@
 package sqlz
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +67,20 @@ func TestGetMapValue(t *testing.T) {
 		assert.False(t, ok)
 		assert.Nil(t, v)
 	})
+}
+
+func TestNotFound(t *testing.T) {
+	err := errors.New("some custom error")
+	assert.Equal(t, false, IsNotFound(err))
+
+	err = fmt.Errorf("some custom error")
+	assert.Equal(t, false, IsNotFound(err))
+
+	err = errors.Join(fmt.Errorf("some custom error"), sql.ErrNoRows)
+	assert.Equal(t, true, IsNotFound(err))
+
+	err = fmt.Errorf("a wrapper around sql.ErrNoRows: %w", sql.ErrNoRows)
+	assert.Equal(t, true, IsNotFound(err))
 }
 
 func TestToSnakeCase(t *testing.T) {
