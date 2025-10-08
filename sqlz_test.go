@@ -38,7 +38,7 @@ func TestConnect_wrong_driver(t *testing.T) {
 	assert.ErrorContains(t, err, "unknown driver")
 }
 
-func TestBasicQueryMethods(t *testing.T) {
+func TestDB_basic(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		var err error
@@ -49,11 +49,11 @@ func TestBasicQueryMethods(t *testing.T) {
 		expected := "Hello World"
 		expectedSlice := []string{"Hello World"}
 
-		err = db.Query(ctx, &ss, query)
+		err = db.Select(ctx, &ss, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = db.QueryRow(ctx, &s, query)
+		err = db.Get(ctx, &s, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 
@@ -62,11 +62,11 @@ func TestBasicQueryMethods(t *testing.T) {
 		defer tx.Rollback()
 
 		ss = ss[:0] // clear slice
-		err = tx.Query(ctx, &ss, query)
+		err = tx.Select(ctx, &ss, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = tx.QueryRow(ctx, &s, query)
+		err = tx.Get(ctx, &s, query)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 	})
@@ -103,7 +103,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err := db.Query(ctx, new([]int), q)
+			err := db.Select(ctx, new([]int), q)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -112,7 +112,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := db.Query(ctx, new([]int), q)
+			err := db.Select(ctx, new([]int), q)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
@@ -121,7 +121,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err := db.QueryRow(ctx, new(int), q)
+			err := db.Get(ctx, new(int), q)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -130,7 +130,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := db.QueryRow(ctx, new(int), q)
+			err := db.Get(ctx, new(int), q)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 	})
@@ -179,7 +179,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err = tx.Query(ctx, new([]int), q)
+			err = tx.Select(ctx, new([]int), q)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -192,7 +192,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err = tx.Query(ctx, new([]int), q)
+			err = tx.Select(ctx, new([]int), q)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
@@ -205,7 +205,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err = tx.QueryRow(ctx, new(int), q)
+			err = tx.Get(ctx, new(int), q)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -218,7 +218,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err = tx.QueryRow(ctx, new(int), q)
+			err = tx.Get(ctx, new(int), q)
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 	})
@@ -261,7 +261,7 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.QueryRow(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
+			assert.NoError(t, db.Get(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
 			assert.Equal(t, 3, count)
 
 			// clean up
@@ -297,7 +297,7 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.QueryRow(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
+			assert.NoError(t, db.Get(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
 			assert.Equal(t, 0, count)
 		})
 
@@ -331,7 +331,7 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.QueryRow(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
+			assert.NoError(t, db.Get(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
 			assert.Equal(t, 0, count)
 		})
 	})
@@ -360,7 +360,7 @@ func TestCustomStructTag(t *testing.T) {
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
-		err := db.QueryRow(ctx, &user, q)
+		err := db.Get(ctx, &user, q)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})
