@@ -3,6 +3,7 @@ package sqlz
 import (
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -20,7 +21,7 @@ var (
 	valuerType = reflect.TypeFor[driver.Valuer]()
 )
 
-// Assert validates if arg is a map[string]any.
+// assertMap validates if arg is a map[string]any.
 func assertMap(arg any) (map[string]any, error) {
 	m, ok := arg.(map[string]any)
 	if !ok {
@@ -48,6 +49,11 @@ func getMapValue(key string, m map[string]any) (any, bool) {
 	}
 
 	return getMapValue(splits[1], nestedMap)
+}
+
+// IsNotFound is a helper to check if err contains [sql.ErrNoRows].
+func IsNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows)
 }
 
 // ToSnakeCase transforms a string to snake case.

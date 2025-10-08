@@ -16,6 +16,28 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+func TestNew(t *testing.T) {
+	db := sqlz.New("sqlite3", &sql.DB{}, nil)
+	assert.NotNil(t, db)
+	assert.IsType(t, &sqlz.DB{}, db)
+}
+
+func TestNew_panic(t *testing.T) {
+	defer func() {
+		err, ok := recover().(error)
+		assert.True(t, ok)
+		assert.ErrorContains(t, err, "unable to find bind")
+	}()
+
+	sqlz.New("wrongdriver", &sql.DB{}, nil)
+}
+
+func TestConnect_wrong_driver(t *testing.T) {
+	_, err := sqlz.Connect("wrongdriver", ":memory:")
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "unknown driver")
+}
+
 func TestBasicQueryMethods(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
