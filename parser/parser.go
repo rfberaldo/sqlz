@@ -11,7 +11,7 @@ import (
 const EOF = 0
 
 // Bind represent the placeholder used by different drivers.
-type Bind byte
+type Bind uint8
 
 const (
 	BindUnknown  Bind = iota
@@ -21,7 +21,7 @@ const (
 	BindQuestion      // placeholder '?'
 )
 
-// Parser is an SQL query parser that parses named queries into native queries.
+// Parser is an SQL query parser mostly for named queries.
 type Parser struct {
 	input        string
 	bind         Bind

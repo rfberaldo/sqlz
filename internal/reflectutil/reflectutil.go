@@ -1,7 +1,6 @@
 package reflectutil
 
 import (
-	"fmt"
 	"reflect"
 )
 
@@ -70,29 +69,6 @@ func TypeOf(t reflect.Type) Type {
 	}
 
 	return Invalid
-}
-
-func (t Type) String() string {
-	switch t {
-	case Invalid:
-		return "invalid"
-	case Primitive:
-		return "primitive"
-	case Map:
-		return "map"
-	case Struct:
-		return "struct"
-	case Slice:
-		return "slice"
-	case SlicePrimitive:
-		return "[]primitive"
-	case SliceMap:
-		return "[]map"
-	case SliceStruct:
-		return "[]struct"
-	}
-
-	panic(fmt.Errorf("sqlz/reflectutil: unexpected type %d", t))
 }
 
 // Deref follows the pointer from a [reflect.Type].

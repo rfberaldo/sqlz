@@ -1,7 +1,6 @@
-package core
+package sqlz
 
 import (
-	"cmp"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -11,22 +10,8 @@ import (
 	"github.com/rfberaldo/sqlz/parser"
 )
 
-type NamedOptions struct {
-	// Bind is the bind type the result query will have.
-	Bind parser.Bind
-
-	// StructTag is the reflection tag that will be used to map struct fields.
-	StructTag string
-
-	// FieldNameMapper is a func that maps a struct field name to the database column.
-	// It is only used when the struct tag is not found.
-	FieldNameMapper func(string) string
-}
-
 type namedQuery struct {
-	bind            parser.Bind
-	structTag       string
-	fieldNameMapper func(string) string
+	*config
 	fieldIndexByKey map[string][]int
 
 	// result
@@ -34,22 +19,13 @@ type namedQuery struct {
 	args  []any
 }
 
-func ProcessNamed(query string, arg any, opts *NamedOptions) (string, []any, error) {
-	if opts == nil {
-		opts = &NamedOptions{}
+func processNamed(query string, arg any, cfg *config) (string, []any, error) {
+	if cfg == nil {
+		cfg = &config{}
 	}
+	cfg.defaults()
 
-	opts.Bind = cmp.Or(opts.Bind, parser.BindQuestion)
-	opts.StructTag = cmp.Or(opts.StructTag, DefaultStructTag)
-	if opts.FieldNameMapper == nil {
-		opts.FieldNameMapper = SnakeCaseMapper
-	}
-
-	n := &namedQuery{
-		bind:            opts.Bind,
-		structTag:       opts.StructTag,
-		fieldNameMapper: opts.FieldNameMapper,
-	}
+	n := &namedQuery{config: cfg}
 
 	if err := n.process(query, arg); err != nil {
 		return "", nil, err
@@ -130,7 +106,7 @@ func (n *namedQuery) bindStructArgs(idents []string, argValue reflect.Value) err
 		n.fieldIndexByKey = reflectutil.StructFieldMap(
 			argValue.Type(),
 			n.structTag,
-			n.fieldNameMapper,
+			n.fieldNameTransformer,
 		)
 	}
 

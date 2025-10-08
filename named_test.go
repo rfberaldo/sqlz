@@ -1,4 +1,4 @@
-package core
+package sqlz
 
 import (
 	"testing"
@@ -321,8 +321,11 @@ func TestProcessNamed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &NamedOptions{Bind: parser.BindAt, StructTag: tt.structTag}
-			query, args, err := ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
+			cfg := &config{structTag: tt.structTag}
+			cfg.defaults()
+
+			cfg.bind = parser.BindAt
+			query, args, err := processNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedAt, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -330,8 +333,8 @@ func TestProcessNamed(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectErrContains)
 			}
 
-			cfg = &NamedOptions{Bind: parser.BindColon, StructTag: tt.structTag}
-			query, args, err = ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
+			cfg.bind = parser.BindColon
+			query, args, err = processNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedColon, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -339,8 +342,8 @@ func TestProcessNamed(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectErrContains)
 			}
 
-			cfg = &NamedOptions{Bind: parser.BindDollar, StructTag: tt.structTag}
-			query, args, err = ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
+			cfg.bind = parser.BindDollar
+			query, args, err = processNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedDollar, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -348,8 +351,8 @@ func TestProcessNamed(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectErrContains)
 			}
 
-			cfg = &NamedOptions{Bind: parser.BindQuestion, StructTag: tt.structTag}
-			query, args, err = ProcessNamed(tt.inputQuery, tt.inputArg, cfg)
+			cfg.bind = parser.BindQuestion
+			query, args, err = processNamed(tt.inputQuery, tt.inputArg, cfg)
 			assert.Equal(t, tt.expectError, err != nil, err)
 			assert.Equal(t, tt.expectedQuestion, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -360,8 +363,7 @@ func TestProcessNamed(t *testing.T) {
 	}
 }
 
-// testing nested fields with same key but different positions
-func TestConcurrency(t *testing.T) {
+func TestProcessNamed_concurrency(t *testing.T) {
 	type withId1 struct {
 		Id   int
 		Name string
@@ -386,9 +388,10 @@ func TestConcurrency(t *testing.T) {
 	expectedQuery := "INSERT INTO person (user1, user2) VALUES (?, ?),(?, ?),(?, ?),(?, ?),(?, ?)"
 	expectedArgs := []any{0, 0, 1, -1, 2, -2, 3, -3, 4, -4}
 
+	// testing nested fields with same key but different positions
 	for range 1000 {
 		go func() {
-			query, args, err := ProcessNamed(inputQuery, persons, nil)
+			query, args, err := processNamed(inputQuery, persons, nil)
 			assert.Equal(t, expectedQuery, query)
 			assert.Equal(t, expectedArgs, args)
 			assert.NoError(t, err)
@@ -480,7 +483,8 @@ func TestEndingParensIndex(t *testing.T) {
 	}
 }
 
-func BenchmarkNamedMap(b *testing.B) {
+// BenchmarkProcessNamed_map-12    	    9903	    109596 ns/op	  116082 B/op	      12 allocs/op
+func BenchmarkProcessNamed_map(b *testing.B) {
 	input := `INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`
 
 	var args []map[string]any
@@ -489,12 +493,13 @@ func BenchmarkNamedMap(b *testing.B) {
 	}
 
 	for b.Loop() {
-		_, _, err := ProcessNamed(input, args, nil)
+		_, _, err := processNamed(input, args, nil)
 		assert.NoError(b, err)
 	}
 }
 
-func BenchmarkNamedStruct(b *testing.B) {
+// BenchmarkProcessNamed_struct-12    	    4746	    234628 ns/op	  170670 B/op	    3777 allocs/op
+func BenchmarkProcessNamed_struct(b *testing.B) {
 	input := `INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`
 
 	type user struct {
@@ -510,7 +515,7 @@ func BenchmarkNamedStruct(b *testing.B) {
 	}
 
 	for b.Loop() {
-		_, _, err := ProcessNamed(input, args, nil)
+		_, _, err := processNamed(input, args, nil)
 		assert.NoError(b, err)
 	}
 }

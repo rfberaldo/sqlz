@@ -546,8 +546,8 @@ func TestParseNamed_Concurrency(t *testing.T) {
 	}
 }
 
-// BenchmarkParseNamed-12    	    2793	    390841 ns/op	  289148 B/op	      16 allocs/op
-func BenchmarkParseNamed(b *testing.B) {
+// BenchmarkParse-12    	    3147	    367662 ns/op	  289145 B/op	      16 allocs/op
+func BenchmarkParse(b *testing.B) {
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)
 	for range 1000 {
@@ -561,7 +561,7 @@ func BenchmarkParseNamed(b *testing.B) {
 	}
 }
 
-// BenchmarkParseQuery-12    	    3672	    315014 ns/op	   49156 B/op	       1 allocs/op
+// BenchmarkParseQuery-12    	    3778	    306687 ns/op	   49156 B/op	       1 allocs/op
 func BenchmarkParseQuery(b *testing.B) {
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)
@@ -576,7 +576,7 @@ func BenchmarkParseQuery(b *testing.B) {
 	}
 }
 
-// BenchmarkParseIdents-12    	    3162	    377257 ns/op	  289147 B/op	      16 allocs/op
+// BenchmarkParseIdents-12    	    3106	    364744 ns/op	  289147 B/op	      16 allocs/op
 func BenchmarkParseIdents(b *testing.B) {
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO user (id, username, email, password, age) VALUES (:id, :username, :email, :password, :age)`)

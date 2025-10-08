@@ -5,18 +5,14 @@ package sqlz
 import (
 	"context"
 	"database/sql"
-
-	"github.com/rfberaldo/sqlz/core"
-	"github.com/rfberaldo/sqlz/parser"
 )
 
 // DB is a database handle representing a pool of zero or more
 // underlying connections. It's safe for concurrent use by multiple
 // goroutines.
 type DB struct {
-	pool      *sql.DB
-	bind      parser.Bind
-	structTag string
+	pool *sql.DB
+	base *base
 }
 
 // Pool return the underlying [sql.DB].
@@ -49,31 +45,36 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		return nil, err
 	}
 
-	return &Tx{tx, db.bind, db.structTag}, nil
+	return &Tx{tx, db.base}, nil
 }
 
-// Query executes a query that returns rows, typically a SELECT.
-// Returned rows will be scanned to dst.
+// Select executes a query that returns rows, typically a SELECT.
+// Returned rows will be scanned to dest.
 // The args are for any placeholder parameters in the query.
 //
 // The default placeholder depends on the driver.
-// The placeholder for any driver can be in the format of a colon
-// followed by the key of the map or struct, e.g. :id, :name, etc.
-func (db *DB) Query(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, db.pool, db.bind, db.structTag, dst, query, args...)
+// It also supports for named queries, in the format of a colon
+// followed by the key of a map or struct.
+// Example:
+//
+//	var users []User
+//	arg := map[string]any{"country": "Brazil"}
+//	db.Select(ctx, &data, "SELECT * FROM user WHERE country = :country", arg)
+func (db *DB) Query(ctx context.Context, dest any, query string, args ...any) error {
+	return db.base.selectz(ctx, db.pool, dest, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
 // If the query selects no rows, will return an error which IsNotFound(err) is true.
 // Otherwise, scans the first row and discards the rest.
-// Returned rows will be scanned to dst.
+// Returned rows will be scanned to dest.
 // The args are for any placeholder parameters in the query.
 //
 // The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
-func (db *DB) QueryRow(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, db.pool, db.bind, db.structTag, dst, query, args...)
+func (db *DB) QueryRow(ctx context.Context, dest any, query string, args ...any) error {
+	return db.base.get(ctx, db.pool, dest, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -83,7 +84,7 @@ func (db *DB) QueryRow(ctx context.Context, dst any, query string, args ...any) 
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return core.Exec(ctx, db.pool, db.bind, db.structTag, query, args...)
+	return db.base.exec(ctx, db.pool, query, args...)
 }
 
 // Tx is an in-progress database transaction, representing a single connection.
@@ -94,9 +95,8 @@ func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, 
 // After a call to [Tx.Commit] or [Tx.Rollback], all operations on the
 // transaction fail with [sql.ErrTxDone].
 type Tx struct {
-	conn      *sql.Tx
-	bind      parser.Bind
-	structTag string
+	conn *sql.Tx
+	base *base
 }
 
 // Conn return the underlying [sql.Tx].
@@ -114,27 +114,27 @@ func (tx *Tx) Commit() error { return tx.conn.Commit() }
 func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 
 // Query executes a query that returns rows, typically a SELECT.
-// Returned rows will be scanned to dst.
+// Returned rows will be scanned to dest.
 // The args are for any placeholder parameters in the query.
 //
 // The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
-func (tx *Tx) Query(ctx context.Context, dst any, query string, args ...any) error {
-	return core.Query(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
+func (tx *Tx) Query(ctx context.Context, dest any, query string, args ...any) error {
+	return tx.base.selectz(ctx, tx.conn, dest, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
 // If the query selects no rows, will return an error which IsNotFound(err) is true.
 // Otherwise, scans the first row and discards the rest.
-// Returned rows will be scanned to dst.
+// Returned rows will be scanned to dest.
 // The args are for any placeholder parameters in the query.
 //
 // The default placeholder depends on the driver.
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
-func (tx *Tx) QueryRow(ctx context.Context, dst any, query string, args ...any) error {
-	return core.QueryRow(ctx, tx.conn, tx.bind, tx.structTag, dst, query, args...)
+func (tx *Tx) QueryRow(ctx context.Context, dest any, query string, args ...any) error {
+	return tx.base.get(ctx, tx.conn, dest, query, args...)
 }
 
 // Exec executes a query without returning any rows.
@@ -145,5 +145,5 @@ func (tx *Tx) QueryRow(ctx context.Context, dst any, query string, args ...any) 
 // The placeholder for any driver can be in the format of a colon
 // followed by the key of the map or struct, e.g. :id, :name, etc.
 func (tx *Tx) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return core.Exec(ctx, tx.conn, tx.bind, tx.structTag, query, args...)
+	return tx.base.exec(ctx, tx.conn, query, args...)
 }
