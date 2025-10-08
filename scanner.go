@@ -1,7 +1,6 @@
-package core
+package sqlz
 
 import (
-	"cmp"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -9,9 +8,9 @@ import (
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
 
-// RowScanner defines the minimal interface for iterating over
+// Rows defines the minimal interface for iterating over
 // and scanning database query results. It is satisfied by [sql.Rows].
-type RowScanner interface {
+type Rows interface {
 	Close() error
 	Columns() ([]string, error)
 	Err() error
@@ -27,71 +26,54 @@ type RowScanner interface {
 // ScanMap and ScanStruct, these methods do not loop over or close rows,
 // nor can they be mixed.
 type Scanner struct {
-	rows                RowScanner
-	columns             []string
-	queryRow            bool
-	ignoreMissingFields bool
-	structTag           string
-	fieldIndexByKey     map[string][]int
-	fieldNameMapper     func(string) string
-	ptrs                []any // slice of pointers for scan, used in all methods
-	values              []any // slice of values from rows, used in map scanning
-	noop                any   // ignored fields sink
+	*config
+	rows            Rows
+	columns         []string
+	queryRow        bool
+	fieldIndexByKey map[string][]int
+	ptrs            []any // slice of pointers for scan, used in all methods
+	values          []any // slice of values from rows, used in map scanning
+	noop            any   // ignored fields sink
 }
 
-type ScannerOptions struct {
-	// QueryRow enforces result to be a single row, only used for Scan method.
-	QueryRow bool
-
-	// StructTag is the reflection tag that will be used to map struct fields.
-	StructTag string
-
-	// FieldNameMapper is a func that maps a struct field name to the database column.
-	// It is only used when the struct tag is not found.
-	FieldNameMapper func(string) string
-
-	// IgnoreMissingFields makes scan to ignore missing struct fields instead of returning error.
-	IgnoreMissingFields bool
-}
-
-func NewScanner(rows RowScanner, opts *ScannerOptions) (*Scanner, error) {
+func newScanner(rows Rows, cfg *config) (*Scanner, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("sqlz/scan: getting column names: %w", err)
 	}
 
-	if len(columns) == 0 {
-		return nil, fmt.Errorf("sqlz/scan: columns length must be > 0")
-	}
-
-	if opts == nil {
-		opts = &ScannerOptions{}
-	}
-
-	opts.StructTag = cmp.Or(opts.StructTag, DefaultStructTag)
-	if opts.FieldNameMapper == nil {
-		opts.FieldNameMapper = SnakeCaseMapper
-	}
-
-	scanner := &Scanner{
-		columns:             columns,
-		rows:                rows,
-		queryRow:            opts.QueryRow,
-		ignoreMissingFields: opts.IgnoreMissingFields,
-		structTag:           opts.StructTag,
-		fieldNameMapper:     opts.FieldNameMapper,
-	}
-
-	if err := scanner.checkDuplicateColumns(); err != nil {
+	if err := checkColumns(columns); err != nil {
 		return nil, err
 	}
 
+	if cfg == nil {
+		cfg = &config{}
+	}
+	cfg.defaults()
+
+	return &Scanner{
+		config:  cfg,
+		rows:    rows,
+		columns: columns,
+	}, nil
+}
+
+func newRowScanner(rows Rows, cfg *config) (*Scanner, error) {
+	scanner, err := newScanner(rows, cfg)
+	if err != nil {
+		return nil, err
+	}
+	scanner.queryRow = true
 	return scanner, nil
 }
 
-func (s *Scanner) checkDuplicateColumns() error {
-	seen := make(map[string]bool, len(s.columns))
-	for _, col := range s.columns {
+func checkColumns(columns []string) error {
+	if len(columns) == 0 {
+		return fmt.Errorf("sqlz/scan: columns length must be > 0")
+	}
+
+	seen := make(map[string]bool, len(columns))
+	for _, col := range columns {
 		if _, ok := seen[col]; ok {
 			return fmt.Errorf("sqlz/scan: duplicate column name: '%s'", col)
 		}
@@ -117,6 +99,8 @@ func (s *Scanner) Scan(dest any) (err error) {
 	}
 
 	destType := reflectutil.TypeOfAny(dest)
+
+	// todo: if queryRow=true, should error if arg = slice
 
 	if destType == reflectutil.Invalid {
 		return fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
@@ -286,7 +270,7 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 
 	if s.fieldIndexByKey == nil {
 		s.fieldIndexByKey = reflectutil.StructFieldMap(
-			v.Type(), s.structTag, s.fieldNameMapper,
+			v.Type(), s.structTag, s.fieldNameTransformer,
 		)
 	}
 

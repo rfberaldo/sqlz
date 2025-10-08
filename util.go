@@ -1,4 +1,4 @@
-package core
+package sqlz
 
 import (
 	"database/sql"
@@ -9,7 +9,7 @@ import (
 	"unicode"
 )
 
-const DefaultStructTag = "db"
+const defaultStructTag = "db"
 
 var (
 	// scannerType is [reflect.Type] of [sql.Scanner]

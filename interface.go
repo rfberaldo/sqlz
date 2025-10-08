@@ -1,12 +1,10 @@
 package sqlz
 
 import (
-	"cmp"
 	"database/sql"
 	"errors"
 	"fmt"
 
-	"github.com/rfberaldo/sqlz/core"
 	"github.com/rfberaldo/sqlz/parser"
 )
 
@@ -14,6 +12,13 @@ import (
 type Options struct {
 	// StructTag is the reflection tag that will be used to map struct fields.
 	StructTag string
+
+	// FieldNameTransformer transforms a struct field name,
+	// it is only used when the struct tag is not found.
+	FieldNameTransformer func(string) string
+
+	// IgnoreMissingFields makes scanner ignore missing struct fields instead of returning error.
+	IgnoreMissingFields bool
 }
 
 // New returns a [DB] instance using an existing [sql.DB].
@@ -31,12 +36,19 @@ func New(driverName string, db *sql.DB, opts *Options) *DB {
 		panic(fmt.Errorf("sqlz: unable to find bind for '%s', register with [sqlz.Register]", driverName))
 	}
 
-	structTag := core.DefaultStructTag
-	if opts != nil {
-		structTag = cmp.Or(opts.StructTag, core.DefaultStructTag)
+	if opts == nil {
+		opts = &Options{}
 	}
 
-	return &DB{db, bind, structTag}
+	cfg := &config{
+		bind:                 bind,
+		structTag:            opts.StructTag,
+		fieldNameTransformer: opts.FieldNameTransformer,
+		ignoreMissingFields:  opts.IgnoreMissingFields,
+	}
+	cfg.defaults()
+
+	return &DB{db, &base{cfg}}
 }
 
 // Connect opens a database specified by its database driver name and a

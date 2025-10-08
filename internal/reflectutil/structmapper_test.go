@@ -158,7 +158,7 @@ func TestFieldTag(t *testing.T) {
 	})
 }
 
-// BenchmarkStructFieldMap-12    	  493293	      2143 ns/op	    1928 B/op	      37 allocs/op
+// BenchmarkStructFieldMap-12    	  450322	      2478 ns/op	    2112 B/op	      44 allocs/op
 func BenchmarkStructFieldMap(b *testing.B) {
 	type Person struct {
 		Name    string
