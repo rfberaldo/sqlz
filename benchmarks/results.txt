@@ -1,35 +1,46 @@
-name                    old time/op    new time/op    delta
-PlaceholderExec-12        4.18µs ± 2%    4.28µs ± 1%   +2.39%  (p=0.000 n=10+10)
-PlaceholderQueryRow-12    4.45µs ± 3%    4.89µs ± 1%   +9.71%  (p=0.000 n=10+9)
-NamedQueryRow-12          5.39µs ± 2%    5.82µs ± 2%   +8.05%  (p=0.000 n=10+10)
-BatchInsertStruct-12      1.35ms ± 1%    1.34ms ± 2%     ~     (p=0.165 n=10+10)
-BatchInsertMap-12         1.26ms ± 3%    1.28ms ± 4%     ~     (p=0.400 n=10+9)
-StructScan-12             1.56ms ± 1%    1.51ms ± 2%   -3.14%  (p=0.000 n=10+10)
-StringScan-12              533µs ± 2%     421µs ± 2%  -21.07%  (p=0.000 n=10+10)
-NamedInClause-12          74.8µs ± 1%    75.0µs ± 2%     ~     (p=0.684 n=10+10)
-PlaceholderInClause-12    74.1µs ± 2%    73.9µs ± 1%     ~     (p=0.684 n=10+10)
-CustomStructTag-12        74.1µs ± 3%    75.2µs ± 2%     ~     (p=0.105 n=10+10)
+goos: linux
+goarch: amd64
+pkg: benchmark/sqlz
+cpu: AMD Ryzen 5 5600X 6-Core Processor             
+                       │   sqlx.txt   │              sqlz.txt               │
+                       │    sec/op    │   sec/op     vs base                │
+PlaceholderExec-12       4.551µ ±  6%   4.091µ ± 1%  -10.10% (p=0.000 n=10)
+PlaceholderQueryRow-12   4.552µ ± 12%   4.472µ ± 4%        ~ (p=0.143 n=10)
+NamedQueryRow-12         6.126µ ± 11%   5.309µ ± 2%  -13.34% (p=0.000 n=10)
+BatchInsertStruct-12     1.436m ± 20%   1.322m ± 2%   -7.97% (p=0.000 n=10)
+BatchInsertMap-12        1.349m ±  2%   1.229m ± 1%   -8.90% (p=0.000 n=10)
+StructScan-12            1.634m ±  5%   1.543m ± 1%   -5.56% (p=0.000 n=10)
+StringScan-12            585.2µ ±  6%   411.2µ ± 1%  -29.74% (p=0.000 n=10)
+NamedInClause-12         84.79µ ±  2%   77.11µ ± 1%   -9.06% (p=0.000 n=10)
+PlaceholderInClause-12   83.02µ ±  1%   77.24µ ± 2%   -6.96% (p=0.000 n=10)
+CustomStructTag-12       81.77µ ±  4%   77.35µ ± 1%   -5.40% (p=0.000 n=10)
+geomean                  103.1µ         92.55µ       -10.21%
 
-name                    old alloc/op   new alloc/op   delta
-PlaceholderExec-12          344B ± 0%      424B ± 0%  +23.26%  (p=0.000 n=10+10)
-PlaceholderQueryRow-12      672B ± 0%      848B ± 0%  +26.19%  (p=0.000 n=10+10)
-NamedQueryRow-12            944B ± 0%      992B ± 0%   +5.08%  (p=0.000 n=10+10)
-BatchInsertStruct-12       714kB ± 0%     670kB ± 0%   -6.22%  (p=0.000 n=10+10)
-BatchInsertMap-12          650kB ± 0%     604kB ± 0%   -7.03%  (p=0.000 n=10+10)
-StructScan-12              313kB ± 0%     225kB ± 0%  -28.01%  (p=0.000 n=10+10)
-StringScan-12              113kB ± 0%      57kB ± 0%  -49.15%  (p=0.000 n=10+10)
-NamedInClause-12          15.1kB ± 0%    13.5kB ± 0%  -10.86%  (p=0.000 n=10+10)
-PlaceholderInClause-12    14.9kB ± 0%    13.3kB ± 0%  -10.18%  (p=0.000 n=10+10)
-CustomStructTag-12        14.9kB ± 0%    13.3kB ± 0%  -10.18%  (p=0.000 n=10+10)
+                       │   sqlx.txt    │               sqlz.txt               │
+                       │     B/op      │     B/op      vs base                │
+PlaceholderExec-12          344.0 ± 0%     424.0 ± 0%  +23.26% (p=0.000 n=10)
+PlaceholderQueryRow-12      672.0 ± 0%     816.0 ± 0%  +21.43% (p=0.000 n=10)
+NamedQueryRow-12            944.0 ± 0%     896.0 ± 0%   -5.08% (p=0.000 n=10)
+BatchInsertStruct-12      698.5Ki ± 0%   589.6Ki ± 0%  -15.60% (p=0.000 n=10)
+BatchInsertMap-12         635.8Ki ± 0%   543.6Ki ± 0%  -14.50% (p=0.000 n=10)
+StructScan-12             305.8Ki ± 0%   220.7Ki ± 0%  -27.83% (p=0.000 n=10)
+StringScan-12            110.41Ki ± 0%   55.78Ki ± 0%  -49.48% (p=0.000 n=10)
+NamedInClause-12          14.75Ki ± 0%   13.75Ki ± 0%   -6.78% (p=0.000 n=10)
+PlaceholderInClause-12    14.51Ki ± 0%   13.70Ki ± 0%   -5.60% (p=0.000 n=10)
+CustomStructTag-12        14.51Ki ± 0%   13.63Ki ± 0%   -6.03% (p=0.000 n=10)
+geomean                   19.84Ki        17.64Ki       -11.08%
 
-name                    old allocs/op  new allocs/op  delta
-PlaceholderExec-12          11.0 ± 0%      13.0 ± 0%  +18.18%  (p=0.000 n=10+10)
-PlaceholderQueryRow-12      23.0 ± 0%      27.0 ± 0%  +17.39%  (p=0.000 n=10+10)
-NamedQueryRow-12            28.0 ± 0%      32.0 ± 0%  +14.29%  (p=0.000 n=10+10)
-BatchInsertStruct-12       5.04k ± 0%     5.05k ± 0%   +0.29%  (p=0.000 n=10+10)
-BatchInsertMap-12          4.04k ± 0%     4.02k ± 0%   -0.37%  (p=0.000 n=10+10)
-StructScan-12              9.69k ± 0%     7.70k ± 0%  -20.50%  (p=0.000 n=10+10)
-StringScan-12              5.03k ± 0%     2.04k ± 0%  -59.36%  (p=0.000 n=10+10)
-NamedInClause-12             391 ± 0%       354 ± 0%   -9.46%  (p=0.000 n=10+10)
-PlaceholderInClause-12       387 ± 0%       350 ± 0%   -9.56%  (p=0.000 n=10+10)
-CustomStructTag-12           387 ± 0%       350 ± 0%   -9.56%  (p=0.000 n=10+10)
+                       │  sqlx.txt   │               sqlz.txt                │
+                       │  allocs/op  │  allocs/op   vs base                  │
+PlaceholderExec-12        11.00 ± 0%    13.00 ± 0%  +18.18% (p=0.000 n=10)
+PlaceholderQueryRow-12    23.00 ± 0%    25.00 ± 0%   +8.70% (p=0.000 n=10)
+NamedQueryRow-12          28.00 ± 0%    28.00 ± 0%        ~ (p=1.000 n=10) ¹
+BatchInsertStruct-12     5.035k ± 0%   6.042k ± 0%  +20.00% (p=0.000 n=10)
+BatchInsertMap-12        4.035k ± 0%   3.022k ± 0%  -25.11% (p=0.000 n=10)
+StructScan-12            9.687k ± 0%   7.706k ± 0%  -20.45% (p=0.000 n=10)
+StringScan-12            5.027k ± 0%   2.028k ± 0%  -59.66% (p=0.000 n=10)
+NamedInClause-12          391.0 ± 0%    362.0 ± 0%   -7.42% (p=0.000 n=10)
+PlaceholderInClause-12    387.0 ± 0%    360.0 ± 0%   -6.98% (p=0.000 n=10)
+CustomStructTag-12        387.0 ± 0%    355.0 ± 0%   -8.27% (p=0.000 n=10)
+geomean                   458.5         405.5       -11.56%
+¹ all samples are equal
