@@ -137,7 +137,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (db *DB) Select(ctx context.Context, dest any, query string, args ...any) error {
 	return db.base.selectz(ctx, db.pool, dest, query, args...)
 }
@@ -147,7 +147,7 @@ func (db *DB) Select(ctx context.Context, dest any, query string, args ...any) e
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (db *DB) Query(ctx context.Context, query string, args ...any) (*Scanner, error) {
 	return db.base.query(ctx, db.pool, query, args...)
 }
@@ -158,7 +158,7 @@ func (db *DB) Query(ctx context.Context, query string, args ...any) (*Scanner, e
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (db *DB) Get(ctx context.Context, dest any, query string, args ...any) error {
 	return db.base.get(ctx, db.pool, dest, query, args...)
 }
@@ -169,7 +169,7 @@ func (db *DB) Get(ctx context.Context, dest any, query string, args ...any) erro
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (db *DB) QueryRow(ctx context.Context, dest any, query string, args ...any) (*Scanner, error) {
 	return db.base.queryRow(ctx, db.pool, query, args...)
 }
@@ -179,7 +179,7 @@ func (db *DB) QueryRow(ctx context.Context, dest any, query string, args ...any)
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (db *DB) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return db.base.exec(ctx, db.pool, query, args...)
 }
@@ -215,7 +215,7 @@ func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (tx *Tx) Select(ctx context.Context, dest any, query string, args ...any) error {
 	return tx.base.selectz(ctx, tx.conn, dest, query, args...)
 }
@@ -225,7 +225,7 @@ func (tx *Tx) Select(ctx context.Context, dest any, query string, args ...any) e
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (tx *Tx) Query(ctx context.Context, query string, args ...any) (*Scanner, error) {
 	return tx.base.query(ctx, tx.conn, query, args...)
 }
@@ -236,7 +236,7 @@ func (tx *Tx) Query(ctx context.Context, query string, args ...any) (*Scanner, e
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (tx *Tx) Get(ctx context.Context, dest any, query string, args ...any) error {
 	return tx.base.get(ctx, tx.conn, dest, query, args...)
 }
@@ -247,7 +247,7 @@ func (tx *Tx) Get(ctx context.Context, dest any, query string, args ...any) erro
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (tx *Tx) QueryRow(ctx context.Context, dest any, query string, args ...any) (*Scanner, error) {
 	return tx.base.queryRow(ctx, tx.conn, query, args...)
 }
@@ -257,7 +257,7 @@ func (tx *Tx) QueryRow(ctx context.Context, dest any, query string, args ...any)
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders, rather than having to bind positionally, e.g. :id, :name, etc.
+// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
 func (tx *Tx) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return tx.base.exec(ctx, tx.conn, query, args...)
 }
