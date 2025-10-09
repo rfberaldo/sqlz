@@ -363,7 +363,7 @@ func TestScanner_NoRows(t *testing.T) {
 			require.NoError(t, err)
 			scanner, err := newScanner(rows, nil)
 			require.NoError(t, err)
-			var tmp string
+			var tmp []string
 			err = scanner.Scan(&tmp)
 			require.NoError(t, err)
 		})
@@ -401,7 +401,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 		t.Run("missing field error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newScanner(rows, nil)
+			scanner, err := newRowScanner(rows, nil)
 			require.NoError(t, err)
 			var user User
 			err = scanner.Scan(&user)
@@ -544,7 +544,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		t.Run("allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newScanner(rows, nil)
+			scanner, err := newRowScanner(rows, nil)
 			require.NoError(t, err)
 			user := make(map[string]any)
 			err = scanner.Scan(&user)
@@ -555,7 +555,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		t.Run("non allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newScanner(rows, nil)
+			scanner, err := newRowScanner(rows, nil)
 			require.NoError(t, err)
 			var user map[string]any
 			err = scanner.Scan(&user)
@@ -566,114 +566,131 @@ func TestScanner_ScanMap(t *testing.T) {
 }
 
 func TestScanner_CheckDest(t *testing.T) {
-	newScanner := func() *Scanner {
-		scanner, err := newScanner(&mock.Rows{
+	newRows := func() *mock.Rows {
+		count := 0
+		return &mock.Rows{
 			ColumnsFunc: func() ([]string, error) {
 				return []string{"user"}, nil
 			},
-		}, nil)
-		require.NoError(t, err)
-		return scanner
+			NextFunc: func() bool {
+				if count > 0 {
+					return false
+				}
+				count++
+				return true
+			},
+			ScanFunc: func(dest ...any) error {
+				for i := range dest {
+					dest[i] = nil
+				}
+				return nil
+			},
+		}
 	}
 
 	errAddressable := "destination must be addressable"
 
 	t.Run("no ref to string", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m string
-		err := scanner.Scan(m)
+		err = scanner.Scan(m)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("no ref to pointer string", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m *string
-		err := scanner.Scan(m)
+		err = scanner.Scan(m)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to string", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m string
-		err := scanner.Scan(&m)
+		err = scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to pointer string", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m *string
-		err := scanner.Scan(&m)
+		err = scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to map", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m map[string]any
-		err := scanner.Scan(&m)
+		err = scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("no ref to map", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m map[string]any
-		err := scanner.Scan(m)
+		err = scanner.Scan(m)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("no ref to slice", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newScanner(newRows(), nil)
+		require.NoError(t, err)
 		var s []string
-		err := scanner.Scan(s)
+		err = scanner.Scan(s)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to slice", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newScanner(newRows(), nil)
+		require.NoError(t, err)
 		var s []string
-		err := scanner.Scan(&s)
+		err = scanner.Scan(&s)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to interface", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		var m any
-		err := scanner.Scan(&m)
+		err = scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("no ref to pointer struct", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newRowScanner(newRows(), nil)
+		require.NoError(t, err)
 		type User struct{}
 		var user *User
-		err := scanner.Scan(user)
+		err = scanner.Scan(user)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to pointer struct", func(t *testing.T) {
-		scanner := newScanner()
-		type User struct{}
-		var user *User
-		err := scanner.Scan(&user)
+		scanner, err := newRowScanner(newRows(), nil)
+		scanner.ignoreMissingFields = true
 		require.NoError(t, err)
-	})
-
-	t.Run("ref to pointer struct", func(t *testing.T) {
-		scanner := newScanner()
 		type User struct{}
 		var user *User
-		err := scanner.Scan(&user)
+		err = scanner.Scan(&user)
 		require.NoError(t, err)
 	})
 
 	t.Run("array", func(t *testing.T) {
-		scanner := newScanner()
+		scanner, err := newScanner(newRows(), nil)
+		require.NoError(t, err)
 		var arr [1]string
-		err := scanner.Scan(&arr)
+		err = scanner.Scan(&arr)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unsupported destination type")
 	})

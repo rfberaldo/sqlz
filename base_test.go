@@ -39,7 +39,7 @@ func TestBase_basic(t *testing.T) {
 
 		t.Run("get", func(t *testing.T) {
 			var got string
-			err := base.selectz(ctx, conn.DB, &got, query)
+			err := base.get(ctx, conn.DB, &got, query)
 			require.NoError(t, err)
 
 			expect := "Hello World"
