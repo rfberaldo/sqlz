@@ -42,7 +42,7 @@ func newScanner(rows Rows, cfg *config) (*Scanner, error) {
 		return nil, fmt.Errorf("sqlz/scan: getting column names: %w", err)
 	}
 
-	if err := checkColumns(columns); err != nil {
+	if err := validateColumns(columns); err != nil {
 		return nil, err
 	}
 
@@ -67,9 +67,9 @@ func newRowScanner(rows Rows, cfg *config) (*Scanner, error) {
 	return scanner, nil
 }
 
-func checkColumns(columns []string) error {
+func validateColumns(columns []string) error {
 	if len(columns) == 0 {
-		return fmt.Errorf("sqlz/scan: columns length must be > 0")
+		return fmt.Errorf("sqlz/scan: no columns in result set")
 	}
 
 	seen := make(map[string]bool, len(columns))
@@ -90,6 +90,28 @@ func (s *Scanner) initDest(dest any) (reflect.Value, error) {
 	return v, nil
 }
 
+func (s *Scanner) resolveDestType(dest any) (reflectutil.Type, error) {
+	destType := reflectutil.TypeOfAny(dest)
+
+	if destType == reflectutil.Invalid {
+		return 0, fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
+	}
+
+	if !s.queryRow && destType < reflectutil.Slice {
+		return 0, fmt.Errorf("sqlz/scan: destination must be a slice to scan multiple rows, got %T", dest)
+	}
+
+	expectOneCol := destType == reflectutil.Primitive ||
+		destType == reflectutil.SlicePrimitive
+
+	if expectOneCol && len(s.columns) != 1 {
+		return 0, fmt.Errorf(
+			"sqlz/scan: query must return 1 column to scan into a primitive type, got %d", len(s.columns))
+	}
+
+	return destType, nil
+}
+
 // Scan automatically iterates over rows and scans results into dest.
 // Scan can only run once, after it is done [sql.Rows] are closed.
 func (s *Scanner) Scan(dest any) (err error) {
@@ -98,19 +120,9 @@ func (s *Scanner) Scan(dest any) (err error) {
 		return err
 	}
 
-	destType := reflectutil.TypeOfAny(dest)
-
-	// todo: if queryRow=true, should error if arg = slice
-
-	if destType == reflectutil.Invalid {
-		return fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
-	}
-
-	expectOneCol := destType == reflectutil.Primitive ||
-		destType == reflectutil.SlicePrimitive
-
-	if expectOneCol && len(s.columns) != 1 {
-		return fmt.Errorf("sqlz/scan: expected 1 column, got %d", len(s.columns))
+	destType, err := s.resolveDestType(dest)
+	if err != nil {
+		return err
 	}
 
 	defer func() {
@@ -278,7 +290,7 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 		index, ok := s.fieldIndexByKey[col]
 		if !ok {
 			if !s.ignoreMissingFields {
-				return fmt.Errorf("sqlz/scan: field not found: '%s' (maybe unexported?)", col)
+				return fmt.Errorf("sqlz/scan: struct field not found: '%s' (maybe unexported?)", col)
 			}
 			s.ptrs[i] = &s.noop
 			continue
@@ -286,7 +298,7 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 
 		fv := reflectutil.FieldByIndex(v, index)
 		if !fv.IsValid() {
-			return fmt.Errorf("sqlz/scan: invalid field: '%s'", col)
+			return fmt.Errorf("sqlz/scan: invalid struct field: '%s'", col)
 		}
 		s.ptrs[i] = fv.Addr().Interface()
 	}
