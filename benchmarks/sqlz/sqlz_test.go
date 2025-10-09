@@ -59,7 +59,7 @@ func BenchmarkPlaceholderQueryRow(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var name string
-		err := db.QueryRow(ctx, &name, input, 1)
+		err := db.Get(ctx, &name, input, 1)
 		noError(b, err)
 	}
 }
@@ -83,7 +83,7 @@ func BenchmarkNamedQueryRow(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var name string
-		err := db.QueryRow(ctx, &name, input, arg)
+		err := db.Get(ctx, &name, input, arg)
 		noError(b, err)
 	}
 }
@@ -191,7 +191,7 @@ func BenchmarkStructScan(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var users []user
-		err := db.Query(ctx, &users, input)
+		err := db.Select(ctx, &users, input)
 		noError(b, err)
 	}
 }
@@ -224,7 +224,7 @@ func BenchmarkStringScan(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var names []string
-		err := db.Query(ctx, &names, input)
+		err := db.Select(ctx, &names, input)
 		noError(b, err)
 	}
 }
@@ -267,7 +267,7 @@ func BenchmarkNamedInClause(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var users []user
-		err := db.Query(ctx, &users, input, arg)
+		err := db.Select(ctx, &users, input, arg)
 		noError(b, err)
 	}
 }
@@ -310,7 +310,7 @@ func BenchmarkPlaceholderInClause(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var users []user
-		err := db.Query(ctx, &users, input, arg)
+		err := db.Select(ctx, &users, input, arg)
 		noError(b, err)
 	}
 }
@@ -357,7 +357,7 @@ func BenchmarkCustomStructTag(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		var users []user
-		err := db.Query(ctx, &users, input, arg)
+		err := db.Select(ctx, &users, input, arg)
 		noError(b, err)
 	}
 }
