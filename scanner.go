@@ -8,9 +8,9 @@ import (
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
 
-// Rows defines the minimal interface for iterating over
+// rows defines the minimal interface for iterating over
 // and scanning database query results. It is satisfied by [sql.Rows].
-type Rows interface {
+type rows interface {
 	Close() error
 	Columns() ([]string, error)
 	Err() error
@@ -27,7 +27,7 @@ type Rows interface {
 // nor can they be mixed.
 type Scanner struct {
 	*config
-	rows            Rows
+	rows            rows
 	columns         []string
 	queryRow        bool
 	fieldIndexByKey map[string][]int
@@ -36,7 +36,7 @@ type Scanner struct {
 	noop            any   // ignored fields sink
 }
 
-func newScanner(rows Rows, cfg *config) (*Scanner, error) {
+func newScanner(rows rows, cfg *config) (*Scanner, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("sqlz/scan: getting column names: %w", err)
@@ -58,7 +58,7 @@ func newScanner(rows Rows, cfg *config) (*Scanner, error) {
 	}, nil
 }
 
-func newRowScanner(rows Rows, cfg *config) (*Scanner, error) {
+func newRowScanner(rows rows, cfg *config) (*Scanner, error) {
 	scanner, err := newScanner(rows, cfg)
 	if err != nil {
 		return nil, err

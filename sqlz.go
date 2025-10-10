@@ -3,6 +3,7 @@
 package sqlz
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
@@ -12,6 +13,10 @@ import (
 
 // Options are optional configs for sqlz.
 type Options struct {
+	// Bind is the placeholder the database driver uses, this should be blank for most users.
+	// Default is based on driver.
+	Bind parser.Bind
+
 	// StructTag is the reflection tag that will be used to map struct fields.
 	// Default is "db".
 	StructTag string
@@ -28,22 +33,20 @@ type Options struct {
 }
 
 // New returns a [DB] instance using an existing [sql.DB].
-// If driverName is not registered in [binds], it panics.
-//
-// The opts parameter can be set to nil for defaults.
+// The opts parameter can be nil for defaults.
 //
 // Example:
 //
 //	pool, err := sql.Open("sqlite3", ":memory:")
 //	db := sqlz.New("sqlite3", pool, nil)
 func New(driverName string, db *sql.DB, opts *Options) *DB {
-	bind := BindByDriver(driverName)
-	if bind == parser.BindUnknown {
-		panic(fmt.Errorf("sqlz: unable to find bind for '%s', register using [sqlz.Register]", driverName))
-	}
-
 	if opts == nil {
 		opts = &Options{}
+	}
+
+	bind := cmp.Or(opts.Bind, bindByDriverName[driverName])
+	if bind == parser.BindUnknown {
+		panic(fmt.Errorf("sqlz: unable to find bind for '%s', set with Options.Bind", driverName))
 	}
 
 	cfg := &config{
@@ -59,7 +62,6 @@ func New(driverName string, db *sql.DB, opts *Options) *DB {
 
 // Connect opens a database specified by its database driver name and a
 // driver-specific data source name, then verify the connection with a ping.
-// If driverName is not registered in [binds], it panics.
 //
 // No database drivers are included in the Go standard library.
 // See https://golang.org/s/sqldrivers for a list of third-party drivers.

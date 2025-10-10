@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/rfberaldo/sqlz"
-	"github.com/rfberaldo/sqlz/parser"
 )
 
 var (
@@ -45,19 +44,6 @@ func ExampleNew_options() {
 	})
 
 	_, err = db.Exec(ctx, "CREATE TABLE user (id INT PRIMARY KEY, name TEXT")
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func ExampleRegister() {
-	customDriver := (&sql.DB{}).Driver() // replace with your driver
-	sql.Register("sqlcustom", customDriver)
-	sqlz.Register("sqlcustom", parser.BindQuestion)
-
-	db := sqlz.MustConnect("sqlcustom", ":memory:")
-
-	_, err := db.Exec(ctx, "CREATE TABLE user (id INT PRIMARY KEY, name TEXT")
 	if err != nil {
 		log.Fatal(err)
 	}
