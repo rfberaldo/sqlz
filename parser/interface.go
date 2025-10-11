@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
 
 // Parse transforms a named query into native query, respecting the bind param,
@@ -70,7 +72,7 @@ func spreadSlices(args []any) (map[int]int, []any, error) {
 			}
 			inClauseCountByIndex[i] = length
 			for j := range length {
-				outArgs = append(outArgs, argValue.Index(j).Interface())
+				outArgs = append(outArgs, reflectutil.TypedValue(argValue.Index(j)))
 			}
 			continue
 		}
