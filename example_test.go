@@ -49,9 +49,9 @@ func ExampleNew_options() {
 	}
 }
 
-func ExampleDB_Select() {
+func ExampleDB_Query() {
 	var names []string
-	err := db.Select(ctx, &names, "SELECT name FROM user WHERE age > ?", 27)
+	err := db.Query(ctx, "SELECT name FROM user WHERE age > ?", 27).Scan(&names)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,14 +59,16 @@ func ExampleDB_Select() {
 	fmt.Printf("%+v", names)
 }
 
-func ExampleDB_Select_named() {
+func ExampleDB_Query_named() {
 	type Params struct {
 		Age int
 	}
 
 	var names []string
 	params := Params{Age: 27} // or map[string]any{"age": 27}
-	err := db.Select(ctx, &names, "SELECT name FROM user WHERE age > :age", params)
+	err := db.
+		Query(ctx, "SELECT name FROM user WHERE age > :age", params).
+		Scan(&names)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -74,10 +76,12 @@ func ExampleDB_Select_named() {
 	fmt.Printf("%+v", names)
 }
 
-func ExampleDB_Select_in_clause() {
+func ExampleDB_Query_in_clause() {
 	var names []string
 	ages := []int{27, 28, 29}
-	err := db.Select(ctx, &names, "SELECT name FROM user WHERE age IN (?)", ages)
+	err := db.
+		Query(ctx, "SELECT name FROM user WHERE age IN (?)", ages).
+		Scan(&names)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -85,14 +89,16 @@ func ExampleDB_Select_in_clause() {
 	fmt.Printf("%+v", names)
 }
 
-func ExampleDB_Select_named_in_clause() {
+func ExampleDB_Query_named_in_clause() {
 	type Params struct {
 		Ages []int
 	}
 
 	var names []string
 	params := Params{Ages: []int{27, 28, 29}}
-	err := db.Select(ctx, &names, "SELECT name FROM user WHERE age IN (:ages)", params)
+	err := db.
+		Query(ctx, "SELECT name FROM user WHERE age IN (:ages)", params).
+		Scan(&names)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -100,14 +106,16 @@ func ExampleDB_Select_named_in_clause() {
 	fmt.Printf("%+v", names)
 }
 
-func ExampleDB_Get() {
+func ExampleDB_QueryRow() {
 	type User struct {
 		Username  string
 		CreatedAt time.Time
 	}
 	id := 42
 	var user User
-	err := db.Get(ctx, &user, "SELECT username, created_at FROM user WHERE id = ?", id)
+	err := db.
+		QueryRow(ctx, "SELECT username, created_at FROM user WHERE id = ?", id).
+		Scan(&user)
 	switch {
 	case sqlz.IsNotFound(err):
 		log.Printf("no user with id %d\n", id)

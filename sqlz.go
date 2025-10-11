@@ -46,7 +46,7 @@ func New(driverName string, db *sql.DB, opts *Options) *DB {
 
 	bind := cmp.Or(opts.Bind, bindByDriverName[driverName])
 	if bind == parser.BindUnknown {
-		panic(fmt.Errorf("sqlz: unable to find bind for '%s', set with Options.Bind", driverName))
+		panic(fmt.Sprintf("sqlz: unable to find bind for '%s', set with Options.Bind", driverName))
 	}
 
 	cfg := &config{
@@ -134,49 +134,33 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	return &Tx{tx, db.base}, nil
 }
 
-// Select executes a query that can return multiple rows, results are scanned to dest.
+// Query executes a query that can return multiple rows. Any errors are deferred
+// until [Scanner.Err] or [Scanner.Scan] is called.
+//
 // The args are for any placeholder parameters in the query,
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
 // map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (db *DB) Select(ctx context.Context, dest any, query string, args ...any) error {
-	return db.base.selectz(ctx, db.pool, dest, query, args...)
-}
-
-// Query executes a query that can return multiple rows.
-// The args are for any placeholder parameters in the query,
-// the default placeholder depends on the driver.
-//
-// Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (db *DB) Query(ctx context.Context, query string, args ...any) (*Scanner, error) {
+func (db *DB) Query(ctx context.Context, query string, args ...any) *Scanner {
 	return db.base.query(ctx, db.pool, query, args...)
 }
 
-// Get executes a query that is expected to return at most one row, results are scanned to dest.
-// If the query selects no rows, it returns [sql.ErrNoRows].
-// The args are for any placeholder parameters in the query,
-// the default placeholder depends on the driver.
-//
-// Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (db *DB) Get(ctx context.Context, dest any, query string, args ...any) error {
-	return db.base.get(ctx, db.pool, dest, query, args...)
-}
-
 // QueryRow executes a query that is expected to return at most one row.
-// If the query selects no rows, the [Scanner] will return [sql.ErrNoRows].
+// Any errors are deferred until [Scanner.Err] or [Scanner.Scan] is called,
+// if the query selects no rows, it returns [sql.ErrNoRows].
+//
 // The args are for any placeholder parameters in the query,
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
 // map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (db *DB) QueryRow(ctx context.Context, dest any, query string, args ...any) (*Scanner, error) {
+func (db *DB) QueryRow(ctx context.Context, query string, args ...any) *Scanner {
 	return db.base.queryRow(ctx, db.pool, query, args...)
 }
 
 // Exec executes a query without returning any rows.
+//
 // The args are for any placeholder parameters in the query,
 // the default placeholder depends on the driver.
 //
@@ -212,49 +196,33 @@ func (tx *Tx) Commit() error { return tx.conn.Commit() }
 // nor will it have been committed to the database.
 func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
 
-// Select executes a query that can return multiple rows, results are scanned to dest.
+// Query executes a query that can return multiple rows. Any errors are deferred
+// until [Scanner.Err] or [Scanner.Scan] is called.
+//
 // The args are for any placeholder parameters in the query,
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
 // map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (tx *Tx) Select(ctx context.Context, dest any, query string, args ...any) error {
-	return tx.base.selectz(ctx, tx.conn, dest, query, args...)
-}
-
-// Query executes a query that can return multiple rows.
-// The args are for any placeholder parameters in the query,
-// the default placeholder depends on the driver.
-//
-// Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (tx *Tx) Query(ctx context.Context, query string, args ...any) (*Scanner, error) {
+func (tx *Tx) Query(ctx context.Context, query string, args ...any) *Scanner {
 	return tx.base.query(ctx, tx.conn, query, args...)
 }
 
-// Get executes a query that is expected to return at most one row, results are scanned to dest.
-// If the query selects no rows, it returns [sql.ErrNoRows].
-// The args are for any placeholder parameters in the query,
-// the default placeholder depends on the driver.
-//
-// Named queries works for all drivers, allowing the use of struct field names or
-// map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (tx *Tx) Get(ctx context.Context, dest any, query string, args ...any) error {
-	return tx.base.get(ctx, tx.conn, dest, query, args...)
-}
-
 // QueryRow executes a query that is expected to return at most one row.
-// If the query selects no rows, the [Scanner] will return [sql.ErrNoRows].
+// Any errors are deferred until [Scanner.Err] or [Scanner.Scan] is called,
+// if the query selects no rows, it returns [sql.ErrNoRows].
+//
 // The args are for any placeholder parameters in the query,
 // the default placeholder depends on the driver.
 //
 // Named queries works for all drivers, allowing the use of struct field names or
 // map keys as placeholders (e.g. :id, :name), rather than having to refer to parameters positionally.
-func (tx *Tx) QueryRow(ctx context.Context, dest any, query string, args ...any) (*Scanner, error) {
+func (tx *Tx) QueryRow(ctx context.Context, query string, args ...any) *Scanner {
 	return tx.base.queryRow(ctx, tx.conn, query, args...)
 }
 
 // Exec executes a query without returning any rows.
+//
 // The args are for any placeholder parameters in the query,
 // the default placeholder depends on the driver.
 //

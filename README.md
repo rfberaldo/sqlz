@@ -29,101 +29,82 @@ db := sqlz.New("sqlite3", pool, nil)
 
 ## Querying
 
-**sqlz** has five main methods, they behave different depending on the args provided:
+**sqlz** has three main methods:
 
 ```go
-Query(ctx context.Context, query string, args ...any) (*Scanner, error)
-QueryRow(ctx context.Context, query string, args ...any) (*Scanner, error)
-Select(ctx context.Context, dest any, query string, args ...any) error
-Get(ctx context.Context, dest any, query string, args ...any) error
+Query(ctx context.Context, query string, args ...any) *Scanner
+QueryRow(ctx context.Context, query string, args ...any) *Scanner
 Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
 ```
 
+> [!NOTE]
+> Error handling is omitted for brevity of these examples.
+
 ### Query / QueryRow
 
-They both query from database and returns a Scanner object. `QueryRow` query for one row.
+They both query from database and returns a Scanner object that can automatically scan rows into structs, maps, slices, etc. `QueryRow` query for one row.
+Errors are deferred to scanner for easy chaining, until `Err` or `Scan` is called.
 
 ```go
-// struct or map args are treated as a named query
-args := map[string]any{"country": "Brazil"}
-scanner, err := db.Query(ctx, "SELECT name FROM user WHERE country = :country", args)
-var names []string
-err = scanner.Scan(&names)
-```
-
-```go
-// otherwise it's treated as a native query, placeholder depends on the driver
-scanner, err := db.QueryRow(ctx, "SELECT name FROM user WHERE id = ?", 42)
 var name string
-err = scanner.Scan(&name) // returns [sql.ErrNoRows] if not found
+db.QueryRow(ctx, "SELECT name FROM user WHERE id = ?", 42).Scan(&name)
 ```
-
-```go
-// also works with 'IN' clause out of the box
-args := []int{4, 8, 16}
-scanner, err := db.Query(ctx, "SELECT * FROM user WHERE id IN (?)", args)
-var users []User
-err = scanner.Scan(&users)
-```
-
-### Select / Get
-
-They both query from database and do the scanning. `Get` query for one row, and returns [sql.ErrNoRows](https://pkg.go.dev/database/sql#ErrNoRows) if not found.
 
 ```go
 // struct or map args are treated as a named query
 loc := Location{Country: "Brazil"}
 var names []string
-err := db.Select(ctx, &names, "SELECT name FROM user WHERE country = :country", loc)
+db.Query(ctx, "SELECT name FROM user WHERE country = :country", loc).Scan(&names)
 ```
 
 ```go
-// otherwise it's treated as a native query, placeholder depends on the driver
-var name string
-err := db.Get(ctx, &name, "SELECT name FROM user WHERE id = ?", 42)
+// also works with 'IN' clause out of the box
+args := []int{4, 8, 16}
+var users []User
+db.Query(ctx, "SELECT * FROM user WHERE id IN (?)", args).Scan(&users)
+// executed as:
+// SELECT * FROM user WHERE id IN (?,?,?)
 ```
 
 ### Exec
 
+Exec is very similar to standard library, with added support for named queries and batch inserts.
+
 ```go
-// struct or map args are treated as a named exec
+// named query
 args := map[string]any{"id": 42}
-result, err := db.Exec(ctx, "DELETE FROM user WHERE id = :id", args)
+db.Exec(ctx, "DELETE FROM user WHERE id = :id", args)
 ```
 
 ```go
-// array args are treated as a named batch insert
+// slice arg is treated as a named batch insert
 users := []User{
   {Id: 1, Name: "Alice", Email: "alice@example.com"},
   {Id: 2, Name: "Rob", Email: "rob@example.com"},
   {Id: 3, Name: "John", Email: "john@example.com"},
 }
-result, err := db.Exec(ctx, "INSERT INTO user (id, name, email) VALUES (:id, :name, :email)", users)
-```
-
-```go
-// otherwise it's treated as a native exec, placeholder depends on the driver
-result, err := db.Exec(ctx, "DELETE FROM user WHERE id = ?", 42)
+query := "INSERT INTO user (id, name, email) VALUES (:id, :name, :email)"
+db.Exec(ctx, query, users)
+// executed as:
+// INSERT INTO user (id, name, email) VALUES (?,?,?), (?,?,?), (?,?,?)
 ```
 
 ### Transactions
 
-Transactions have the same five main methods, other than that it's very similar to standard library.
+Transactions have the methods, and it's also similar to standard library.
 
 ```go
-arg := map[string]any{"id": 42}
+tx := db.Begin(ctx)
 
-tx, err := db.Begin(ctx)
-
-// Rollback will be ignored if tx has been committed later in the function,
-// remember to return early if there is an error.
+// Rollback will be ignored if tx has been committed later in the function
 defer tx.Rollback()
 
-_, err = tx.Exec(ctx, "DELETE FROM user_permission WHERE user_id = :id", arg)
-_, err = tx.Exec(ctx, "DELETE FROM user WHERE id = :id", arg)
+user := User{Id: 42}
+tx.Exec(ctx, "DELETE FROM user_permission WHERE user_id = :id", user)
+tx.Exec(ctx, "DELETE FROM user WHERE id = :id", user)
 
-// Commit may fail, and nothing will have been committed.
-err = tx.Commit()
+// Commit may fail, and nothing will have been committed
+tx.Commit()
 ```
 
 ### Struct fields
@@ -139,22 +120,9 @@ type User struct {
 }
 ```
 
-### Custom options
-
-Set custom options using the `New` constructor:
-
-```go
-pool, err := sql.Open("sqlite3", ":memory:")
-db := sqlz.New("sqlite3", pool, &sqlz.Options{
-  StructTag: "json",                     // default is "db"
-  FieldNameTransformer: strings.ToLower, // default is ToSnakeCase
-  IgnoreMissingFields: true,             // default is false
-})
-```
-
 ## Dependencies
 
-**sqlz** has no dependencies, only testing/dev deps: [testify and db drivers](go.mod).
+**sqlz** has no dependencies, only [testing/dev deps](go.mod).
 
 ## Comparison with [sqlx](https://github.com/jmoiron/sqlx)
 

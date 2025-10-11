@@ -11,6 +11,7 @@ import (
 	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/rfberaldo/sqlz/parser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -24,9 +25,7 @@ func TestNew(t *testing.T) {
 
 func TestNew_panic(t *testing.T) {
 	defer func() {
-		err, ok := recover().(error)
-		assert.True(t, ok)
-		assert.ErrorContains(t, err, "unable to find bind")
+		assert.Contains(t, recover(), "unable to find bind")
 	}()
 
 	sqlz.New("wrongdriver", &sql.DB{}, nil)
@@ -49,11 +48,11 @@ func TestDB_basic(t *testing.T) {
 		expected := "Hello World"
 		expectedSlice := []string{"Hello World"}
 
-		err = db.Select(ctx, &ss, query)
+		err = db.Query(ctx, query).Scan(&ss)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = db.Get(ctx, &s, query)
+		err = db.QueryRow(ctx, query).Scan(&s)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 
@@ -62,17 +61,40 @@ func TestDB_basic(t *testing.T) {
 		defer tx.Rollback()
 
 		ss = ss[:0] // clear slice
-		err = tx.Select(ctx, &ss, query)
+		err = tx.Query(ctx, query).Scan(&ss)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedSlice, ss)
 
-		err = tx.Get(ctx, &s, query)
+		err = tx.QueryRow(ctx, query).Scan(&s)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, s)
 	})
 }
 
-func TestContextCancellation(t *testing.T) {
+func TestDB_deferred_query_error(t *testing.T) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		db := sqlz.New(conn.DriverName, conn.DB, nil)
+		query := "SELECT wrongquery"
+
+		scanner := db.Query(ctx, query)
+		require.Error(t, scanner.Err())
+		assert.ErrorContains(t, scanner.Err(), "wrongquery")
+
+		err := db.Query(ctx, query).Scan(new([]string))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "wrongquery")
+
+		scanner = db.QueryRow(ctx, query)
+		require.Error(t, scanner.Err())
+		assert.ErrorContains(t, scanner.Err(), "wrongquery")
+
+		err = db.QueryRow(ctx, query).Scan(new(string))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "wrongquery")
+	})
+}
+
+func TestDB_context_cancellation(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
@@ -103,7 +125,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err := db.Select(ctx, new([]int), q)
+			err := db.Query(ctx, q).Scan(new([]int))
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -112,7 +134,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := db.Select(ctx, new([]int), q)
+			err := db.Query(ctx, q).Scan(new([]int))
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
@@ -121,7 +143,7 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err := db.Get(ctx, new(int), q)
+			err := db.QueryRow(ctx, q).Scan(new(int))
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -130,13 +152,13 @@ func TestContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := db.Get(ctx, new(int), q)
+			err := db.QueryRow(ctx, q).Scan(new(int))
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 	})
 }
 
-func TestTxContextCancellation(t *testing.T) {
+func TestTx_context_cancellation(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		q := "SELECT SLEEP(1)"
@@ -179,7 +201,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err = tx.Select(ctx, new([]int), q)
+			err = tx.Query(ctx, q).Scan(new([]int))
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -192,7 +214,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err = tx.Select(ctx, new([]int), q)
+			err = tx.Query(ctx, q).Scan(new([]int))
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 
@@ -205,7 +227,7 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			err = tx.Get(ctx, new(int), q)
+			err = tx.QueryRow(ctx, q).Scan(new(int))
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
 		})
 
@@ -218,13 +240,13 @@ func TestTxContextCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err = tx.Get(ctx, new(int), q)
+			err = tx.QueryRow(ctx, q).Scan(new(int))
 			assert.ErrorIs(t, err, context.Canceled)
 		})
 	})
 }
 
-func TestTransaction(t *testing.T) {
+func TestTx_commit_rollback(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
@@ -261,7 +283,8 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.Get(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
+			err = db.QueryRow(ctx, th.Fmt("SELECT count(1) FROM %s")).Scan(&count)
+			assert.NoError(t, err)
 			assert.Equal(t, 3, count)
 
 			// clean up
@@ -297,7 +320,8 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.Get(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
+			err = db.QueryRow(ctx, th.Fmt("SELECT count(1) FROM %s")).Scan(&count)
+			assert.NoError(t, err)
 			assert.Equal(t, 0, count)
 		})
 
@@ -331,13 +355,14 @@ func TestTransaction(t *testing.T) {
 			}()
 
 			var count int
-			assert.NoError(t, db.Get(ctx, &count, th.Fmt("SELECT count(1) FROM %s")))
+			err = db.QueryRow(ctx, th.Fmt("SELECT count(1) FROM %s")).Scan(&count)
+			assert.NoError(t, err)
 			assert.Equal(t, 0, count)
 		})
 	})
 }
 
-func TestCustomStructTag(t *testing.T) {
+func TestDB_custom_structTag(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, &sqlz.Options{StructTag: "json"})
 
@@ -360,13 +385,13 @@ func TestCustomStructTag(t *testing.T) {
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
-		err := db.Get(ctx, &user, q)
+		err := db.QueryRow(ctx, q).Scan(&user)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})
 }
 
-func TestPool(t *testing.T) {
+func TestDB_Pool(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		db := sqlz.New(conn.DriverName, conn.DB, nil)
 		assert.IsType(t, &sql.DB{}, db.Pool())

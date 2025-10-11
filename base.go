@@ -40,7 +40,7 @@ func (c *base) resolveQuery(query string, args []any) (string, []any, error) {
 		return processNamed(query, args[0], c.config)
 
 	case reflectutil.Invalid:
-		panic(fmt.Errorf("sqlz: unsupported argument type: %T", args[0]))
+		panic(fmt.Sprintf("sqlz: unsupported argument type: %T", args[0]))
 
 	default:
 		// must be a native query, just parse for possible "IN" clauses
@@ -48,60 +48,32 @@ func (c *base) resolveQuery(query string, args []any) (string, []any, error) {
 	}
 }
 
-func (c *base) query(ctx context.Context, db querier, query string, args ...any) (*Scanner, error) {
+func (c *base) query(ctx context.Context, db querier, query string, args ...any) *Scanner {
 	query, args, err := c.resolveQuery(query, args)
 	if err != nil {
-		return nil, err
+		return &Scanner{err: err}
 	}
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return &Scanner{err: err}
 	}
 
-	scanner, err := newScanner(rows, c.config)
-	if err != nil {
-		return nil, fmt.Errorf("sqlz: creating scanner: %w", err)
-	}
-
-	return scanner, nil
+	return newScanner(rows, c.config)
 }
 
-func (c *base) selectz(ctx context.Context, db querier, dest any, query string, args ...any) error {
-	scanner, err := c.query(ctx, db, query, args...)
-	if err != nil {
-		return err
-	}
-
-	return scanner.Scan(dest)
-}
-
-func (c *base) queryRow(ctx context.Context, db querier, query string, args ...any) (*Scanner, error) {
+func (c *base) queryRow(ctx context.Context, db querier, query string, args ...any) *Scanner {
 	query, args, err := c.resolveQuery(query, args)
 	if err != nil {
-		return nil, err
+		return &Scanner{err: err}
 	}
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return &Scanner{err: err}
 	}
 
-	scanner, err := newRowScanner(rows, c.config)
-	if err != nil {
-		return nil, fmt.Errorf("sqlz: creating scanner: %w", err)
-	}
-
-	return scanner, nil
-}
-
-func (c *base) get(ctx context.Context, db querier, dest any, query string, args ...any) error {
-	scanner, err := c.queryRow(ctx, db, query, args...)
-	if err != nil {
-		return err
-	}
-
-	return scanner.Scan(dest)
+	return newRowScanner(rows, c.config)
 }
 
 func (c *base) exec(ctx context.Context, db querier, query string, args ...any) (sql.Result, error) {

@@ -30,7 +30,7 @@ func TestBase_basic(t *testing.T) {
 
 		t.Run("select", func(t *testing.T) {
 			var got []string
-			err := base.selectz(ctx, conn.DB, &got, query)
+			err := base.query(ctx, conn.DB, query).Scan(&got)
 			require.NoError(t, err)
 
 			expect := []string{"Hello World"}
@@ -39,7 +39,7 @@ func TestBase_basic(t *testing.T) {
 
 		t.Run("get", func(t *testing.T) {
 			var got string
-			err := base.get(ctx, conn.DB, &got, query)
+			err := base.queryRow(ctx, conn.DB, query).Scan(&got)
 			require.NoError(t, err)
 
 			expect := "Hello World"
@@ -48,9 +48,7 @@ func TestBase_basic(t *testing.T) {
 
 		t.Run("query", func(t *testing.T) {
 			var got []string
-			scanner, err := base.query(ctx, conn.DB, query)
-			require.NoError(t, err)
-			err = scanner.Scan(&got)
+			err := base.query(ctx, conn.DB, query).Scan(&got)
 			require.NoError(t, err)
 
 			expect := []string{"Hello World"}
@@ -59,9 +57,7 @@ func TestBase_basic(t *testing.T) {
 
 		t.Run("queryRow", func(t *testing.T) {
 			var got string
-			scanner, err := base.queryRow(ctx, conn.DB, query)
-			require.NoError(t, err)
-			err = scanner.Scan(&got)
+			err := base.queryRow(ctx, conn.DB, query).Scan(&got)
 			require.NoError(t, err)
 
 			expect := "Hello World"
@@ -70,7 +66,7 @@ func TestBase_basic(t *testing.T) {
 	})
 }
 
-func TestBase_select(t *testing.T) {
+func TestBase_query(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		base := newBase(&config{bind: conn.Bind})
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
@@ -115,7 +111,7 @@ func TestBase_select(t *testing.T) {
 			}
 			var users []User
 			q := th.Fmt("SELECT * FROM %s")
-			err = base.selectz(ctx, conn.DB, &users, q)
+			err = base.query(ctx, conn.DB, q).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 3, len(users))
 			assert.Equal(t, expected, users)
@@ -128,7 +124,7 @@ func TestBase_select(t *testing.T) {
 			}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = ? OR id = ?`)
 			var users []User
-			err = base.selectz(ctx, conn.DB, &users, q, 2, 3)
+			err = base.query(ctx, conn.DB, q, 2, 3).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -142,7 +138,7 @@ func TestBase_select(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (?)`)
 			var users []User
 			ids := []int{2, 3}
-			err = base.selectz(ctx, conn.DB, &users, q, ids)
+			err = base.query(ctx, conn.DB, q, ids).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -155,7 +151,7 @@ func TestBase_select(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var users []User
 			arg := struct{ Id int }{Id: 2}
-			err = base.selectz(ctx, conn.DB, &users, q, arg)
+			err = base.query(ctx, conn.DB, q, arg).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 1, len(users))
 			assert.Equal(t, expected, users)
@@ -168,7 +164,7 @@ func TestBase_select(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var users []User
 			arg := map[string]any{"id": 2}
-			err = base.selectz(ctx, conn.DB, &users, q, arg)
+			err = base.query(ctx, conn.DB, q, arg).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 1, len(users))
 			assert.Equal(t, expected, users)
@@ -182,7 +178,7 @@ func TestBase_select(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (:ids)`)
 			var users []User
 			arg := map[string]any{"ids": []int{2, 3}}
-			err = base.selectz(ctx, conn.DB, &users, q, arg)
+			err = base.query(ctx, conn.DB, q, arg).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(users))
 			assert.Equal(t, expected, users)
@@ -191,14 +187,14 @@ func TestBase_select(t *testing.T) {
 		t.Run("query should return length 0 if no result is found", func(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = 42`)
 			var users []User
-			err = base.selectz(ctx, conn.DB, &users, q)
+			err = base.query(ctx, conn.DB, q).Scan(&users)
 			require.NoError(t, err)
 			assert.Equal(t, 0, len(users))
 		})
 	})
 }
 
-func TestBase_get(t *testing.T) {
+func TestBase_queryRow(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		base := newBase(&config{bind: conn.Bind})
 		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
@@ -239,7 +235,7 @@ func TestBase_get(t *testing.T) {
 			expected := User{1, "Alice", 18, true, ts}
 			var user User
 			q := th.Fmt("SELECT * FROM %s LIMIT 1")
-			err = base.get(ctx, conn.DB, &user, q)
+			err = base.queryRow(ctx, conn.DB, q).Scan(&user)
 			require.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -248,7 +244,7 @@ func TestBase_get(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = ? AND active = ?`)
 			var user User
-			err = base.get(ctx, conn.DB, &user, q, 2, true)
+			err = base.queryRow(ctx, conn.DB, q, 2, true).Scan(&user)
 			require.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -258,7 +254,7 @@ func TestBase_get(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (?)`)
 			var user User
 			ids := []int{2}
-			err = base.get(ctx, conn.DB, &user, q, ids)
+			err = base.queryRow(ctx, conn.DB, q, ids).Scan(&user)
 			require.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -268,7 +264,7 @@ func TestBase_get(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := struct{ Id int }{Id: 2}
-			err = base.get(ctx, conn.DB, &user, q, arg)
+			err = base.queryRow(ctx, conn.DB, q, arg).Scan(&user)
 			require.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -278,7 +274,7 @@ func TestBase_get(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var user User
 			arg := map[string]any{"id": 2}
-			err = base.get(ctx, conn.DB, &user, q, arg)
+			err = base.queryRow(ctx, conn.DB, q, arg).Scan(&user)
 			require.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -288,7 +284,7 @@ func TestBase_get(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (:ids)`)
 			var user User
 			arg := map[string]any{"ids": []int{2}}
-			err = base.get(ctx, conn.DB, &user, q, arg)
+			err = base.queryRow(ctx, conn.DB, q, arg).Scan(&user)
 			require.NoError(t, err)
 			assert.Equal(t, expected, user)
 		})
@@ -296,7 +292,7 @@ func TestBase_get(t *testing.T) {
 		t.Run("get should return sql.ErrNoRows if no result", func(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = 42`)
 			var user User
-			err = base.get(ctx, conn.DB, &user, q)
+			err = base.queryRow(ctx, conn.DB, q).Scan(&user)
 			require.Error(t, err)
 			require.ErrorIs(t, err, sql.ErrNoRows)
 		})
@@ -308,7 +304,7 @@ func TestBase_get(t *testing.T) {
 
 			q = th.Fmt(`SELECT * FROM %s WHERE id = 100`)
 			var user User
-			err = base.get(ctx, conn.DB, &user, q)
+			err = base.queryRow(ctx, conn.DB, q).Scan(&user)
 			require.Error(t, err)
 			assert.ErrorContains(t, err, "converting NULL to string is unsupported")
 		})
@@ -514,7 +510,7 @@ func TestBase_customStructTag(t *testing.T) {
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
-		err = base.get(ctx, conn.DB, &user, th.Fmt("SELECT * FROM %s LIMIT 1"))
+		err = base.queryRow(ctx, conn.DB, th.Fmt("SELECT * FROM %s LIMIT 1")).Scan(&user)
 		require.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})
@@ -559,7 +555,7 @@ func TestBase_nonEnglishCharacters(t *testing.T) {
 
 		expected := User{1, "Alice", "alice@wonderland.com", "123456", 18, true}
 		var user User
-		err = base.get(ctx, conn.DB, &user, th.Fmt("SELECT * FROM %s LIMIT 1"))
+		err = base.queryRow(ctx, conn.DB, th.Fmt("SELECT * FROM %s LIMIT 1")).Scan(&user)
 		require.NoError(t, err)
 		assert.Equal(t, expected, user)
 	})
