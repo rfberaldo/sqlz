@@ -18,62 +18,58 @@ type rows interface {
 	Scan(dest ...any) error
 }
 
-// Scanner wrapps rows and exposes the Scan method that automatically scan rows
-// into destination regardless of type. Each instance of Scan must be for a single
-// query result.
-//
-// Scanner also exposes primitive methods for a single row scan: ScanRow,
-// ScanMap and ScanStruct, these methods do not loop over or close rows,
-// nor can they be mixed.
+// Scanner is the result of calling [DB.Query] or [DB.QueryRow].
 type Scanner struct {
 	*config
-	rows            rows
+
+	// one of these two will be non-nil:
+	err  error // deferred error
+	rows rows
+
+	manualIterating bool
 	columns         []string
 	queryRow        bool
+	destType        reflectutil.Type
 	fieldIndexByKey map[string][]int
 	ptrs            []any // slice of pointers for scan, used in all methods
 	values          []any // slice of values from rows, used in map scanning
 	noop            any   // ignored fields sink
 }
 
-func newScanner(rows rows, cfg *config) (*Scanner, error) {
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, fmt.Errorf("sqlz/scan: getting column names: %w", err)
-	}
-
-	if err := validateColumns(columns); err != nil {
-		return nil, err
-	}
-
+func newScanner(rows rows, cfg *config) *Scanner {
 	if cfg == nil {
 		cfg = &config{}
 	}
 	cfg.defaults()
 
 	return &Scanner{
-		config:  cfg,
-		rows:    rows,
-		columns: columns,
-	}, nil
-}
-
-func newRowScanner(rows rows, cfg *config) (*Scanner, error) {
-	scanner, err := newScanner(rows, cfg)
-	if err != nil {
-		return nil, err
+		config: cfg,
+		rows:   rows,
 	}
-	scanner.queryRow = true
-	return scanner, nil
 }
 
-func validateColumns(columns []string) error {
-	if len(columns) == 0 {
+func newRowScanner(rows rows, cfg *config) *Scanner {
+	scanner := newScanner(rows, cfg)
+	scanner.queryRow = true
+	return scanner
+}
+
+func (s *Scanner) resolveColumns() (err error) {
+	if s.columns != nil {
+		return nil
+	}
+
+	s.columns, err = s.rows.Columns()
+	if err != nil {
+		return fmt.Errorf("sqlz/scan: getting column names: %w", err)
+	}
+
+	if len(s.columns) == 0 {
 		return fmt.Errorf("sqlz/scan: no columns in result set")
 	}
 
-	seen := make(map[string]bool, len(columns))
-	for _, col := range columns {
+	seen := make(map[string]bool, len(s.columns))
+	for _, col := range s.columns {
 		if _, ok := seen[col]; ok {
 			return fmt.Errorf("sqlz/scan: duplicate column name: '%s'", col)
 		}
@@ -82,107 +78,88 @@ func validateColumns(columns []string) error {
 	return nil
 }
 
-func (s *Scanner) initDest(dest any) (reflect.Value, error) {
-	v := reflectutil.Init(reflect.ValueOf(dest))
-	if !v.CanSet() {
-		return reflect.Value{}, fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
+func (s *Scanner) resolveDestType(dest any) error {
+	if s.destType != reflectutil.Invalid {
+		return nil
 	}
-	return v, nil
+
+	s.destType = reflectutil.TypeOfAny(dest)
+
+	if s.destType == reflectutil.Invalid {
+		return fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
+	}
+
+	if !s.manualIterating && !s.queryRow && !s.destType.IsSlice() {
+		return fmt.Errorf("sqlz/scan: destination must be a slice to scan multiple rows, got %T", dest)
+	}
+
+	if s.destType.IsPrimitive() && len(s.columns) != 1 {
+		return fmt.Errorf(
+			"sqlz/scan: query must return 1 column to scan into a primitive type, got %d",
+			len(s.columns),
+		)
+	}
+
+	return nil
 }
 
-func (s *Scanner) resolveDestType(dest any) (reflectutil.Type, error) {
-	destType := reflectutil.TypeOfAny(dest)
-
-	if destType == reflectutil.Invalid {
-		return 0, fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
-	}
-
-	if !s.queryRow && destType < reflectutil.Slice {
-		return 0, fmt.Errorf("sqlz/scan: destination must be a slice to scan multiple rows, got %T", dest)
-	}
-
-	expectOneCol := destType == reflectutil.Primitive ||
-		destType == reflectutil.SlicePrimitive
-
-	if expectOneCol && len(s.columns) != 1 {
-		return 0, fmt.Errorf(
-			"sqlz/scan: query must return 1 column to scan into a primitive type, got %d", len(s.columns))
-	}
-
-	return destType, nil
-}
-
-// Scan automatically iterates over rows and scans results into dest.
-// Scan can only run once, after it is done [sql.Rows] are closed.
+// Scan automatically iterates over rows and scans into dest regardless of type.
+// Scan should not be called more than once per [Scanner] instance.
 func (s *Scanner) Scan(dest any) (err error) {
-	destValue, err := s.initDest(dest)
-	if err != nil {
+	if s.err != nil {
+		return s.err
+	}
+
+	if s.manualIterating {
+		panic("sqlz/scan: Scan cannot be used with manual iteration, use ScanRow instead")
+	}
+
+	if err := s.resolveColumns(); err != nil {
 		return err
 	}
 
-	destType, err := s.resolveDestType(dest)
-	if err != nil {
+	if err := s.resolveDestType(dest); err != nil {
 		return err
 	}
 
+	return s.scanAll(dest)
+}
+
+// ScanRow scans the current row into dest regardless of type,
+// it must be called inside a [NextRow] loop.
+func (s *Scanner) ScanRow(dest any) (err error) {
+	if s.err != nil {
+		return s.err
+	}
+
+	if !s.manualIterating {
+		panic("sqlz/scan: ScanRow can only be used with manual iteration, use Scan for automatic iteration")
+	}
+
+	if err := s.resolveColumns(); err != nil {
+		return err
+	}
+
+	if err := s.resolveDestType(dest); err != nil {
+		return err
+	}
+
+	return s.scanOne(dest)
+}
+
+func (s *Scanner) scanAll(dest any) (err error) {
 	defer func() {
 		if errClose := s.rows.Close(); errClose != nil {
 			err = fmt.Errorf("sqlz/scan: closing rows: %w", errClose)
 		}
 	}()
 
-	isSlice := destValue.Kind() == reflect.Slice
-
 	rowCount := 0
 	for s.rows.Next() {
-		if isSlice {
-			if destValue.Len() == destValue.Cap() {
-				destValue.Grow(1)
-			}
-			destValue.SetLen(destValue.Len() + 1)
-		}
-
-		switch destType {
-		case reflectutil.Primitive:
-			err = s.ScanRow(dest)
-
-		case reflectutil.SlicePrimitive:
-			elValue := destValue.Index(destValue.Len() - 1)
-			err = s.ScanRow(elValue.Addr().Interface())
-
-		case reflectutil.Struct:
-			err = s.ScanStruct(dest)
-
-		case reflectutil.SliceStruct:
-			elValue := destValue.Index(destValue.Len() - 1)
-			err = s.ScanStruct(elValue.Addr().Interface())
-
-		case reflectutil.Map:
-			m, errMap := assertMap(destValue.Interface())
-			if errMap != nil {
-				return errMap
-			}
-			err = s.ScanMap(m)
-
-		case reflectutil.SliceMap:
-			elValue := destValue.Index(destValue.Len() - 1)
-			elValue = reflectutil.Init(elValue)
-			m, errMap := assertMap(elValue.Interface())
-			if errMap != nil {
-				return errMap
-			}
-			err = s.ScanMap(m)
-		}
-
-		if err != nil {
+		if err := s.scanOne(dest); err != nil {
 			return err
 		}
-
 		rowCount++
-	}
-
-	if err != nil {
-		return err
 	}
 
 	if err := s.rows.Err(); err != nil {
@@ -200,10 +177,47 @@ func (s *Scanner) Scan(dest any) (err error) {
 	return err
 }
 
-// ScanRow copies the columns in the current row into the values pointed at by dest.
-// The number of values in dest must be the same as the number of columns.
-// Must be called after [Scanner.NextRow]. Refer to [sql.Rows.Scan].
-func (s *Scanner) ScanRow(dest ...any) error {
+func (s *Scanner) scanOne(dest any) (err error) {
+	destValue := reflectutil.Init(reflect.ValueOf(dest))
+	if !destValue.CanSet() {
+		return fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
+	}
+
+	if s.destType.IsSlice() {
+		if destValue.Len() == destValue.Cap() {
+			destValue.Grow(1)
+		}
+		destValue.SetLen(destValue.Len() + 1)
+	}
+
+	switch s.destType {
+	case reflectutil.Primitive:
+		return s.scan(dest)
+
+	case reflectutil.SlicePrimitive:
+		elValue := destValue.Index(destValue.Len() - 1)
+		return s.scan(elValue.Addr().Interface())
+
+	case reflectutil.Struct:
+		return s.scanStruct(dest)
+
+	case reflectutil.SliceStruct:
+		elValue := destValue.Index(destValue.Len() - 1)
+		return s.scanStruct(elValue.Addr().Interface())
+
+	case reflectutil.Map:
+		return s.scanMap(destValue.Interface())
+
+	case reflectutil.SliceMap:
+		elValue := destValue.Index(destValue.Len() - 1)
+		elValue = reflectutil.Init(elValue)
+		return s.scanMap(elValue.Interface())
+	}
+
+	panic("sqlz/scan: type not handled, got " + destValue.Type().String())
+}
+
+func (s *Scanner) scan(dest ...any) error {
 	s.ptrs = s.ptrs[:0] // empty slice keeping the underlying array
 	s.ptrs = append(s.ptrs, dest...)
 
@@ -214,8 +228,16 @@ func (s *Scanner) ScanRow(dest ...any) error {
 	return nil
 }
 
-// ScanMap scans a single row into m. Must be called after [Scanner.NextRow].
-func (s *Scanner) ScanMap(m map[string]any) error {
+func (s *Scanner) scanMap(dest any) error {
+	if dest == nil {
+		dest = make(map[string]any)
+	}
+
+	m, errMap := assertMap(dest)
+	if errMap != nil {
+		return errMap
+	}
+
 	s.setMapPtrs()
 
 	if err := s.rows.Scan(s.ptrs...); err != nil {
@@ -251,17 +273,12 @@ func isScannable(t reflect.Type) bool {
 	return reflect.PointerTo(t).Implements(scannerType) || t.Implements(scannerType)
 }
 
-// ScanStruct scans a single row into dest, if dest is not a struct it panics.
-// Must be called after [Scanner.NextRow].
-func (s *Scanner) ScanStruct(dest any) error {
-	destValue, err := s.initDest(dest)
-	if err != nil {
-		return err
-	}
+func (s *Scanner) scanStruct(dest any) error {
+	destValue := reflectutil.Init(reflect.ValueOf(dest))
 
-	// if dest implements [sql.Scanner], just pass directly to [sql.Rows.Scan].
+	// if implements [sql.Scanner], just scan it natively
 	if isScannable(destValue.Type()) {
-		return s.ScanRow(dest)
+		return s.scan(dest)
 	}
 
 	if err := s.setStructPtrs(destValue); err != nil {
@@ -308,18 +325,39 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 
 // Close closes [Scanner], preventing further enumeration, and returning the connection to the pool.
 // Close is idempotent and does not affect the result of [Scanner.Err].
-func (s *Scanner) Close() error { return s.rows.Close() }
+func (s *Scanner) Close() error {
+	if s.rows == nil {
+		return nil
+	}
+	if err := s.rows.Close(); err != nil {
+		return fmt.Errorf("sqlz/scan: closing rows: %w", err)
+	}
+	return nil
+}
 
-// NextRow prepares the next result row for reading with [Scanner.ScanRow],
-// [Scanner.ScanMap] or [Scanner.ScanStruct] methods.
+// NextRow prepares the next result row for reading with [Scanner.ScanRow].
 // It returns true on success, or false if there is no next result row or an error
 // happened while preparing it. [Scanner.Err] should be consulted to distinguish between
 // the two cases.
 //
-// Every call to [Scanner.ScanRow], [Scanner.ScanMap] or [Scanner.ScanStruct],
-// even the first one, must be preceded by a call to [Scanner.NextRow].
-func (s *Scanner) NextRow() bool { return s.rows.Next() }
+// Every call to [Scanner.ScanRow], even the first one, must be preceded by a NextRow.
+func (s *Scanner) NextRow() bool {
+	if s.rows == nil {
+		return false
+	}
+	s.manualIterating = true
+	return s.rows.Next()
+}
 
-// Err returns the error, if any, that was encountered during iteration.
+// Err returns the error, if any, that was encountered while running the query
+// or during iteration.
 // Err may be called after an explicit or implicit [Scanner.Close].
-func (s *Scanner) Err() error { return s.rows.Err() }
+func (s *Scanner) Err() error {
+	if s.err != nil {
+		return s.err
+	}
+	if err := s.rows.Err(); err != nil {
+		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
+	}
+	return nil
+}

@@ -11,7 +11,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rfberaldo/sqlz/internal/testutil"
-	"github.com/rfberaldo/sqlz/internal/testutil/mock"
 	"github.com/rfberaldo/sqlz/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,6 +55,11 @@ func TestScanner_Scan(t *testing.T) {
 			query    string
 			expected any
 		}{
+			{
+				name:     "string",
+				query:    "SELECT 'Alice' AS name",
+				expected: "Alice",
+			},
 			{
 				name: "struct",
 				query: `
@@ -150,17 +154,17 @@ func TestScanner_Scan(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				rows, err := conn.DB.Query(tc.query)
 				require.NoError(t, err)
-				scanner, err := newRowScanner(rows, nil)
-				require.NoError(t, err)
+				scanner := newRowScanner(rows, nil)
 				dst := allocDest(tc.expected)
-				scanner.Scan(dst)
+				err = scanner.Scan(dst)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected, derefDest(dst))
 			})
 		}
 	})
 }
 
-func TestScanner_ScanSlices(t *testing.T) {
+func TestScanner_Scan_slices(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		testCases := []struct {
 			name     string
@@ -341,28 +345,43 @@ func TestScanner_ScanSlices(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
+			t.Run("Scan "+tc.name, func(t *testing.T) {
 				rows, err := conn.DB.Query(tc.query)
 				require.NoError(t, err)
-				scanner, err := newScanner(rows, nil)
-				require.NoError(t, err)
+				scanner := newScanner(rows, nil)
 				dst := allocDest(tc.expected)
-				scanner.Scan(dst)
+				err = scanner.Scan(dst)
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, derefDest(dst))
+			})
+
+			t.Run("ScanRow "+tc.name, func(t *testing.T) {
+				rows, err := conn.DB.Query(tc.query)
+				require.NoError(t, err)
+				scanner := newScanner(rows, nil)
+				dst := allocDest(tc.expected)
+
+				defer scanner.Close()
+				for scanner.NextRow() {
+					err = scanner.ScanRow(dst)
+					require.NoError(t, err)
+				}
+				require.NoError(t, scanner.Err())
+
 				assert.Equal(t, tc.expected, derefDest(dst))
 			})
 		}
 	})
 }
 
-func TestScanner_NoRows(t *testing.T) {
+func TestScanner_Scan_no_rows(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		query := `SELECT NULL LIMIT 0`
 
 		t.Run("queryRow=false do not return error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newScanner(rows, nil)
-			require.NoError(t, err)
+			scanner := newScanner(rows, nil)
 			var tmp []string
 			err = scanner.Scan(&tmp)
 			require.NoError(t, err)
@@ -371,8 +390,7 @@ func TestScanner_NoRows(t *testing.T) {
 		t.Run("queryRow=true return error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newRowScanner(rows, nil)
-			require.NoError(t, err)
+			scanner := newRowScanner(rows, nil)
 			var tmp string
 			err = scanner.Scan(&tmp)
 			require.Error(t, err)
@@ -381,7 +399,7 @@ func TestScanner_NoRows(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanStructMissingFields(t *testing.T) {
+func TestScanner_Scan_struct_missing_fields(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		query := `
 		SELECT
@@ -401,8 +419,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 		t.Run("missing field error", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newRowScanner(rows, nil)
-			require.NoError(t, err)
+			scanner := newRowScanner(rows, nil)
 			var user User
 			err = scanner.Scan(&user)
 			require.Error(t, err)
@@ -419,8 +436,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newRowScanner(rows, &config{ignoreMissingFields: true})
-			require.NoError(t, err)
+			scanner := newRowScanner(rows, &config{ignoreMissingFields: true})
 			var user *User
 			err = scanner.Scan(&user)
 			require.NoError(t, err)
@@ -429,7 +445,7 @@ func TestScanner_ScanStructMissingFields(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanStructNested(t *testing.T) {
+func TestScanner_Scan_struct_nested(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		query := `
 		SELECT
@@ -469,8 +485,7 @@ func TestScanner_ScanStructNested(t *testing.T) {
 
 		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
-		scanner, err := newRowScanner(rows, nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(rows, nil)
 		var user User
 		err = scanner.Scan(&user)
 		require.NoError(t, err)
@@ -478,7 +493,7 @@ func TestScanner_ScanStructNested(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanStructEmbed(t *testing.T) {
+func TestScanner_Scan_struct_embed(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		query := `
 		SELECT
@@ -518,8 +533,7 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 
 		rows, err := conn.DB.Query(query)
 		require.NoError(t, err)
-		scanner, err := newRowScanner(rows, nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(rows, nil)
 		var user User
 		err = scanner.Scan(&user)
 		require.NoError(t, err)
@@ -527,7 +541,7 @@ func TestScanner_ScanStructEmbed(t *testing.T) {
 	})
 }
 
-func TestScanner_ScanMap(t *testing.T) {
+func TestScanner_Scan_map(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		query := `
 		SELECT
@@ -544,8 +558,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		t.Run("allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newRowScanner(rows, nil)
-			require.NoError(t, err)
+			scanner := newRowScanner(rows, nil)
 			user := make(map[string]any)
 			err = scanner.Scan(&user)
 			require.NoError(t, err)
@@ -555,8 +568,7 @@ func TestScanner_ScanMap(t *testing.T) {
 		t.Run("non allocated map", func(t *testing.T) {
 			rows, err := conn.DB.Query(query)
 			require.NoError(t, err)
-			scanner, err := newRowScanner(rows, nil)
-			require.NoError(t, err)
+			scanner := newRowScanner(rows, nil)
 			var user map[string]any
 			err = scanner.Scan(&user)
 			require.NoError(t, err)
@@ -565,10 +577,53 @@ func TestScanner_ScanMap(t *testing.T) {
 	})
 }
 
-func TestScanner_CheckDest(t *testing.T) {
-	newRows := func() *mock.Rows {
+type mockRows struct {
+	CloseFunc   func() error
+	ColumnsFunc func() ([]string, error)
+	ErrFunc     func() error
+	NextFunc    func() bool
+	ScanFunc    func(dest ...any) error
+}
+
+func (m *mockRows) Close() error {
+	if m.CloseFunc == nil {
+		return nil
+	}
+	return m.CloseFunc()
+}
+
+func (m *mockRows) Columns() ([]string, error) {
+	if m.ColumnsFunc == nil {
+		return nil, nil
+	}
+	return m.ColumnsFunc()
+}
+
+func (m *mockRows) Err() error {
+	if m.ErrFunc == nil {
+		return nil
+	}
+	return m.ErrFunc()
+}
+
+func (m *mockRows) Next() bool {
+	if m.NextFunc == nil {
+		return false
+	}
+	return m.NextFunc()
+}
+
+func (m *mockRows) Scan(dest ...any) error {
+	if m.ScanFunc == nil {
+		return nil
+	}
+	return m.ScanFunc(dest...)
+}
+
+func TestScanner_Scan_validate_dest(t *testing.T) {
+	newRows := func() *mockRows {
 		count := 0
-		return &mock.Rows{
+		return &mockRows{
 			ColumnsFunc: func() ([]string, error) {
 				return []string{"user"}, nil
 			},
@@ -591,117 +646,105 @@ func TestScanner_CheckDest(t *testing.T) {
 	errAddressable := "destination must be addressable"
 
 	t.Run("no ref to string", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m string
-		err = scanner.Scan(m)
+		err := scanner.Scan(m)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("no ref to pointer string", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m *string
-		err = scanner.Scan(m)
+		err := scanner.Scan(m)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to string", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m string
-		err = scanner.Scan(&m)
+		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to pointer string", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m *string
-		err = scanner.Scan(&m)
+		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to map", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m map[string]any
-		err = scanner.Scan(&m)
+		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("no ref to map", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m map[string]any
-		err = scanner.Scan(m)
+		err := scanner.Scan(m)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("no ref to slice", func(t *testing.T) {
-		scanner, err := newScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newScanner(newRows(), nil)
 		var s []string
-		err = scanner.Scan(s)
+		err := scanner.Scan(s)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to slice", func(t *testing.T) {
-		scanner, err := newScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newScanner(newRows(), nil)
 		var s []string
-		err = scanner.Scan(&s)
+		err := scanner.Scan(&s)
 		require.NoError(t, err)
 	})
 
 	t.Run("ref to interface", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		var m any
-		err = scanner.Scan(&m)
+		err := scanner.Scan(&m)
 		require.NoError(t, err)
 	})
 
 	t.Run("no ref to pointer struct", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), nil)
 		type User struct{}
 		var user *User
-		err = scanner.Scan(user)
+		err := scanner.Scan(user)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, errAddressable)
 	})
 
 	t.Run("ref to pointer struct", func(t *testing.T) {
-		scanner, err := newRowScanner(newRows(), nil)
-		scanner.ignoreMissingFields = true
-		require.NoError(t, err)
+		scanner := newRowScanner(newRows(), &config{ignoreMissingFields: true})
 		type User struct{}
 		var user *User
-		err = scanner.Scan(&user)
+		err := scanner.Scan(&user)
 		require.NoError(t, err)
 	})
 
 	t.Run("array", func(t *testing.T) {
-		scanner, err := newScanner(newRows(), nil)
-		require.NoError(t, err)
+		scanner := newScanner(newRows(), nil)
 		var arr [1]string
-		err = scanner.Scan(&arr)
+		err := scanner.Scan(&arr)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unsupported destination type")
 	})
 }
 
-func TestScanner_DuplicateColumns(t *testing.T) {
-	_, err := newScanner(&mock.Rows{
+func TestScanner_resolveColumns(t *testing.T) {
+	scanner := newScanner(&mockRows{
 		ColumnsFunc: func() ([]string, error) {
 			return []string{"user", "user"}, nil
 		},
 	}, nil)
+	err := scanner.resolveColumns()
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "duplicate column")
 }
@@ -742,8 +785,7 @@ func BenchmarkScan_MapSlice(b *testing.B) {
 		var m []map[string]any
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
 		require.NoError(b, err)
-		scanner, err := newScanner(rows, nil)
-		require.NoError(b, err)
+		scanner := newScanner(rows, nil)
 		err = scanner.Scan(&m)
 		require.NoError(b, err)
 		assert.Equal(b, 1000, len(m))
@@ -768,10 +810,41 @@ func BenchmarkScan_StructSlice(b *testing.B) {
 		var users []User
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
 		require.NoError(b, err)
-		scanner, err := newScanner(rows, nil)
-		require.NoError(b, err)
+		scanner := newScanner(rows, nil)
 		err = scanner.Scan(&users)
 		require.NoError(b, err)
+		assert.Equal(b, 1000, len(users))
+	}
+}
+
+// BenchmarkScan_StructSlice_manual-12    	    1017	   1216979 ns/op	  265769 B/op	    8710 allocs/op
+func BenchmarkScan_StructSlice_manual(b *testing.B) {
+	conn := testutil.GetMySQL(b)
+	require.NotNil(b, conn.DB)
+	th := setupTestTable(b, conn.DB)
+
+	type User struct {
+		Id        int
+		Name      *string
+		Age       *int
+		Username  string
+		CreatedAt time.Time
+	}
+
+	for b.Loop() {
+		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s"))
+		require.NoError(b, err)
+		scanner := newScanner(rows, nil)
+
+		var users []User
+		var user User
+		defer scanner.Close()
+		for scanner.NextRow() {
+			err = scanner.ScanRow(&user)
+			require.NoError(b, err)
+			users = append(users, user)
+		}
+		require.NoError(b, scanner.Err())
 		assert.Equal(b, 1000, len(users))
 	}
 }
@@ -786,8 +859,7 @@ func BenchmarkScan_Primitivelice(b *testing.B) {
 		var names []string
 		rows, err := conn.DB.Query(th.Fmt("SELECT name FROM %s"))
 		require.NoError(b, err)
-		scanner, err := newScanner(rows, nil)
-		require.NoError(b, err)
+		scanner := newScanner(rows, nil)
 		err = scanner.Scan(&names)
 		require.NoError(b, err)
 		assert.Equal(b, 1000, len(names))
@@ -812,8 +884,7 @@ func BenchmarkScan_Struct(b *testing.B) {
 		var user User
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s LIMIT 1"))
 		require.NoError(b, err)
-		scanner, err := newScanner(rows, nil)
-		require.NoError(b, err)
+		scanner := newRowScanner(rows, nil)
 		err = scanner.Scan(&user)
 		require.NoError(b, err)
 	}
@@ -829,8 +900,7 @@ func BenchmarkScan_Map(b *testing.B) {
 		m := make(map[string]any)
 		rows, err := conn.DB.Query(th.Fmt("SELECT * FROM %s LIMIT 1"))
 		require.NoError(b, err)
-		scanner, err := newScanner(rows, nil)
-		require.NoError(b, err)
+		scanner := newRowScanner(rows, nil)
 		err = scanner.Scan(&m)
 		require.NoError(b, err)
 	}

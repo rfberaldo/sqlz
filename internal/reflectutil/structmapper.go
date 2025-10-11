@@ -1,7 +1,6 @@
 package reflectutil
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 )
@@ -18,7 +17,7 @@ type structMapper struct {
 func StructFieldMap(structType reflect.Type, tag string, nameMapper func(string) string) map[string][]int {
 	structType = Deref(structType)
 	if structType.Kind() != reflect.Struct {
-		panic(fmt.Errorf("sqlz/reflectutil: reflect.Type must be a struct or pointer to struct, got %s", structType))
+		panic("sqlz/reflectutil: reflect.Type must be a struct, got " + structType.String())
 	}
 
 	sm := &structMapper{tag, nameMapper, make(map[string][]int)}
@@ -127,11 +126,11 @@ func FieldByIndex(v reflect.Value, index []int) reflect.Value {
 	}
 
 	if v.Kind() != reflect.Struct {
-		panic(fmt.Errorf("sqlz/reflectutil: reflect.Value must a struct: %s", v.Type()))
+		panic("sqlz/reflectutil: reflect.Value must a struct, got " + v.Type().String())
 	}
 
 	if !v.CanAddr() {
-		panic(fmt.Errorf("sqlz/reflectutil: reflect.Value must be an addressable struct: %s", v.Type()))
+		panic("sqlz/reflectutil: reflect.Value must be an addressable struct")
 	}
 
 	fv, err := v.FieldByIndexErr(index)

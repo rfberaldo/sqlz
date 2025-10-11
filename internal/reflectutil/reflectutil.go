@@ -20,6 +20,15 @@ const (
 	SliceStruct    = Slice | Struct
 )
 
+func (t Type) IsSlice() bool {
+	return t&Slice != 0
+}
+
+// IsPrimitive reports whether t is [Primitive] or [SlicePrimitive].
+func (t Type) IsPrimitive() bool {
+	return t&Primitive != 0
+}
+
 // TypeOfAny recursively returns the Type of arg, nil is considered Primitive.
 func TypeOfAny(arg any) Type {
 	return TypeOf(reflect.TypeOf(arg))
