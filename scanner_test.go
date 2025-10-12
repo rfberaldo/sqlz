@@ -458,8 +458,8 @@ func TestScanner_Scan_struct_nested(t *testing.T) {
 			'Dev'     AS profession_name`
 
 		type Profession struct {
-			ProfessionId   int
-			ProfessionName string
+			Id   int
+			Name string
 		}
 
 		type User struct {
@@ -478,8 +478,8 @@ func TestScanner_Scan_struct_nested(t *testing.T) {
 			Salary:   69420.42,
 			IsActive: true,
 			Profession: &Profession{
-				ProfessionId:   1,
-				ProfessionName: "Dev",
+				Id:   1,
+				Name: "Dev",
 			},
 		}
 

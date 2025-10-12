@@ -104,9 +104,7 @@ func (n *namedQuery) bindStructArgs(idents []string, argValue reflect.Value) err
 
 	if n.fieldIndexByKey == nil {
 		n.fieldIndexByKey = reflectutil.StructFieldMap(
-			argValue.Type(),
-			n.structTag,
-			n.fieldNameTransformer,
+			argValue.Type(), n.structTag, ".", n.fieldNameTransformer,
 		)
 	}
 

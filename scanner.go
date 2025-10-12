@@ -299,7 +299,7 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 
 	if s.fieldIndexByKey == nil {
 		s.fieldIndexByKey = reflectutil.StructFieldMap(
-			v.Type(), s.structTag, s.fieldNameTransformer,
+			v.Type(), s.structTag, "_", s.fieldNameTransformer,
 		)
 	}
 

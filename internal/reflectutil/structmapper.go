@@ -8,19 +8,21 @@ import (
 // structMapper is a helper to map struct fields index by tag/name.
 type structMapper struct {
 	tag        string
+	sep        string
 	nameMapper func(string) string
 	indexByKey map[string][]int
 }
 
 // StructFieldMap maps the structType fields, tag is the struct tag to search for,
-// and nameMapper is used to map field names in case the tag was not found.
-func StructFieldMap(structType reflect.Type, tag string, nameMapper func(string) string) map[string][]int {
+// sep is the sepatator for nested structs, and nameMapper transforms the
+// field name in case the tag was not found.
+func StructFieldMap(structType reflect.Type, tag, sep string, nameMapper func(string) string) map[string][]int {
 	structType = Deref(structType)
 	if structType.Kind() != reflect.Struct {
 		panic("sqlz/reflectutil: reflect.Type must be a struct, got " + structType.String())
 	}
 
-	sm := &structMapper{tag, nameMapper, make(map[string][]int)}
+	sm := &structMapper{tag, sep, nameMapper, make(map[string][]int)}
 	sm.traverse(structType)
 
 	return sm.indexByKey
@@ -71,51 +73,46 @@ func (sm *structMapper) traverse(t reflect.Type) {
 				continue
 			}
 
-			name, ok := FieldTag(field, sm.tag)
-			if !ok {
+			name, inline := fieldTag(field, sm.tag)
+			if name == "" {
 				name = sm.nameMapper(field.Name)
 			}
 
 			curr.index = append(curr.index, field.Index...)
-			curr.path = append(curr.path, name)
+			if !field.Anonymous && !inline {
+				curr.path = append(curr.path, name)
 
-			if fieldType.Kind() == reflect.Struct {
-				queue = append(queue, curr)
-
-				if field.Anonymous {
-					continue
+				key := strings.Join(curr.path, sm.sep)
+				if _, exists := sm.indexByKey[key]; !exists {
+					sm.indexByKey[key] = curr.index
 				}
 			}
 
-			if _, exists := sm.indexByKey[name]; !exists {
-				sm.indexByKey[name] = curr.index
-			}
-
-			key := strings.Join(curr.path, ".")
-			if _, exists := sm.indexByKey[key]; !exists {
-				sm.indexByKey[key] = curr.index
+			if fieldType.Kind() == reflect.Struct {
+				queue = append(queue, curr)
 			}
 		}
 	}
 }
 
-// FieldTag returns the tag from a struct field, removing any optional args.
-func FieldTag(field reflect.StructField, structTag string) (string, bool) {
-	tagValue, ok := field.Tag.Lookup(structTag)
-	if !ok {
-		return "", false
-	}
+func fieldTag(field reflect.StructField, structTag string) (tag string, inline bool) {
+	tag = field.Tag.Get(structTag)
+
+	// test with >= 1 in case of a tag named "inline"
+	inline = strings.LastIndex(tag, "inline") >= 1
 
 	// check for possible comma as in "...,omitempty"
-	if i := strings.Index(tagValue, ","); i > -1 {
-		tagValue = tagValue[:i]
+	if i := strings.Index(tag, ","); i > -1 {
+		tag = tag[:i]
 	}
 
-	if tagValue != "" && tagValue != "-" {
-		return tagValue, true
+	// don't want to ignore "-" like [json.Marshall], some users may use "json"
+	// tag but still want to scan from database.
+	if tag == "-" {
+		return "", inline
 	}
 
-	return "", false
+	return tag, inline
 }
 
 // FieldByIndex returns the struct field from v, initializing any nested nil pointers.

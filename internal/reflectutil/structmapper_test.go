@@ -10,9 +10,14 @@ import (
 )
 
 func TestStructFieldMap(t *testing.T) {
+	type Job struct {
+		JobName string
+	}
+
 	type Person struct {
 		Id         int    `json:",omitempty"`
 		Name       string `json:",omitempty"`
+		Job        Job
 		unexported string
 	}
 
@@ -23,23 +28,46 @@ func TestStructFieldMap(t *testing.T) {
 		Active    bool      `json:",omitempty"`
 		Parent    *Person   `json:",omitempty"`
 		CreatedAt time.Time `json:"created_at,omitzero"`
+		Job
 	}
 
 	expect := map[string][]int{
-		"person.id":   {0, 0},
-		"person.name": {0, 1},
-		"id":          {0, 0},
-		"name":        {0, 1},
-		"user_id":     {1},
-		"username":    {2},
-		"active":      {3},
-		"parent":      {4},
-		"parent.id":   {4, 0},
-		"parent.name": {4, 1},
-		"created_at":  {5},
+		"user_id":            {1},
+		"username":           {2},
+		"active":             {3},
+		"parent":             {4},
+		"created_at":         {5},
+		"id":                 {0, 0},
+		"name":               {0, 1},
+		"job":                {0, 2},
+		"parent.id":          {4, 0},
+		"parent.name":        {4, 1},
+		"parent.job":         {4, 2},
+		"jobname":            {6, 0},
+		"job.jobname":        {0, 2, 0},
+		"parent.job.jobname": {4, 2, 0},
 	}
 
-	got := StructFieldMap(reflect.TypeFor[User](), "json", strings.ToLower)
+	got := StructFieldMap(reflect.TypeFor[User](), "json", ".", strings.ToLower)
+	assert.Equal(t, expect, got)
+}
+
+func TestStructFieldMap_inline(t *testing.T) {
+	type Person struct {
+		Name string `json:"person_name"`
+	}
+
+	type User struct {
+		Id     int
+		Parent *Person `json:",inline"`
+	}
+
+	expect := map[string][]int{
+		"id":          {0},
+		"person_name": {1, 0},
+	}
+
+	got := StructFieldMap(reflect.TypeFor[User](), "json", "_", strings.ToLower)
 	assert.Equal(t, expect, got)
 }
 
@@ -59,7 +87,7 @@ func TestStructFieldMap_circular(t *testing.T) {
 		expect[key] = idx
 	}
 
-	got := StructFieldMap(reflect.TypeFor[Person](), "json", strings.ToLower)
+	got := StructFieldMap(reflect.TypeFor[Person](), "json", ".", strings.ToLower)
 	assert.Equal(t, 255, len(got))
 	assert.Equal(t, expect, got)
 }
@@ -113,52 +141,87 @@ func TestFieldByIndex(t *testing.T) {
 
 func TestFieldTag(t *testing.T) {
 	type Sample struct {
-		NoTag      string
-		WithTag    string `db:"colname"`
-		WithOmit   string `db:"omitme,omitempty"`
-		WithIgnore string `db:"-"`
-		EmptyTag   string `db:""`
+		NoTag          string
+		WithTag        string `json:"colname"`
+		WithOmit       string `json:"colname2,omitempty"`
+		NoTagWithOmit  string `json:",omitempty"`
+		WithInline     string `json:",omitempty,inline"`
+		InlineEdgeCase string `json:"inline"`
+		WithIgnore     string `json:"-"`
+		EmptyTag       string `json:""`
+	}
+
+	type InlineEdgeCase struct {
+		Field string `json:"inline,inline"`
 	}
 
 	typ := reflect.TypeOf(Sample{})
 
 	t.Run("tag not found", func(t *testing.T) {
 		f, _ := typ.FieldByName("NoTag")
-		tag, ok := FieldTag(f, "db")
-		assert.False(t, ok)
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
 		assert.Empty(t, tag)
 	})
 
 	t.Run("tag found", func(t *testing.T) {
 		f, _ := typ.FieldByName("WithTag")
-		tag, ok := FieldTag(f, "db")
-		assert.True(t, ok)
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
 		assert.Equal(t, "colname", tag)
 	})
 
 	t.Run("tag with omitempty", func(t *testing.T) {
 		f, _ := typ.FieldByName("WithOmit")
-		tag, ok := FieldTag(f, "db")
-		assert.True(t, ok)
-		assert.Equal(t, "omitme", tag)
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
+		assert.Equal(t, "colname2", tag)
+	})
+
+	t.Run("tag with omitempty", func(t *testing.T) {
+		f, _ := typ.FieldByName("NoTagWithOmit")
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
+		assert.Empty(t, tag)
+	})
+
+	t.Run("tag with inline", func(t *testing.T) {
+		f, _ := typ.FieldByName("WithInline")
+		tag, inline := fieldTag(f, "json")
+		assert.True(t, inline)
+		assert.Empty(t, tag)
+	})
+
+	t.Run("inline edge case 1", func(t *testing.T) {
+		f, _ := typ.FieldByName("InlineEdgeCase")
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
+		assert.Equal(t, "inline", tag)
+	})
+
+	t.Run("inline edge case 2", func(t *testing.T) {
+		f, _ := reflect.TypeFor[InlineEdgeCase]().FieldByName("Field")
+		tag, inline := fieldTag(f, "json")
+		assert.True(t, inline)
+		assert.Equal(t, "inline", tag)
 	})
 
 	t.Run("tag with dash", func(t *testing.T) {
 		f, _ := typ.FieldByName("WithIgnore")
-		tag, ok := FieldTag(f, "db")
-		assert.False(t, ok)
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
 		assert.Empty(t, tag)
 	})
 
 	t.Run("tag empty string", func(t *testing.T) {
 		f, _ := typ.FieldByName("EmptyTag")
-		tag, ok := FieldTag(f, "db")
-		assert.False(t, ok)
+		tag, inline := fieldTag(f, "json")
+		assert.False(t, inline)
 		assert.Empty(t, tag)
 	})
 }
 
-// BenchmarkStructFieldMap-12    	  450322	      2478 ns/op	    2112 B/op	      44 allocs/op
+// BenchmarkStructFieldMap-12    	  655912	      1621 ns/op	    1272 B/op	      38 allocs/op
 func BenchmarkStructFieldMap(b *testing.B) {
 	type Person struct {
 		Name    string
@@ -177,6 +240,6 @@ func BenchmarkStructFieldMap(b *testing.B) {
 
 	for b.Loop() {
 		var user User
-		_ = StructFieldMap(reflect.TypeOf(user), "json", strings.ToLower)
+		_ = StructFieldMap(reflect.TypeOf(user), "json", ".", strings.ToLower)
 	}
 }
