@@ -2,6 +2,7 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
+	base: '/sqlz/',
 	title: "sqlz",
 	description: "sqlz is a lightweight, dependency-free Go library that extends the standard database/sql package with named queries, scanning, and batch operations with a simple API",
 	themeConfig: {
