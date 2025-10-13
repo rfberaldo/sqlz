@@ -160,14 +160,14 @@ func (s *Scanner) scanAll(dest any) (err error) {
 			return err
 		}
 		rowCount++
+
+		if s.queryRow && rowCount > 1 {
+			return fmt.Errorf("sqlz/scan: expected one row, got more")
+		}
 	}
 
 	if err := s.rows.Err(); err != nil {
-		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
-	}
-
-	if s.queryRow && rowCount > 1 {
-		return fmt.Errorf("sqlz/scan: expected one row, got %d", rowCount)
+		return fmt.Errorf("sqlz/scan: preparing next row: %w", err)
 	}
 
 	if s.queryRow && rowCount == 0 {
@@ -229,10 +229,6 @@ func (s *Scanner) scan(dest ...any) error {
 }
 
 func (s *Scanner) scanMap(dest any) error {
-	if dest == nil {
-		dest = make(map[string]any)
-	}
-
 	m, errMap := assertMap(dest)
 	if errMap != nil {
 		return errMap
@@ -357,7 +353,7 @@ func (s *Scanner) Err() error {
 		return s.err
 	}
 	if err := s.rows.Err(); err != nil {
-		return fmt.Errorf("sqlz/scan: preparing rows: %w", err)
+		return fmt.Errorf("sqlz/scan: preparing next row: %w", err)
 	}
 	return nil
 }

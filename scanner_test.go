@@ -399,6 +399,37 @@ func TestScanner_Scan_no_rows(t *testing.T) {
 	})
 }
 
+func TestScanner_Scan_multiple_rows(t *testing.T) {
+	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
+		query := `
+			SELECT *
+			FROM (
+				SELECT 'val1'
+				UNION ALL
+				SELECT 'val2'
+			) AS t (foo)`
+
+		t.Run("queryRow=false do not return error", func(t *testing.T) {
+			rows, err := conn.DB.Query(query)
+			require.NoError(t, err)
+			scanner := newScanner(rows, nil)
+			var tmp []string
+			err = scanner.Scan(&tmp)
+			require.NoError(t, err)
+		})
+
+		t.Run("queryRow=true return error", func(t *testing.T) {
+			rows, err := conn.DB.Query(query)
+			require.NoError(t, err)
+			scanner := newRowScanner(rows, nil)
+			var tmp string
+			err = scanner.Scan(&tmp)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "expected one row")
+		})
+	})
+}
+
 func TestScanner_Scan_struct_missing_fields(t *testing.T) {
 	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
 		query := `
@@ -728,25 +759,81 @@ func TestScanner_Scan_validate_dest(t *testing.T) {
 		err := scanner.Scan(&user)
 		require.NoError(t, err)
 	})
+}
 
-	t.Run("array", func(t *testing.T) {
-		scanner := newScanner(newRows(), nil)
-		var arr [1]string
-		err := scanner.Scan(&arr)
+func TestScanner_resolveDestType(t *testing.T) {
+	t.Run("unsupported destination", func(t *testing.T) {
+		scanner := newScanner(&mockRows{}, nil)
+		err := scanner.resolveDestType(new([1]string))
 		require.Error(t, err)
-		assert.ErrorContains(t, err, "unsupported destination type")
+		assert.ErrorContains(t, err, "unsupported destination")
+	})
+
+	t.Run("must be slice", func(t *testing.T) {
+		scanner := newScanner(&mockRows{}, nil)
+		err := scanner.resolveDestType(new(string))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "destination must be a slice")
+	})
+
+	t.Run("primitive expects 1 column", func(t *testing.T) {
+		scanner := newScanner(&mockRows{
+			ColumnsFunc: func() ([]string, error) {
+				return []string{"col1", "col2"}, nil
+			},
+		}, nil)
+		scanner.queryRow = true
+		err := scanner.resolveDestType(new(string))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "query must return 1 column")
+	})
+
+	t.Run("primitive slice expects 1 column", func(t *testing.T) {
+		scanner := newScanner(&mockRows{
+			ColumnsFunc: func() ([]string, error) {
+				return []string{"col1", "col2"}, nil
+			},
+		}, nil)
+		scanner.queryRow = true
+		err := scanner.resolveDestType(new([]string))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "query must return 1 column")
 	})
 }
 
 func TestScanner_resolveColumns(t *testing.T) {
-	scanner := newScanner(&mockRows{
-		ColumnsFunc: func() ([]string, error) {
-			return []string{"user", "user"}, nil
-		},
-	}, nil)
-	err := scanner.resolveColumns()
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "duplicate column")
+	t.Run("columns error", func(t *testing.T) {
+		scanner := newScanner(&mockRows{
+			ColumnsFunc: func() ([]string, error) {
+				return nil, assert.AnError
+			},
+		}, nil)
+		err := scanner.resolveColumns()
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "getting column names")
+	})
+
+	t.Run("no rows", func(t *testing.T) {
+		scanner := newScanner(&mockRows{
+			ColumnsFunc: func() ([]string, error) {
+				return []string{}, nil
+			},
+		}, nil)
+		err := scanner.resolveColumns()
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "no columns")
+	})
+
+	t.Run("duplicate columns", func(t *testing.T) {
+		scanner := newScanner(&mockRows{
+			ColumnsFunc: func() ([]string, error) {
+				return []string{"user", "user"}, nil
+			},
+		}, nil)
+		err := scanner.resolveColumns()
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "duplicate column")
+	})
 }
 
 func setupTestTable(t testing.TB, db *sql.DB) *testutil.TableHelper {
