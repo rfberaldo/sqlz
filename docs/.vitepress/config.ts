@@ -5,6 +5,10 @@ export default defineConfig({
 	base: '/sqlz/',
 	title: "sqlz",
 	description: "sqlz is a lightweight, dependency-free Go library that extends the standard database/sql package with named queries, scanning, and batch operations with a simple API",
+	head: [
+    ['meta', { name: 'google-site-verification', content: 'vuU8vXfk8Vj7wSnkqwk4UoviK1jF5elT04-Fk2PxhDk' }],
+  ],
+
 	themeConfig: {
 		// https://vitepress.dev/reference/default-theme-config
 		nav: [
