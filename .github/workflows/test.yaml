@@ -1,11 +1,11 @@
-name: Test
+name: test
 
 on:
   push:
-    paths-ignore: [benchmarks/**]
+    paths-ignore: [benchmarks/**, docs/**]
     branches: [master]
   pull_request:
-    paths-ignore: [benchmarks/**]
+    paths-ignore: [benchmarks/**, docs/**]
     branches: [master]
 
 jobs:
@@ -45,16 +45,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
+    - uses: actions/setup-go@v4
       with:
         go-version: ${{ matrix.go-version }}
 
-    - name: Vet
-      run: go vet ./...
+    - run: go vet ./...
 
-    - name: Test
+    - run: go test -v -race ./...
       env:
         MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/mysql?parseTime=True
         POSTGRES_DSN: postgres://postgres:root@127.0.0.1:5432/postgres?sslmode=disable
-      run: go test -v -race ./...
