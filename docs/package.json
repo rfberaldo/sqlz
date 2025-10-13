@@ -6,7 +6,7 @@
     "build": "vitepress build",
     "preview": "vitepress preview"
   },
-    "devDependencies": {
+  "devDependencies": {
     "vitepress": "^2.0.0-alpha.12"
   }
 }

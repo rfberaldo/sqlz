@@ -6,35 +6,35 @@ outline: [2,3]
 
 **sqlz** can automatically scan query rows into primitives, structs, maps and slices.
 
-[Scanner](https://pkg.go.dev/github.com/rfberaldo/sqlz#Scanner) returns from both `Query()` and `QueryRow()`, and it's similar to [sql.Rows](https://pkg.go.dev/database/sql#Rows).
-Query errors are deferred to scanner, making it easy to chain methods.
+[Scanner](https://pkg.go.dev/github.com/rfberaldo/sqlz#Scanner) is returned by both `Query()` and `QueryRow()`, and it's similar to [sql.Rows](https://pkg.go.dev/database/sql#Rows).
+Query errors are deferred to the scanner, making it easy to chain methods.
 
 > [!IMPORTANT]
 > 1. Scanner behaves differently depending on whether it was called from `Query()` or `QueryRow()`.
-> 2. Scanner will not empty the slice before scanning, previously data will be kept.
+> 2. Scanner will not empty the slice before scanning, previous data will be kept.
 > 3. Scanner holds the connection until `Scan()` or `Close()` is called, so always call one of them to avoid leaking connections.
 
 ## Query Scanner
 
 ### Automatic
 
-`Scan()` automatically iterate over rows and scans into destination, it expects a slice as destination.
+`Scan()` automatically iterates over rows and scans into destination; it expects a slice as destination.
 If the query results are empty, the slice remains unchanged and no error is returned.
 
 ```go
 var users []User
-err := db.Query(ctx, "SELECT * FROM user").Scan(&name)
+err := db.Query(ctx, "SELECT * FROM user").Scan(&users)
 ...
 // users variable now contains data from query
 ```
 
 ### Manual
 
-`ScanRow()` and `NextRow()` gives you more control over the scanning, specially useful if you don't want or need to allocate the entire slice.
-For example, if you only need a single row from the table to process something:
+`ScanRow()` and `NextRow()` give you more control over the scanning, especially useful when you want to avoid allocating an entire slice.
+For example, if you only need a single row from the table at a time:
 
 ```go
-// logs might have million rows
+// logs might have millions of rows
 scanner := db.Query(ctx, "SELECT * FROM logs")
 
 // check for deferred query error
@@ -59,7 +59,7 @@ err = scanner.Err()
 
 ## QueryRow Scanner
 
-`Scan()` automatically iterate over rows and scans at max one row into destination.
+`Scan()` automatically iterates over rows and scans at most one row into destination.
 If the query results are empty, it returns [sql.ErrNoRows](https://pkg.go.dev/database/sql#ErrNoRows).
 
 ```go
@@ -79,11 +79,11 @@ Scanning into a struct is straightforward, but there are a few details to keep i
 
 ### Field key
 
-To find the key of a struct field, it first try to find the **"db"** tag,
+To get the key of a struct field, it first tries to find the **"db"** tag;
 if it's not present, it then transforms the field name to snake case.
 
 > [!IMPORTANT]
-> Note that the field must be exported/public in order for **sqlz** to access them, just like [json.Marshall](https://pkg.go.dev/encoding/json#Marshal), and any other marshaller in Go.
+> Note that the fields must be exported/public in order for **sqlz** to access them, just like [json.Marshal](https://pkg.go.dev/encoding/json#Marshal), and any other marshaler in Go.
 
 ```go
 type User struct {
@@ -125,7 +125,7 @@ Product.Category.Name // mapped as 'category_name'
 ```
 
 > [!NOTE]
-> - Embed fields are not prefixed.
+> - Embedded fields are not prefixed.
 > - When mapping from database, separator is an underscore.
 > - When mapping from named query, separator is a dot.
 

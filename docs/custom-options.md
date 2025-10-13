@@ -1,6 +1,7 @@
 # Custom options
 
-To set a custom options, use [Options](https://pkg.go.dev/github.com/rfberaldo/sqlz#Options) object with the `New()` constructor, any option can be left blank for defaults:
+To set custom options, use the [Options](https://pkg.go.dev/github.com/rfberaldo/sqlz#Options) object with the `New()` constructor.
+Any option can be left blank for defaults:
 
 ```go
 pool, err := sql.Open("sqlite3", ":memory:")

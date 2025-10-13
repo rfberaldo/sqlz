@@ -4,10 +4,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rfberaldo/sqlz)](https://goreportcard.com/report/github.com/rfberaldo/sqlz)
 [![Codecov](https://codecov.io/github/rfberaldo/sqlz/graph/badge.svg?token=RQI8TCN1IO)](https://codecov.io/github/rfberaldo/sqlz)
 [![Go Reference](https://pkg.go.dev/badge/github.com/rfberaldo/sqlz.svg)](https://pkg.go.dev/github.com/rfberaldo/sqlz)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
-**sqlz** is a lightweight, dependency-free Go library that extends the standard [database/sql](https://pkg.go.dev/database/sql) package with named queries, scanning, and batch operations with a simple API.
+**sqlz** is a lightweight, dependency-free Go library that extends the standard [database/sql](https://pkg.go.dev/database/sql) package with named queries, scanning, and batch operations, while having a simple API.
 
-> Guide documentation: https://rfberaldo.github.io/sqlz/.
+> Documentation: https://rfberaldo.github.io/sqlz/.
 
 ## Getting started
 
@@ -33,13 +34,13 @@ db := sqlz.New("sqlite3", pool, nil)
 ## Examples
 
 > [!NOTE]
-> Error handling is omitted for brevity of the examples.
+> For brevity of the examples, error handling is omitted.
 
 ### Standard query
 
 ```go
 var users []User
-db.Query(ctx, "SELECT * FROM user WHERE active = ?", true).Scan(&name)
+db.Query(ctx, "SELECT * FROM user WHERE active = ?", true).Scan(&users)
 // users variable now contains data from query
 ```
 
@@ -78,7 +79,7 @@ db.Exec(ctx, "INSERT INTO user (name, email) VALUES (:name, :email)", users)
 ## Comparison with [sqlx](https://github.com/jmoiron/sqlx)
 
 - It was designed with a simpler API for everyday use, with fewer concepts and less verbose.
-- It has full support for UTF-8 in named queries.
+- It has full support for UTF-8/multilingual named queries.
 
 ### Performance
 

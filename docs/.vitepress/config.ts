@@ -8,6 +8,10 @@ export default defineConfig({
 	head: [
     ['meta', { name: 'google-site-verification', content: 'vuU8vXfk8Vj7wSnkqwk4UoviK1jF5elT04-Fk2PxhDk' }],
   ],
+	cleanUrls: true,
+	sitemap: {
+    hostname: 'https://rfberaldo.github.io/sqlz/'
+  },
 
 	themeConfig: {
 		// https://vitepress.dev/reference/default-theme-config

@@ -30,7 +30,7 @@ Typically, you start a connection once and don't have to close it.
 
 ```go
 var users []User
-db.Query(ctx, "SELECT * FROM user WHERE active = ?", true).Scan(&name)
+db.Query(ctx, "SELECT * FROM user WHERE active = ?", true).Scan(&users)
 // users variable now contains data from query
 ```
 
