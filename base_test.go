@@ -231,7 +231,7 @@ func TestBase_queryRow(t *testing.T) {
 			Created  time.Time `db:"created_at"`
 		}
 
-		t.Run("get without args should perform a regular query", func(t *testing.T) {
+		t.Run("queryRow without args should perform a regular query", func(t *testing.T) {
 			expected := User{1, "Alice", 18, true, ts}
 			var user User
 			q := th.Fmt("SELECT * FROM %s LIMIT 1")
@@ -240,7 +240,7 @@ func TestBase_queryRow(t *testing.T) {
 			assert.Equal(t, expected, user)
 		})
 
-		t.Run("get should work with multiple default placeholders", func(t *testing.T) {
+		t.Run("queryRow should work with multiple default placeholders", func(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = ? AND active = ?`)
 			var user User
@@ -249,7 +249,7 @@ func TestBase_queryRow(t *testing.T) {
 			assert.Equal(t, expected, user)
 		})
 
-		t.Run("get should parse IN clause using default placeholder", func(t *testing.T) {
+		t.Run("queryRow should parse IN clause using default placeholder", func(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (?)`)
 			var user User
@@ -259,7 +259,7 @@ func TestBase_queryRow(t *testing.T) {
 			assert.Equal(t, expected, user)
 		})
 
-		t.Run("get should work with struct named arg", func(t *testing.T) {
+		t.Run("queryRow should work with struct named arg", func(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var user User
@@ -269,7 +269,7 @@ func TestBase_queryRow(t *testing.T) {
 			assert.Equal(t, expected, user)
 		})
 
-		t.Run("get should work with map named arg", func(t *testing.T) {
+		t.Run("queryRow should work with map named arg", func(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id = :id`)
 			var user User
@@ -279,7 +279,7 @@ func TestBase_queryRow(t *testing.T) {
 			assert.Equal(t, expected, user)
 		})
 
-		t.Run("get should parse IN clause using named arg", func(t *testing.T) {
+		t.Run("queryRow should parse IN clause using named arg", func(t *testing.T) {
 			expected := User{2, "Rob", 38, true, ts}
 			q := th.Fmt(`SELECT * FROM %s WHERE id IN (:ids)`)
 			var user User
@@ -289,7 +289,7 @@ func TestBase_queryRow(t *testing.T) {
 			assert.Equal(t, expected, user)
 		})
 
-		t.Run("get should return sql.ErrNoRows if no result", func(t *testing.T) {
+		t.Run("queryRow should return sql.ErrNoRows if no result", func(t *testing.T) {
 			q := th.Fmt(`SELECT * FROM %s WHERE id = 42`)
 			var user User
 			err = base.queryRow(ctx, conn.DB, q).Scan(&user)
@@ -297,7 +297,7 @@ func TestBase_queryRow(t *testing.T) {
 			require.ErrorIs(t, err, sql.ErrNoRows)
 		})
 
-		t.Run("get should return correct error if value is null", func(t *testing.T) {
+		t.Run("queryRow should return correct error if value is null", func(t *testing.T) {
 			q := th.Fmt(`INSERT INTO %s (id, username, age, active, created_at) VALUES (?,?,?,?,?)`)
 			_, err = conn.DB.Exec(q, 100, nil, 18, true, ts)
 			require.NoError(t, err)
