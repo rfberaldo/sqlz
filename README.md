@@ -1,6 +1,6 @@
 # sqlz
 
-[![Tests Status](https://github.com/rfberaldo/sqlz/actions/workflows/test.yaml/badge.svg?branch=master)](https://github.com/rfberaldo/sqlz/actions/workflows/test.yaml)
+[![Test Status](https://github.com/rfberaldo/sqlz/actions/workflows/test.yaml/badge.svg)](https://github.com/rfberaldo/sqlz/actions/workflows/test.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rfberaldo/sqlz)](https://goreportcard.com/report/github.com/rfberaldo/sqlz)
 [![Codecov](https://codecov.io/github/rfberaldo/sqlz/graph/badge.svg?token=RQI8TCN1IO)](https://codecov.io/github/rfberaldo/sqlz)
 [![Go Reference](https://pkg.go.dev/badge/github.com/rfberaldo/sqlz.svg)](https://pkg.go.dev/github.com/rfberaldo/sqlz)

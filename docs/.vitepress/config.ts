@@ -44,7 +44,7 @@ export default defineConfig({
 		],
 
 		editLink: {
-      pattern: 'https://github.com/rfberaldo/sqlz/edit/master/docs/:path',
+      pattern: 'https://github.com/rfberaldo/sqlz/edit/main/docs/:path',
     },
 
 		search: {
