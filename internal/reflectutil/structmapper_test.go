@@ -77,7 +77,7 @@ func TestStructFieldMap_circular(t *testing.T) {
 	}
 
 	expect := make(map[string][]int)
-	for i := range 255 {
+	for i := range maxCircular {
 		key := "parent"
 		idx := []int{0}
 		for range i {
@@ -88,7 +88,7 @@ func TestStructFieldMap_circular(t *testing.T) {
 	}
 
 	got := StructFieldMap(reflect.TypeFor[Person](), "json", ".", strings.ToLower)
-	assert.Equal(t, 255, len(got))
+	assert.Equal(t, maxCircular, len(got))
 	assert.Equal(t, expect, got)
 }
 
@@ -239,7 +239,18 @@ func BenchmarkStructFieldMap(b *testing.B) {
 	}
 
 	for b.Loop() {
-		var user User
-		_ = StructFieldMap(reflect.TypeOf(user), "json", ".", strings.ToLower)
+		_ = StructFieldMap(reflect.TypeFor[User](), "json", ".", strings.ToLower)
+	}
+}
+
+// BenchmarkStructFieldMap_circular-8   	   45915	     29806 ns/op	    6992 B/op	      97 allocs/op
+func BenchmarkStructFieldMap_circular(b *testing.B) {
+	type Person struct {
+		Name   string
+		Parent *Person
+	}
+
+	for b.Loop() {
+		_ = StructFieldMap(reflect.TypeFor[Person](), "json", ".", strings.ToLower)
 	}
 }

@@ -42,9 +42,11 @@ func (n *node) spawn(t reflect.Type) node {
 	}
 }
 
+const maxCircular = 10
+
 // traverse maps the struct field indexes, using BFS algorithm starting on t.
 func (sm *structMapper) traverse(t reflect.Type) {
-	visited := make(map[reflect.Type]uint8)
+	visited := make(map[reflect.Type]int8)
 	queue := append(
 		make([]node, 0, t.NumField()),
 		node{t, make([]string, 0, 1), make([]int, 0, 1)},
@@ -54,7 +56,7 @@ func (sm *structMapper) traverse(t reflect.Type) {
 		parent := queue[0]
 		queue = queue[1:]
 
-		if count := visited[parent.t]; count == 255 {
+		if count := visited[parent.t]; count == maxCircular {
 			continue
 		}
 
