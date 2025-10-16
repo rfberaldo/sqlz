@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/rfberaldo/sqlz/internal/parser"
-	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -151,7 +150,7 @@ func TestProcessNamed(t *testing.T) {
 		{
 			name:             "nested struct with field pointers",
 			inputQuery:       "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address.city",
-			inputArg:         nestedStructWithPointers{ID: 1, Name: testutil.PtrTo("Alice"), Address: &address{City: "Wonderland"}},
+			inputArg:         nestedStructWithPointers{ID: 1, Name: ptrTo("Alice"), Address: &address{City: "Wonderland"}},
 			structTag:        "db",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2 AND address.city = @p3",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address.city",
@@ -163,7 +162,7 @@ func TestProcessNamed(t *testing.T) {
 		{
 			name:             "nested nil struct",
 			inputQuery:       "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address",
-			inputArg:         nestedStructWithPointers{ID: 1, Name: testutil.PtrTo("Alice")},
+			inputArg:         nestedStructWithPointers{ID: 1, Name: ptrTo("Alice")},
 			structTag:        "db",
 			expectedAt:       "SELECT * FROM user WHERE id = @p1 AND name = @p2 AND address.city = @p3",
 			expectedColon:    "SELECT * FROM user WHERE id = :id AND name = :name AND address.city = :address",

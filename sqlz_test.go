@@ -1,4 +1,4 @@
-package sqlz_test
+package sqlz
 
 import (
 	"context"
@@ -7,9 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rfberaldo/sqlz"
 	"github.com/rfberaldo/sqlz/internal/parser"
-	"github.com/rfberaldo/sqlz/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,9 +16,9 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	db := sqlz.New("sqlite3", &sql.DB{}, nil)
+	db := New("sqlite3", &sql.DB{}, nil)
 	assert.NotNil(t, db)
-	assert.IsType(t, &sqlz.DB{}, db)
+	assert.IsType(t, &DB{}, db)
 }
 
 func TestNew_panic(t *testing.T) {
@@ -28,18 +26,18 @@ func TestNew_panic(t *testing.T) {
 		assert.Contains(t, recover(), "unable to find bind")
 	}()
 
-	sqlz.New("wrongdriver", &sql.DB{}, nil)
+	New("wrongdriver", &sql.DB{}, nil)
 }
 
 func TestConnect_wrong_driver(t *testing.T) {
-	_, err := sqlz.Connect("wrongdriver", ":memory:")
+	_, err := Connect("wrongdriver", ":memory:")
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "unknown driver")
 }
 
 func TestDB_basic(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, nil)
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
 		var err error
 		var s string
 		var ss []string
@@ -72,8 +70,8 @@ func TestDB_basic(t *testing.T) {
 }
 
 func TestDB_deferred_query_error(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, nil)
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
 		query := "SELECT wrongquery"
 
 		scanner := db.Query(ctx, query)
@@ -99,10 +97,10 @@ func TestDB_deferred_query_error(t *testing.T) {
 }
 
 func TestDB_context_cancellation(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, nil)
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
 		q := "SELECT SLEEP(1)"
-		if conn.Bind == parser.BindDollar {
+		if conn.bind == parser.BindDollar {
 			q = "SELECT PG_SLEEP(1)"
 		}
 
@@ -163,10 +161,10 @@ func TestDB_context_cancellation(t *testing.T) {
 }
 
 func TestTx_context_cancellation(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, nil)
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
 		q := "SELECT SLEEP(1)"
-		if conn.Bind == parser.BindDollar {
+		if conn.bind == parser.BindDollar {
 			q = "SELECT PG_SLEEP(1)"
 		}
 
@@ -251,11 +249,11 @@ func TestTx_context_cancellation(t *testing.T) {
 }
 
 func TestTx_commit_rollback(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, nil)
-		th := testutil.NewTableHelper(t, conn.DB, conn.Bind)
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
+		th := newTableHelper(t, conn.db, conn.bind)
 
-		_, err := db.Exec(ctx, th.Fmt(`
+		_, err := db.Exec(ctx, th.fmt(`
 			CREATE TABLE IF NOT EXISTS %s (
 				id INT PRIMARY KEY,
 				name VARCHAR(255),
@@ -265,7 +263,7 @@ func TestTx_commit_rollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		t.Run("tx should commit", func(t *testing.T) {
-			q := th.Fmt(`INSERT INTO %s (id, name, age) VALUES (?,?,?),(?,?,?),(?,?,?)`)
+			q := th.fmt(`INSERT INTO %s (id, name, age) VALUES (?,?,?),(?,?,?),(?,?,?)`)
 
 			func() {
 				tx, err := db.Begin(ctx)
@@ -287,17 +285,17 @@ func TestTx_commit_rollback(t *testing.T) {
 			}()
 
 			var count int
-			err = db.QueryRow(ctx, th.Fmt("SELECT count(1) FROM %s")).Scan(&count)
+			err = db.QueryRow(ctx, th.fmt("SELECT count(1) FROM %s")).Scan(&count)
 			assert.NoError(t, err)
 			assert.Equal(t, 3, count)
 
 			// clean up
-			_, err := db.Exec(ctx, th.Fmt("DELETE FROM %s"))
+			_, err := db.Exec(ctx, th.fmt("DELETE FROM %s"))
 			assert.NoError(t, err)
 		})
 
 		t.Run("tx should rollback using defer", func(t *testing.T) {
-			q := th.Fmt(`INSERT INTO %s (id, name, age) VALUES (?,?,?),(?,?,?),(?,?,?)`)
+			q := th.fmt(`INSERT INTO %s (id, name, age) VALUES (?,?,?),(?,?,?),(?,?,?)`)
 
 			func() {
 				tx, err := db.Begin(ctx)
@@ -324,13 +322,13 @@ func TestTx_commit_rollback(t *testing.T) {
 			}()
 
 			var count int
-			err = db.QueryRow(ctx, th.Fmt("SELECT count(1) FROM %s")).Scan(&count)
+			err = db.QueryRow(ctx, th.fmt("SELECT count(1) FROM %s")).Scan(&count)
 			assert.NoError(t, err)
 			assert.Equal(t, 0, count)
 		})
 
 		t.Run("tx should rollback using context cancel", func(t *testing.T) {
-			q := th.Fmt(`INSERT INTO %s (id, name, age) VALUES (?,?,?),(?,?,?),(?,?,?)`)
+			q := th.fmt(`INSERT INTO %s (id, name, age) VALUES (?,?,?),(?,?,?),(?,?,?)`)
 
 			func() {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -359,7 +357,7 @@ func TestTx_commit_rollback(t *testing.T) {
 			}()
 
 			var count int
-			err = db.QueryRow(ctx, th.Fmt("SELECT count(1) FROM %s")).Scan(&count)
+			err = db.QueryRow(ctx, th.fmt("SELECT count(1) FROM %s")).Scan(&count)
 			assert.NoError(t, err)
 			assert.Equal(t, 0, count)
 		})
@@ -367,8 +365,8 @@ func TestTx_commit_rollback(t *testing.T) {
 }
 
 func TestDB_custom_structTag(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, &sqlz.Options{StructTag: "json"})
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, &Options{StructTag: "json"})
 
 		type User struct {
 			Identifier int    `json:"id"`
@@ -396,8 +394,8 @@ func TestDB_custom_structTag(t *testing.T) {
 }
 
 func TestDB_Pool(t *testing.T) {
-	testutil.RunConn(t, func(t *testing.T, conn *testutil.Conn) {
-		db := sqlz.New(conn.DriverName, conn.DB, nil)
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
 		assert.IsType(t, &sql.DB{}, db.Pool())
 		db.Pool().SetMaxOpenConns(42)
 		assert.Equal(t, 42, db.Pool().Stats().MaxOpenConnections)
