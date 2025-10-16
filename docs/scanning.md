@@ -76,14 +76,15 @@ if err != nil {
 ## Struct scanning
 
 Scanning into a struct is straightforward, but there are a few details to keep in mind.
+Under the hood, **sqlz** traverses the struct tree using a [BFS algorithm](https://en.wikipedia.org/wiki/Breadth-first_search) and caches the field mapping for faster slice scanning.
+
+> [!IMPORTANT]
+> If a struct implements the [sql.Scanner](https://pkg.go.dev/database/sql#Scanner) interface, **sqlz will not** perform field mapping.
 
 ### Field key
 
 To get the key of a struct field, it first tries to find the **"db"** tag;
 if it's not present, it then transforms the field name to snake case.
-
-> [!IMPORTANT]
-> Note that the fields must be exported/public in order for **sqlz** to access them, just like [json.Marshal](https://pkg.go.dev/encoding/json#Marshal), and any other marshaler in Go.
 
 ```go
 type User struct {
@@ -93,16 +94,14 @@ type User struct {
 }
 ```
 
-It's possible to [customize](/custom-options) the default struct tag and/or the transformation function.
+> [!TIP]
+> - Note that the fields must be exported/public in order for **sqlz** to access them, just like [json.Marshal](https://pkg.go.dev/encoding/json#Marshal), and any other marshaler in Go.
+> - It's possible to [customize](/custom-options) the default struct tag and/or the transformation function.
 
 ### Nested structs
 
-Embedding, nesting, and circular references are supported.
+Embedding, nesting, and circular references (up to 10 levels) are supported.
 If a nested struct is nil, it will initialize the pointer before scanning into it.
-Under the hood, **sqlz** traverses the struct tree using a [BFS algorithm](https://en.wikipedia.org/wiki/Breadth-first_search) and caches the field mapping for faster slice scanning.
-
-> [!IMPORTANT]
-> If a struct implements the [sql.Scanner](https://pkg.go.dev/database/sql#Scanner) interface, **sqlz** will defer to its `Scan()` method instead of performing field mapping.
 
 Nested structs are mapped with the struct name as prefix, for example:
 

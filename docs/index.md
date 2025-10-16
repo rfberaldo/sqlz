@@ -10,7 +10,7 @@ It's designed to feel familiar to anyone using [database/sql](https://pkg.go.dev
 
 If you're not familiar working with SQL in Go, I'd suggest taking a look at [the official tutorial](https://go.dev/doc/tutorial/database-access); and if you want to dive deeper, check out [go-database-sql.org](http://go-database-sql.org).
 
-**sqlz** is not an ORM.
+Note that **sqlz is not an ORM**.
 It scans data from the database into Go objects, and converts object fields into query arguments, but it can't build database queries based on those objects.
 It also doesn't know anything about relationships between objects.
 

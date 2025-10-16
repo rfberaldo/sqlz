@@ -16,7 +16,7 @@ By default, the pool creates a new connection whenever needed if all existing co
 By default, it keeps two idle connections at any given moment. Increasing the limit can avoid frequent reconnects in programs with significant parallelism.
 
 > [!TIP]
-> Read more at the [official docs](https://go.dev/doc/database/manage-connections).
+> Read more at the [official documentation](https://go.dev/doc/database/manage-connections).
 
 To prevent accidentally holding connections, ensure every transaction returns its connection via `Commit()` or `Rollback()`;
 and every scanner via `Scan()` or `Close()`.
