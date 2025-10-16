@@ -38,6 +38,7 @@ func ExampleNew_options() {
 
 	// use sqlz.Options as third parameter
 	db := sqlz.New("sqlite3", pool, &sqlz.Options{
+		Bind:                 sqlz.BindDollar,
 		StructTag:            "json",
 		FieldNameTransformer: strings.ToLower,
 		IgnoreMissingFields:  true,

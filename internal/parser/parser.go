@@ -11,7 +11,7 @@ import (
 const EOF = 0
 
 // Bind represent the placeholder used by different drivers.
-type Bind uint8
+type Bind uint
 
 const (
 	BindUnknown  Bind = iota

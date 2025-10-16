@@ -1,5 +1,5 @@
-// Package sqlz is a thin wrapper around the standard [database/sql] package.
-// It provides a less verbose API for working with SQL databases.
+// Package sqlz is an extension for the standard [database/sql] package.
+// It adds named queries, scanning, and batch operations, while prividing a simple API.
 package sqlz
 
 import (
@@ -8,7 +8,14 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
+)
+
+const (
+	BindAt       = parser.BindAt       // Syntax: '@p1'
+	BindColon    = parser.BindColon    // Syntax: ':param'
+	BindDollar   = parser.BindDollar   // Syntax: '$1'
+	BindQuestion = parser.BindQuestion // Syntax: '?'
 )
 
 // Options are optional configs for sqlz.

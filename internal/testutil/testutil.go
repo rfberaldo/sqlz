@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 // PtrTo returns a pointer to the value v.

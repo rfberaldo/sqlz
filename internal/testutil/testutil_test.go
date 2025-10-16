@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
 	"github.com/stretchr/testify/assert"
 )
 

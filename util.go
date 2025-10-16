@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 const defaultStructTag = "db"

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 // Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rfberaldo/sqlz/internal/parser"
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
-	"github.com/rfberaldo/sqlz/parser"
 )
 
 type namedQuery struct {

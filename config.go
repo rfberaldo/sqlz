@@ -3,7 +3,7 @@ package sqlz
 import (
 	"cmp"
 
-	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
 // config contains flags that are used across internal objects.
