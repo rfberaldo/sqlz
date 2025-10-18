@@ -7,7 +7,7 @@ import (
 // Type is similar to [reflect.Kind], but adds support for type of slices.
 // [reflect.Func], [reflect.Chan], [reflect.Array] and [reflect.UnsafePointer] are considered Invalid.
 // Nil is considered Primitive.
-type Type uint8
+type Type uint
 
 const (
 	Invalid   Type = 0
@@ -21,12 +21,16 @@ const (
 )
 
 func (t Type) IsSlice() bool {
-	return t&Slice != 0
+	return (t & Slice) != 0
 }
 
-// IsPrimitive reports whether t is [Primitive] or [SlicePrimitive].
 func (t Type) IsPrimitive() bool {
-	return t&Primitive != 0
+	return (t & Primitive) != 0
+}
+
+// IsNamed reports whether t contains [Struct] or [Map].
+func (t Type) IsNamed() bool {
+	return (t & (Struct | Map)) != 0
 }
 
 // TypeOfAny recursively returns the Type of arg, nil is considered Primitive.
