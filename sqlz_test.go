@@ -410,3 +410,17 @@ func TestDB_Pool(t *testing.T) {
 		assert.IsType(t, &sql.Tx{}, tx.Conn())
 	})
 }
+
+func TestDB_ClearStmtCache(t *testing.T) {
+	runConn(t, func(t *testing.T, conn *Conn) {
+		db := New(conn.driverName, conn.db, nil)
+		query := rebind(conn.bind, "SELECT 'Hello World' WHERE 1 = ?")
+
+		err := db.QueryRow(ctx, query, 1).Scan(new(string))
+		require.NoError(t, err)
+		assert.Equal(t, db.base.stmtCache.Len(), 1)
+
+		db.ClearStmtCache()
+		assert.Equal(t, db.base.stmtCache.Len(), 0)
+	})
+}

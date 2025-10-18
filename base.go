@@ -147,8 +147,7 @@ func (c *base) loadOrPrepare(ctx context.Context, db querier, query string) (*sq
 	return stmt.(*sql.Stmt), nil
 }
 
-// closeStmts closes all cached statements, if any.
-func (c *base) closeStmts() {
+func (c *base) clearStmtCache() {
 	if c.stmtCache == nil {
 		return
 	}
