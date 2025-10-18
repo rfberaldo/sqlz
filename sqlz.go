@@ -37,7 +37,7 @@ type Options struct {
 	// Default is false.
 	IgnoreMissingFields bool
 
-	// StatementCacheCapacity sets maximum amount of prepared cached statements,
+	// StatementCacheCapacity sets the maximum number of cached statements,
 	// if it's zero, prepared statement caching is completely disabled.
 	// Note that each statement may be prepared on each connection in the pool.
 	// Default is 16.
@@ -117,6 +117,13 @@ type DB struct {
 
 // Pool return the underlying [sql.DB].
 func (db *DB) Pool() *sql.DB { return db.pool }
+
+// ClearStmtCache clears the prepared statement cache.
+// This is useful when the database schema has changed and cached statements
+// may no longer be valid.
+func (db *DB) ClearStmtCache() {
+	db.base.clearStmtCache()
+}
 
 // Begin starts a transaction. The default isolation level is dependent on
 // the driver.
@@ -203,7 +210,7 @@ func (tx *Tx) Conn() *sql.Tx { return tx.conn }
 //
 // If Commit fails, then all queries on the Tx should be discarded as invalid.
 func (tx *Tx) Commit() error {
-	tx.base.closeStmts()
+	tx.base.clearStmtCache()
 	return tx.conn.Commit()
 }
 
@@ -212,7 +219,7 @@ func (tx *Tx) Commit() error {
 // Even if Rollback fails, the transaction will no longer be valid,
 // nor will it have been committed to the database.
 func (tx *Tx) Rollback() error {
-	tx.base.closeStmts()
+	tx.base.clearStmtCache()
 	return tx.conn.Rollback()
 }
 
