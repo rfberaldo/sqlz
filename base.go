@@ -152,6 +152,5 @@ func (c *base) closeStmts() {
 	if c.stmtCache == nil {
 		return
 	}
-	c.stmtCache.CloseAll()
-	c.stmtCache = nil
+	c.stmtCache.Clear()
 }

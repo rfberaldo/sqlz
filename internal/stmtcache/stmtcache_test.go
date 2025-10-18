@@ -44,7 +44,7 @@ func TestStmtCache(t *testing.T) {
 		v, ok := c.Get("foo")
 		require.True(t, ok)
 		assert.Equal(t, nil, v)
-		assert.Equal(t, 1, c.l.Len())
+		assert.Equal(t, 1, c.Len())
 	})
 
 	t.Run("updating existing key moves it to front", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestStmtCache(t *testing.T) {
 		v, ok := c.Get("foo")
 		require.True(t, ok)
 		assert.Equal(t, fooStmt, v)
-		assert.Equal(t, 1, c.l.Len())
+		assert.Equal(t, 1, c.Len())
 	})
 
 	t.Run("evict when full", func(t *testing.T) {
@@ -76,15 +76,16 @@ func TestStmtCache(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, bazStmt, v)
 
-		assert.Equal(t, cap, c.l.Len())
+		assert.Equal(t, cap, c.Len())
 	})
 
-	t.Run("close all", func(t *testing.T) {
+	t.Run("clear", func(t *testing.T) {
 		assert.False(t, barStmt.closeCalled)
 		assert.False(t, bazStmt.closeCalled)
-		c.CloseAll()
+		c.Clear()
 		assert.True(t, barStmt.closeCalled)
 		assert.True(t, bazStmt.closeCalled)
+		assert.Equal(t, 0, c.Len())
 	})
 
 	t.Run("blank key should panic", func(t *testing.T) {

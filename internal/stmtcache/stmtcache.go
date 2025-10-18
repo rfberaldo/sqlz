@@ -1,6 +1,7 @@
 package stmtcache
 
 import (
+	"container/list"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -45,12 +46,19 @@ func (c *StmtCache) Put(key string, stmt stmt) (evicted bool) {
 	return c.put(hashKey(key), stmt)
 }
 
-// CloseAll closes all cached statements, if any.
-func (c *StmtCache) CloseAll() {
+// Clear removes all entries from the cache, closing all prepared statements.
+func (c *StmtCache) Clear() {
 	for el := c.l.Front(); el != nil; el = el.Next() {
 		stmt := el.Value.(entry[string, stmt]).val
 		_ = stmt.Close()
 	}
+	c.l.Init()
+	c.m = make(map[string]*list.Element)
+}
+
+// Len returns the number of cached statements.
+func (c *StmtCache) Len() int {
+	return c.l.Len()
 }
 
 // hashKey hashes s using SHA256, it's deterministic, and it's a consistent
