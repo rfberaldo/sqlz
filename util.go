@@ -13,8 +13,6 @@ import (
 	"github.com/rfberaldo/sqlz/internal/parser"
 )
 
-const defaultStructTag = "db"
-
 var (
 	// scannerType is [reflect.Type] of [sql.Scanner]
 	scannerType = reflect.TypeFor[sql.Scanner]()

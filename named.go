@@ -20,12 +20,7 @@ type namedQuery struct {
 }
 
 func processNamed(query string, arg any, cfg *config) (string, []any, error) {
-	if cfg == nil {
-		cfg = &config{}
-	}
-	cfg.defaults()
-
-	n := &namedQuery{config: cfg}
+	n := &namedQuery{config: applyDefaults(cfg)}
 
 	if err := n.process(query, arg); err != nil {
 		return "", nil, err
@@ -51,9 +46,8 @@ func (n *namedQuery) process(query string, arg any) error {
 	return fmt.Errorf("sqlz/named: unsupported argument type: %T", arg)
 }
 
-func (n *namedQuery) processOne(query string, argValue reflect.Value, kind reflect.Kind) error {
+func (n *namedQuery) processOne(query string, argValue reflect.Value, kind reflect.Kind) (err error) {
 	query, idents := parser.Parse(n.bind, query)
-	var err error
 
 	switch kind {
 	case reflect.Map:
@@ -145,8 +139,6 @@ func (n *namedQuery) bindMapArgs(idents []string, argValue reflect.Value) error 
 	return nil
 }
 
-type binderFunc = func(idents []string, argValue reflect.Value) error
-
 func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) error {
 	if sliceValue.Len() == 0 {
 		return fmt.Errorf("sqlz/named: slice is zero length: %s", sliceValue.Type())
@@ -165,19 +157,21 @@ func (n *namedQuery) processSlice(query string, sliceValue reflect.Value) error 
 	}
 }
 
-func (n *namedQuery) bindSliceArgs(query string, sliceValue reflect.Value, binder binderFunc) error {
+func (n *namedQuery) bindSliceArgs(
+	query string,
+	sliceValue reflect.Value,
+	fn func(idents []string, argValue reflect.Value) error,
+) (err error) {
 	idents := parser.ParseIdents(n.bind, query)
 	if n.args == nil {
 		n.args = make([]any, 0, len(idents)*sliceValue.Len())
 	}
 
 	for i := range sliceValue.Len() {
-		if err := binder(idents, sliceValue.Index(i)); err != nil {
+		if err := fn(idents, sliceValue.Index(i)); err != nil {
 			return err
 		}
 	}
-
-	var err error
 
 	// if bind is '?', parse query before expanding
 	if n.bind == parser.BindQuestion {

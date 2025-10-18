@@ -28,8 +28,7 @@ type Options struct {
 	// Default is "db".
 	StructTag string
 
-	// FieldNameTransformer transforms a struct field name,
-	// it is only used when the struct tag is not found.
+	// FieldNameTransformer transforms a struct field name when the struct tag is not found.
 	// Default is [ToSnakeCase].
 	FieldNameTransformer func(string) string
 
@@ -37,6 +36,12 @@ type Options struct {
 	// rather than returning an error.
 	// Default is false.
 	IgnoreMissingFields bool
+
+	// StatementCacheCapacity sets maximum amount of prepared cached statements,
+	// if it's zero, prepared statement caching is completely disabled.
+	// Note that each statement may be prepared on each connection in the pool.
+	// Default is 16.
+	StatementCacheCapacity int
 }
 
 // New returns a [DB] instance using an existing [sql.DB].
@@ -56,15 +61,13 @@ func New(driverName string, db *sql.DB, opts *Options) *DB {
 		panic(fmt.Sprintf("sqlz: unable to find bind for '%s', set with Options.Bind", driverName))
 	}
 
-	cfg := &config{
+	return &DB{db, newBase(&config{
 		bind:                 bind,
 		structTag:            opts.StructTag,
 		fieldNameTransformer: opts.FieldNameTransformer,
 		ignoreMissingFields:  opts.IgnoreMissingFields,
-	}
-	cfg.defaults()
-
-	return &DB{db, &base{cfg}}
+		stmtCacheCapacity:    opts.StatementCacheCapacity,
+	})}
 }
 
 // Connect opens a database specified by its database driver name and a
@@ -138,7 +141,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		return nil, err
 	}
 
-	return &Tx{tx, db.base}, nil
+	return &Tx{tx, newBase(db.base.config)}, nil
 }
 
 // Query executes a query that can return multiple rows. Any errors are deferred
@@ -195,13 +198,19 @@ func (tx *Tx) Conn() *sql.Tx { return tx.conn }
 // Commit commits the transaction.
 //
 // If Commit fails, then all queries on the Tx should be discarded as invalid.
-func (tx *Tx) Commit() error { return tx.conn.Commit() }
+func (tx *Tx) Commit() error {
+	tx.base.closeStmts()
+	return tx.conn.Commit()
+}
 
 // Rollback aborts the transaction.
 //
 // Even if Rollback fails, the transaction will no longer be valid,
 // nor will it have been committed to the database.
-func (tx *Tx) Rollback() error { return tx.conn.Rollback() }
+func (tx *Tx) Rollback() error {
+	tx.base.closeStmts()
+	return tx.conn.Rollback()
+}
 
 // Query executes a query that can return multiple rows. Any errors are deferred
 // until [Scanner.Err] or [Scanner.Scan] is called.
