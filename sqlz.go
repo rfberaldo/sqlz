@@ -52,6 +52,10 @@ type Options struct {
 //	pool, err := sql.Open("sqlite3", ":memory:")
 //	db := sqlz.New("sqlite3", pool, nil)
 func New(driverName string, db *sql.DB, opts *Options) *DB {
+	if opts != nil && opts.StatementCacheCapacity == 0 {
+		opts.StatementCacheCapacity = -1
+	}
+
 	if opts == nil {
 		opts = &Options{}
 	}

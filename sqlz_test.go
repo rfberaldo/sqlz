@@ -21,6 +21,11 @@ func TestNew(t *testing.T) {
 	assert.IsType(t, &DB{}, db)
 }
 
+func TestNew_no_stmt_cache(t *testing.T) {
+	db := New("sqlite3", &sql.DB{}, &Options{StatementCacheCapacity: 0})
+	assert.Nil(t, db.base.stmtCache)
+}
+
 func TestNew_panic(t *testing.T) {
 	defer func() {
 		assert.Contains(t, recover(), "unable to find bind")
