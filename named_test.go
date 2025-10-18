@@ -321,7 +321,6 @@ func TestProcessNamed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config{structTag: tt.structTag}
-			cfg.defaults()
 
 			cfg.bind = parser.BindAt
 			query, args, err := processNamed(tt.inputQuery, tt.inputArg, cfg)

@@ -17,33 +17,10 @@ import (
 
 var ctx = context.Background()
 
-func newBase(cfg *config) *base {
-	cfg.defaults()
-	return &base{cfg}
-}
-
 func TestBase_basic(t *testing.T) {
 	runConn(t, func(t *testing.T, conn *Conn) {
 		base := newBase(&config{bind: conn.bind})
 		query := "SELECT 'Hello World'"
-
-		t.Run("select", func(t *testing.T) {
-			var got []string
-			err := base.query(ctx, conn.db, query).Scan(&got)
-			require.NoError(t, err)
-
-			expect := []string{"Hello World"}
-			assert.Equal(t, expect, got)
-		})
-
-		t.Run("get", func(t *testing.T) {
-			var got string
-			err := base.queryRow(ctx, conn.db, query).Scan(&got)
-			require.NoError(t, err)
-
-			expect := "Hello World"
-			assert.Equal(t, expect, got)
-		})
 
 		t.Run("query", func(t *testing.T) {
 			var got []string
@@ -61,6 +38,41 @@ func TestBase_basic(t *testing.T) {
 
 			expect := "Hello World"
 			assert.Equal(t, expect, got)
+		})
+
+		t.Run("exec", func(t *testing.T) {
+			_, err := base.exec(ctx, conn.db, query)
+			require.NoError(t, err)
+		})
+	})
+}
+
+func TestBase_basic_no_stmt_cache(t *testing.T) {
+	runConn(t, func(t *testing.T, conn *Conn) {
+		base := newBase(&config{bind: conn.bind, stmtCacheCapacity: 0})
+		query := "SELECT 'Hello World'"
+
+		t.Run("query", func(t *testing.T) {
+			var got []string
+			err := base.query(ctx, conn.db, query).Scan(&got)
+			require.NoError(t, err)
+
+			expect := []string{"Hello World"}
+			assert.Equal(t, expect, got)
+		})
+
+		t.Run("queryRow", func(t *testing.T) {
+			var got string
+			err := base.queryRow(ctx, conn.db, query).Scan(&got)
+			require.NoError(t, err)
+
+			expect := "Hello World"
+			assert.Equal(t, expect, got)
+		})
+
+		t.Run("exec", func(t *testing.T) {
+			_, err := base.exec(ctx, conn.db, query)
+			require.NoError(t, err)
 		})
 	})
 }
@@ -595,4 +607,40 @@ func TestBase_valuerInterface(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "not a valid email")
 	})
+}
+
+// BenchmarkBatchInsertStruct-12    	     210	   5568681 ns/op	  389638 B/op	    3042 allocs/op
+func BenchmarkBatchInsertStruct(b *testing.B) {
+	conn := mysqlConn
+	base := newBase(&config{bind: conn.bind})
+	th := newTableHelper(b, conn.db, conn.bind)
+
+	_, err := conn.db.Exec(th.fmt(`
+		CREATE TABLE IF NOT EXISTS %s (
+			id INT PRIMARY KEY AUTO_INCREMENT,
+			username VARCHAR(255) NOT NULL,
+			email VARCHAR(255),
+			password VARCHAR(255),
+			age INT
+		)`,
+	))
+	require.NoError(b, err)
+
+	type user struct {
+		Username string
+		Email    string
+		Password string
+		Age      int
+	}
+	var args []user
+	for range 1000 {
+		args = append(args, user{"john", "john@id.com", "doom", 42})
+	}
+	input := th.fmt(`INSERT INTO %s (username, email, password, age)
+		VALUES (:username, :email, :password, :age)`)
+
+	for b.Loop() {
+		_, err := base.exec(ctx, conn.db, input, args)
+		require.NoError(b, err)
+	}
 }

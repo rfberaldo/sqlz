@@ -37,21 +37,18 @@ type Scanner struct {
 }
 
 func newScanner(rows rows, cfg *config) *Scanner {
-	if cfg == nil {
-		cfg = &config{}
-	}
-	cfg.defaults()
-
 	return &Scanner{
-		config: cfg,
+		config: applyDefaults(cfg),
 		rows:   rows,
 	}
 }
 
 func newRowScanner(rows rows, cfg *config) *Scanner {
-	scanner := newScanner(rows, cfg)
-	scanner.queryRow = true
-	return scanner
+	return &Scanner{
+		config:   applyDefaults(cfg),
+		rows:     rows,
+		queryRow: true,
+	}
 }
 
 func (s *Scanner) resolveColumns() (err error) {
