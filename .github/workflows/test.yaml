@@ -2,10 +2,10 @@ name: test
 
 on:
   push:
-    paths-ignore: [benchmarks/**, docs/**]
+    paths-ignore: [benchmarks/**, docs/**, '**.md']
     branches: [main]
   pull_request:
-    paths-ignore: [benchmarks/**, docs/**]
+    paths-ignore: [benchmarks/**, docs/**, '**.md']
     branches: [main]
 
 jobs:
