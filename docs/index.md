@@ -4,7 +4,7 @@ title: Guide Introduction
 
 # Introduction
 
-**sqlz** is a lightweight Go library that builds on top of the standard [database/sql](https://pkg.go.dev/database/sql) package, adding first-class support for named queries, struct scanning, and batch operations, while having a clean, minimal API and zero external dependencies.
+**sqlz** is a lightweight, dependency-free Go library that extends the standard [database/sql](https://pkg.go.dev/database/sql) package, adding support for named queries, struct scanning, and batch operations, while having a clean, minimal API.
 
 It's designed to feel familiar to anyone using [database/sql](https://pkg.go.dev/database/sql), while removing repetitive boilerplate code. It can scan directly into structs, maps, or slices, and run named queries with full UTF-8/multilingual support.
 
@@ -17,10 +17,10 @@ It also doesn't know anything about relationships between objects.
 ## Features
 
 - Named queries for structs and maps.
-- Auto-scanning into primitives, structs, maps and slices.
-- Auto-expanding "IN" clauses.
-- Auto-expanding batch inserts.
-- Performant.
+- Automatic scanning into primitives, structs, maps and slices.
+- Automatic expanding "IN" clauses.
+- Automatic expanding batch inserts.
+- Automatic prepared statement caching.
 
 ## About this documentation
 
@@ -30,4 +30,4 @@ It also doesn't know anything about relationships between objects.
 
 ## Similar projects
 
-**sqlz** was inspired by [sqlx](https://github.com/jmoiron/sqlx/) and [scanny](https://github.com/georgysavva/scany/).
+**sqlz** was inspired by [sqlx](https://github.com/jmoiron/sqlx/) and [scany](https://github.com/georgysavva/scany/).

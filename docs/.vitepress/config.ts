@@ -29,6 +29,7 @@ export default defineConfig({
 					{ text: 'Querying', link: '/querying' },
 					{ text: 'Scanning', link: '/scanning' },
 					{ text: 'Transactions', link: '/transactions' },
+					{ text: 'Prepared statement caching', link: '/prepared-stmt-caching' },
 					{ text: 'Custom options', link: '/custom-options' },
 					{ text: 'Connection pool', link: '/connection-pool' },
 				],

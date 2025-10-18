@@ -6,9 +6,19 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/rfberaldo/sqlz.svg)](https://pkg.go.dev/github.com/rfberaldo/sqlz)
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
-**sqlz** is a lightweight, dependency-free Go library that extends the standard [database/sql](https://pkg.go.dev/database/sql) package with named queries, scanning, and batch operations, while having a simple API.
+**sqlz** is a lightweight, dependency-free Go library that extends the standard [database/sql](https://pkg.go.dev/database/sql) package, adding support for named queries, struct scanning, and batch operations, while having a clean, minimal API.
+
+It's designed to feel familiar to anyone using [database/sql](https://pkg.go.dev/database/sql), while removing repetitive boilerplate code. It can scan directly into structs, maps, or slices, and run named queries with full UTF-8/multilingual support.
 
 > Documentation: https://rfberaldo.github.io/sqlz/.
+
+## Features
+
+- Named queries for structs and maps.
+- Automatic scanning into primitives, structs, maps and slices.
+- Automatic expanding "IN" clauses.
+- Automatic expanding batch inserts.
+- Automatic prepared statement caching.
 
 ## Getting started
 
@@ -80,7 +90,4 @@ db.Exec(ctx, "INSERT INTO user (name, email) VALUES (:name, :email)", users)
 
 - It was designed with a simpler API for everyday use, with fewer concepts and less verbose.
 - It has full support for UTF-8/multilingual named queries.
-
-### Performance
-
-Take a look at [benchmarks](benchmarks) for more info.
+- It's more performant in most cases, take a look at the [benchmarks](benchmarks) for comparison.

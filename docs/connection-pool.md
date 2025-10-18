@@ -3,11 +3,17 @@
 Query execution requires a connection, and [sql.DB](https://pkg.go.dev/database/sql#DB) is a pool of connections: whenever you make a query, it grabs a connection, executes it, and returns it to the pool.
 There are two ways to control the size of the connection pool:
 
-```go
-db, err := sqlz.Connect("sqlite3", ":memory:")
-db.Pool().SetMaxOpenConns(n)
-db.Pool().SetMaxIdleConns(n)
+::: code-group
+```go [sqlz.DB]
+DB.Pool().SetMaxOpenConns(n int)
+DB.Pool().SetMaxIdleConns(n int)
 ```
+
+```go [sql.DB]
+DB.SetMaxOpenConns(n int)
+DB.SetMaxIdleConns(n int)
+```
+:::
 
 By default, the pool creates a new connection whenever needed if all existing connections are in use.
 [sql.DB.SetMaxOpenConns](https://pkg.go.dev/database/sql#DB.SetMaxOpenConns) imposes a limit on the number of open connections. Past this limit, new database operations will wait for an existing operation to finish.
