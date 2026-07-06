@@ -14,11 +14,8 @@ import (
 )
 
 var (
-	// scannerType is [reflect.Type] of [sql.Scanner]
 	scannerType = reflect.TypeFor[sql.Scanner]()
-
-	// valuerType is [reflect.Type] of [driver.Valuer]
-	valuerType = reflect.TypeFor[driver.Valuer]()
+	valuerType  = reflect.TypeFor[driver.Valuer]()
 
 	bindByDriverName = map[string]parser.Bind{
 		"azuresql":         parser.BindAt,

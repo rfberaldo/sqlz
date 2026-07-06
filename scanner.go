@@ -8,9 +8,8 @@ import (
 	"github.com/rfberaldo/sqlz/internal/reflectutil"
 )
 
-// rows defines the minimal interface for iterating over
-// and scanning database query results. It is satisfied by [sql.Rows].
-type rows interface {
+// cursor is satisfied by [sql.Rows].
+type cursor interface {
 	Close() error
 	Columns() ([]string, error)
 	Err() error
@@ -24,9 +23,8 @@ type Scanner struct {
 
 	// one of these two will be non-nil:
 	err  error // deferred error
-	rows rows
+	rows cursor
 
-	manualIterating bool
 	columns         []string
 	queryRow        bool
 	destType        reflectutil.Type
@@ -36,19 +34,24 @@ type Scanner struct {
 	noop            any   // ignored fields sink
 }
 
-func newScanner(rows rows, cfg *config) *Scanner {
+func newScanner(rows cursor, cfg *config) *Scanner {
 	return &Scanner{
 		config: applyDefaults(cfg),
 		rows:   rows,
 	}
 }
 
-func newRowScanner(rows rows, cfg *config) *Scanner {
+func newRowScanner(rows cursor, cfg *config) *Scanner {
 	return &Scanner{
 		config:   applyDefaults(cfg),
 		rows:     rows,
 		queryRow: true,
 	}
+}
+
+// Err returns the deferred query error, if any. Useful for wrappers.
+func (s *Scanner) Err() error {
+	return s.err
 }
 
 func (s *Scanner) resolveColumns() (err error) {
@@ -86,10 +89,6 @@ func (s *Scanner) resolveDestType(dest any) error {
 		return fmt.Errorf("sqlz/scan: unsupported destination type: %T", dest)
 	}
 
-	if !s.manualIterating && !s.queryRow && !s.destType.IsSlice() {
-		return fmt.Errorf("sqlz/scan: destination must be a slice to scan multiple rows, got %T", dest)
-	}
-
 	if s.destType.IsPrimitive() && len(s.columns) != 1 {
 		return fmt.Errorf(
 			"sqlz/scan: query must return 1 column to scan into a primitive type, got %d",
@@ -107,49 +106,48 @@ func (s *Scanner) Scan(dest any) (err error) {
 		return s.err
 	}
 
-	if s.manualIterating {
-		panic("sqlz/scan: Scan cannot be used with manual iteration, use ScanRow instead")
-	}
-
 	if err := s.resolveColumns(); err != nil {
 		return err
 	}
 
 	if err := s.resolveDestType(dest); err != nil {
 		return err
+	}
+
+	if !s.queryRow && !s.destType.IsSlice() {
+		return fmt.Errorf("sqlz/scan: destination must be a slice to scan multiple rows, got %T", dest)
 	}
 
 	return s.scanAll(dest)
 }
 
-// ScanRow scans the current row into dest regardless of type,
-// it must be called inside a [NextRow] loop.
-func (s *Scanner) ScanRow(dest any) (err error) {
+type ScanFunc func(arg any) error
+
+func (s *Scanner) ForEach(fn func(scan ScanFunc) error) error {
 	if s.err != nil {
 		return s.err
-	}
-
-	if !s.manualIterating {
-		panic("sqlz/scan: ScanRow can only be used with manual iteration, use Scan for automatic iteration")
 	}
 
 	if err := s.resolveColumns(); err != nil {
 		return err
 	}
 
-	if err := s.resolveDestType(dest); err != nil {
-		return err
+	defer s.rows.Close()
+	for s.rows.Next() {
+		if err := fn(s.scanOne); err != nil {
+			return err
+		}
 	}
 
-	return s.scanOne(dest)
+	if err := s.rows.Err(); err != nil {
+		return fmt.Errorf("sqlz/scan: preparing next row: %w", err)
+	}
+
+	return nil
 }
 
-func (s *Scanner) scanAll(dest any) (err error) {
-	defer func() {
-		if errClose := s.rows.Close(); errClose != nil {
-			err = fmt.Errorf("sqlz/scan: closing rows: %w", errClose)
-		}
-	}()
+func (s *Scanner) scanAll(dest any) error {
+	defer s.rows.Close()
 
 	rowCount := 0
 	for s.rows.Next() {
@@ -171,10 +169,14 @@ func (s *Scanner) scanAll(dest any) (err error) {
 		return sql.ErrNoRows
 	}
 
-	return err
+	return nil
 }
 
 func (s *Scanner) scanOne(dest any) (err error) {
+	if err := s.resolveDestType(dest); err != nil {
+		return err
+	}
+
 	destValue := reflectutil.Init(reflect.ValueOf(dest))
 	if !destValue.CanSet() {
 		return fmt.Errorf("sqlz/scan: destination must be addressable: %T", dest)
@@ -262,15 +264,12 @@ func (s *Scanner) setMapPtrs() {
 	}
 }
 
-func isScannable(t reflect.Type) bool {
-	return reflect.PointerTo(t).Implements(scannerType) || t.Implements(scannerType)
-}
-
 func (s *Scanner) scanStruct(dest any) error {
 	destValue := reflectutil.Init(reflect.ValueOf(dest))
 
-	// if implements [sql.Scanner], just scan it natively
-	if isScannable(destValue.Type()) {
+	// if it implements [sql.Scanner], just scan it natively
+	if destValue.Type().Implements(scannerType) ||
+		reflect.PointerTo(destValue.Type()).Implements(scannerType) {
 		return s.scan(dest)
 	}
 
@@ -285,14 +284,14 @@ func (s *Scanner) scanStruct(dest any) error {
 	return nil
 }
 
-func (s *Scanner) setStructPtrs(v reflect.Value) error {
+func (s *Scanner) setStructPtrs(destValue reflect.Value) error {
 	if s.ptrs == nil {
 		s.ptrs = make([]any, len(s.columns))
 	}
 
 	if s.fieldIndexByKey == nil {
 		s.fieldIndexByKey = reflectutil.StructFieldMap(
-			v.Type(), s.structTag, "_", s.fieldNameTransformer,
+			destValue.Type(), s.structTag, "_", s.fieldNameTransformer,
 		)
 	}
 
@@ -306,51 +305,12 @@ func (s *Scanner) setStructPtrs(v reflect.Value) error {
 			continue
 		}
 
-		fv := reflectutil.FieldByIndex(v, index)
+		fv := reflectutil.FieldByIndex(destValue, index)
 		if !fv.IsValid() {
 			return fmt.Errorf("sqlz/scan: invalid struct field: '%s'", col)
 		}
 		s.ptrs[i] = fv.Addr().Interface()
 	}
 
-	return nil
-}
-
-// Close closes [Scanner], preventing further enumeration, and returning the connection to the pool.
-// Close is idempotent and does not affect the result of [Scanner.Err].
-func (s *Scanner) Close() error {
-	if s.rows == nil {
-		return nil
-	}
-	if err := s.rows.Close(); err != nil {
-		return fmt.Errorf("sqlz/scan: closing rows: %w", err)
-	}
-	return nil
-}
-
-// NextRow prepares the next result row for reading with [Scanner.ScanRow].
-// It returns true on success, or false if there is no next result row or an error
-// happened while preparing it. [Scanner.Err] should be consulted to distinguish between
-// the two cases.
-//
-// Every call to [Scanner.ScanRow], even the first one, must be preceded by a NextRow.
-func (s *Scanner) NextRow() bool {
-	if s.rows == nil {
-		return false
-	}
-	s.manualIterating = true
-	return s.rows.Next()
-}
-
-// Err returns the error, if any, that was encountered while running the query
-// or during iteration.
-// Err may be called after an explicit or implicit [Scanner.Close].
-func (s *Scanner) Err() error {
-	if s.err != nil {
-		return s.err
-	}
-	if err := s.rows.Err(); err != nil {
-		return fmt.Errorf("sqlz/scan: preparing next row: %w", err)
-	}
 	return nil
 }

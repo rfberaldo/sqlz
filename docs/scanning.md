@@ -6,13 +6,13 @@ outline: [2,3]
 
 **sqlz** can automatically scan query rows into primitives, structs, maps and slices.
 
-[Scanner](https://pkg.go.dev/github.com/rfberaldo/sqlz#Scanner) is returned by both `Query()` and `QueryRow()`, and it's similar to [sql.Rows](https://pkg.go.dev/database/sql#Rows).
+[Scanner](https://pkg.go.dev/github.com/rfberaldo/sqlz#Scanner) is returned by both `Query()` and `QueryRow()`, it manages the underlying [sql.Rows](https://pkg.go.dev/database/sql#Rows).
 Query errors are deferred to the scanner, making it easy to chain methods.
 
 > [!IMPORTANT]
 > 1. Scanner behaves differently depending on whether it was called from `Query()` or `QueryRow()`.
 > 2. Scanner will not empty the slice before scanning, previous data will be kept.
-> 3. Scanner holds the connection until `Scan()` or `Close()` is called, so always call one of them to avoid leaking connections.
+> 3. Scanner holds the connection until `Scan()` or `ForEach()` is called, always call one of them to avoid leaking connections.
 
 ## Query Scanner
 
@@ -24,38 +24,30 @@ If the query results are empty, the slice remains unchanged and no error is retu
 ```go
 var users []User
 err := db.Query(ctx, "SELECT * FROM user").Scan(&users)
-...
 // users variable now contains data from query
 ```
 
 ### Manual
 
-`ScanRow()` and `NextRow()` give you more control over the scanning, especially useful when you want to avoid allocating an entire slice.
-For example, if you only need a single row from the table at a time:
+`ForEach()` gives more control over the scanning, especially useful when you want to avoid allocating an entire slice.
+For example, when you only need a single row from the table at a time.
 
 ```go
 // logs might have millions of rows
 scanner := db.Query(ctx, "SELECT * FROM logs")
 
-// check for deferred query error
-err := scanner.Err()
-...
-
-defer scanner.Close()
-for scanner.NextRow() {
+// ForEach arg is a callback function that you can use to scan a single row
+err := scanner.ForEach(func(scan sqlz.ScanFunc) error {
   var log Log
-  err = scanner.ScanRow(&log)
-  ...
-  processLog(log)
-}
+  if err := scan(&log); err != nil {
+    return err
+  }
 
-// loop might exit for some reason other than EOF,
-// so always check whether the loop terminated correctly or not
-err = scanner.Err()
-...
+  // do stuff with each row
+
+  return nil
+})
 ```
-
-`Err()` returns the deferred error from the query, or the error during `NextRow()`.
 
 ## QueryRow Scanner
 

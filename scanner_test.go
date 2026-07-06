@@ -20,12 +20,12 @@ type CustomScan struct {
 	Key2 string
 }
 
-func (cst *CustomScan) Scan(val any) error {
+func (c *CustomScan) Scan(val any) error {
 	switch v := val.(type) {
 	case []byte:
-		return json.Unmarshal(v, cst)
+		return json.Unmarshal(v, c)
 	case string:
-		return json.Unmarshal([]byte(v), cst)
+		return json.Unmarshal([]byte(v), c)
 	default:
 		return fmt.Errorf("unsupported type: %T", v)
 	}
@@ -354,18 +354,16 @@ func TestScanner_Scan_slices(t *testing.T) {
 				assert.Equal(t, tc.expected, derefDest(dst))
 			})
 
-			t.Run("ScanRow "+tc.name, func(t *testing.T) {
+			t.Run("ForEach "+tc.name, func(t *testing.T) {
 				rows, err := conn.db.Query(tc.query)
 				require.NoError(t, err)
 				scanner := newScanner(rows, nil)
 				dst := allocDest(tc.expected)
 
-				defer scanner.Close()
-				for scanner.NextRow() {
-					err = scanner.ScanRow(dst)
-					require.NoError(t, err)
-				}
-				require.NoError(t, scanner.Err())
+				err = scanner.ForEach(func(scan ScanFunc) error {
+					return scan(dst)
+				})
+				require.NoError(t, err)
 
 				assert.Equal(t, tc.expected, derefDest(dst))
 			})
@@ -758,6 +756,13 @@ func TestScanner_Scan_validate_dest(t *testing.T) {
 		err := scanner.Scan(&user)
 		require.NoError(t, err)
 	})
+
+	t.Run("must be slice", func(t *testing.T) {
+		scanner := newScanner(newRows(), nil)
+		err := scanner.Scan(new(string))
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "destination must be a slice")
+	})
 }
 
 func TestScanner_resolveDestType(t *testing.T) {
@@ -766,13 +771,6 @@ func TestScanner_resolveDestType(t *testing.T) {
 		err := scanner.resolveDestType(new([1]string))
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unsupported destination")
-	})
-
-	t.Run("must be slice", func(t *testing.T) {
-		scanner := newScanner(&mockRows{}, nil)
-		err := scanner.resolveDestType(new(string))
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "destination must be a slice")
 	})
 
 	t.Run("primitive expects 1 column", func(t *testing.T) {
@@ -903,8 +901,8 @@ func BenchmarkScan_StructSlice(b *testing.B) {
 	}
 }
 
-// BenchmarkScan_StructSlice_manual-12    	    1017	   1216979 ns/op	  265769 B/op	    8710 allocs/op
-func BenchmarkScan_StructSlice_manual(b *testing.B) {
+// BenchmarkScan_StructSlice_ForEach-12    	    1081	   1095336 ns/op	  281701 B/op	    9709 allocs/op
+func BenchmarkScan_StructSlice_ForEach(b *testing.B) {
 	conn := mysqlConn
 	require.NoError(b, conn.err)
 	th := setupTestTable(b, conn.db)
@@ -924,13 +922,14 @@ func BenchmarkScan_StructSlice_manual(b *testing.B) {
 
 		var users []User
 		var user User
-		defer scanner.Close()
-		for scanner.NextRow() {
-			err = scanner.ScanRow(&user)
-			require.NoError(b, err)
+		err = scanner.ForEach(func(scan ScanFunc) error {
+			if err := scan(&user); err != nil {
+				return err
+			}
 			users = append(users, user)
-		}
-		require.NoError(b, scanner.Err())
+			return nil
+		})
+		require.NoError(b, err)
 		assert.Equal(b, 1000, len(users))
 	}
 }

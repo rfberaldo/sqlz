@@ -80,8 +80,6 @@ func TestDB_deferred_query_error(t *testing.T) {
 		query := "SELECT wrongquery"
 
 		scanner := db.Query(ctx, query)
-		assert.False(t, scanner.NextRow())
-		require.NoError(t, scanner.Close())
 		require.Error(t, scanner.Err())
 		assert.ErrorContains(t, scanner.Err(), "wrongquery")
 
@@ -90,8 +88,6 @@ func TestDB_deferred_query_error(t *testing.T) {
 		assert.ErrorContains(t, err, "wrongquery")
 
 		scanner = db.QueryRow(ctx, query)
-		assert.False(t, scanner.NextRow())
-		require.NoError(t, scanner.Close())
 		require.Error(t, scanner.Err())
 		assert.ErrorContains(t, scanner.Err(), "wrongquery")
 

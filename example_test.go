@@ -211,3 +211,28 @@ func ExampleDB_Pool() {
 	db.Pool().SetMaxOpenConns(10)
 	db.Pool().SetMaxIdleConns(4)
 }
+
+func ExampleScanner_ForEach() {
+	// logs might have millions of rows, we don't want to allocate all at once
+	scanner := db.Query(ctx, "SELECT * FROM logs")
+
+	type Log struct {
+		Id int
+		// etc.
+	}
+
+	// ForEach arg is a callback function that you can use to scan a single row
+	err := scanner.ForEach(func(scan sqlz.ScanFunc) error {
+		var log Log
+		if err := scan(&log); err != nil {
+			return err
+		}
+
+		// do stuff with each row
+
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
