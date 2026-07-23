@@ -75,8 +75,7 @@ func (n *namedQuery) structValue(v reflect.Value) any {
 		return nil
 	}
 
-	// not testing pointer receiver, as [driver.Valuer] must have value receiver
-	if v.Type().Implements(valuerType) {
+	if reflectutil.ImplementsValuer(v.Type()) {
 		return v.Interface()
 	}
 

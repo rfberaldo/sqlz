@@ -268,8 +268,7 @@ func (s *Scanner) scanStruct(dest any) error {
 	destValue := reflectutil.Init(reflect.ValueOf(dest))
 
 	// if it implements [sql.Scanner], just scan it natively
-	if destValue.Type().Implements(scannerType) ||
-		reflect.PointerTo(destValue.Type()).Implements(scannerType) {
+	if reflectutil.ImplementsScanner(destValue.Type()) {
 		return s.scan(dest)
 	}
 

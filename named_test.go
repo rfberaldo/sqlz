@@ -1,6 +1,8 @@
 package sqlz
 
 import (
+	"database/sql/driver"
+	"strings"
 	"testing"
 
 	"github.com/rfberaldo/sqlz/internal/parser"
@@ -359,6 +361,55 @@ func TestProcessNamed(t *testing.T) {
 			}
 		})
 	}
+}
+
+type stringSlicePtr []string
+
+func (ss *stringSlicePtr) Value() (driver.Value, error) {
+	if ss == nil || len(*ss) == 0 {
+		return nil, nil
+	}
+	return strings.Join(*ss, ","), nil
+}
+
+type stringSlice []string
+
+func (ss stringSlice) Value() (driver.Value, error) {
+	if len(ss) == 0 {
+		return nil, nil
+	}
+	return strings.Join(ss, ","), nil
+}
+
+func TestProcessNamed_valuer_interface(t *testing.T) {
+	inputQuery := "INSERT INTO person (phones) VALUES (:phones)"
+	expectedQuery := "INSERT INTO person (phones) VALUES (?)"
+
+	t.Run("with pointer receiver", func(t *testing.T) {
+		type person struct {
+			Phones stringSlicePtr
+		}
+		arg := person{Phones: stringSlicePtr{"1", "2"}}
+		expectedArgs := []any{stringSlicePtr{"1", "2"}}
+
+		query, args, err := processNamed(inputQuery, arg, nil)
+		assert.Equal(t, expectedQuery, query)
+		assert.Equal(t, expectedArgs, args)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with value receiver", func(t *testing.T) {
+		type person struct {
+			Phones stringSlice
+		}
+		arg := person{Phones: stringSlice{"1", "2"}}
+		expectedArgs := []any{stringSlice{"1", "2"}}
+
+		query, args, err := processNamed(inputQuery, arg, nil)
+		assert.Equal(t, expectedQuery, query)
+		assert.Equal(t, expectedArgs, args)
+		assert.NoError(t, err)
+	})
 }
 
 func TestProcessNamed_concurrency(t *testing.T) {

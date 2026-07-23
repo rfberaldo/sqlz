@@ -2,10 +2,8 @@ package sqlz
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -14,9 +12,6 @@ import (
 )
 
 var (
-	scannerType = reflect.TypeFor[sql.Scanner]()
-	valuerType  = reflect.TypeFor[driver.Valuer]()
-
 	bindByDriverName = map[string]parser.Bind{
 		"azuresql":         parser.BindAt,
 		"sqlserver":        parser.BindAt,

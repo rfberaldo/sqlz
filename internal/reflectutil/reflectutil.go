@@ -1,6 +1,8 @@
 package reflectutil
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"reflect"
 )
 
@@ -142,4 +144,19 @@ func TypedValue(v reflect.Value) any {
 	}
 
 	return v.Interface()
+}
+
+var (
+	valuerType  = reflect.TypeFor[driver.Valuer]()
+	scannerType = reflect.TypeFor[sql.Scanner]()
+)
+
+// ImplementsValuer returns whether t or *t implements [driver.Valuer] interface.
+func ImplementsValuer(t reflect.Type) bool {
+	return t.Implements(valuerType) || reflect.PointerTo(t).Implements((valuerType))
+}
+
+// ImplementsScanner returns whether t or *t implements [sql.Scanner] interface.
+func ImplementsScanner(t reflect.Type) bool {
+	return t.Implements(scannerType) || reflect.PointerTo(t).Implements((scannerType))
 }

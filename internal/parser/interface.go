@@ -92,7 +92,11 @@ func shouldSpread(v reflect.Value) bool {
 		return false
 	}
 
-	// []byte is a [driver.Value] type so it should not be expanded
+	if reflectutil.ImplementsValuer(v.Type()) {
+		return false
+	}
+
+	// []byte is a [driver.Value] type, should not be expanded
 	if v.Type().Elem().Kind() == reflect.Uint8 {
 		return false
 	}
