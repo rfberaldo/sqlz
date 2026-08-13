@@ -8,7 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/rfberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 const (

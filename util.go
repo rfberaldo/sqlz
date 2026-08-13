@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/rfberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rfberaldo/sqlz/internal/reflectutil"
+	"github.com/rfberaldo/sqlz/reflectutil"
 )
 
 // Parse transforms a named query into native query, respecting the bind param,

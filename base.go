@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rfberaldo/sqlz/internal/parser"
-	"github.com/rfberaldo/sqlz/internal/reflectutil"
 	"github.com/rfberaldo/sqlz/internal/stmtcache"
+	"github.com/rfberaldo/sqlz/parser"
+	"github.com/rfberaldo/sqlz/reflectutil"
 )
 
 // querier is satisfied by [sql.DB], [sql.Tx] or [sql.Conn].

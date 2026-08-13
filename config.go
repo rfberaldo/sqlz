@@ -3,7 +3,7 @@ package sqlz
 import (
 	"cmp"
 
-	"github.com/rfberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 const (

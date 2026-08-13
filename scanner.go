@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rfberaldo/sqlz/internal/reflectutil"
+	"github.com/rfberaldo/sqlz/reflectutil"
 )
 
 // cursor is satisfied by [sql.Rows].

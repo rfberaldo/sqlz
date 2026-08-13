@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rfberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

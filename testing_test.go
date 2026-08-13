@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rfberaldo/sqlz/internal/parser"
+	"github.com/rfberaldo/sqlz/parser"
 )
 
 // Tests look for `MYSQL_DSN` and `POSTGRES_DSN` environment variables,
