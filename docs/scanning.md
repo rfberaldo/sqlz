@@ -7,10 +7,9 @@ outline: [2,3]
 **sqlz** can automatically scan query rows into primitives, structs, maps and slices.
 
 [Scanner](https://pkg.go.dev/github.com/rfberaldo/sqlz#Scanner) is returned by both `Query()` and `QueryRow()`, it manages the underlying [sql.Rows](https://pkg.go.dev/database/sql#Rows).
-Query errors are deferred to the scanner, making it easy to chain methods.
 
 > [!IMPORTANT]
-> 1. Scanner behaves differently depending on whether it was called from `Query()` or `QueryRow()`.
+> 1. Query errors are deferred to the scanner, making it easy to chain methods.
 > 2. Scanner will not empty the slice before scanning, previous data will be kept.
 > 3. Scanner holds the connection until `Scan()` or `ForEach()` is called, always call one of them to avoid leaking connections.
 
@@ -30,21 +29,19 @@ err := db.Query(ctx, "SELECT * FROM user").Scan(&users)
 ### Manual
 
 `ForEach()` gives more control over the scanning, especially useful when you want to avoid allocating an entire slice.
-For example, when you only need a single row from the table at a time.
+For example, when you need to apply a remap on each row.
 
 ```go
-// logs might have millions of rows
-scanner := db.Query(ctx, "SELECT * FROM logs")
+var users []user.User
+var row Row // defined out of callback to avoid re-creating
 
 // ForEach arg is a callback function that you can use to scan a single row
-err := scanner.ForEach(func(scan sqlz.ScanFunc) error {
-  var log Log
-  if err := scan(&log); err != nil {
+err := db.Query(ctx, "SELECT * FROM user").ForEach(func(scan sqlz.ScanFunc) error {
+  if err := scan(&row); err != nil {
     return err
   }
 
-  // do stuff with each row
-
+  users = append(users, rowToUser(row))
   return nil
 })
 ```
@@ -56,7 +53,7 @@ If the query results are empty, it returns [sql.ErrNoRows](https://pkg.go.dev/da
 
 ```go
 var user User
-err = db.QueryRow(ctx, "SELECT * FROM user WHERE id = ?", 42).Scan(&user)
+err := db.QueryRow(ctx, "SELECT * FROM user WHERE id = ?", 42).Scan(&user)
 if err != nil {
   if sqlz.IsNotFound(err) {
     log.Fatal("user not found!")
@@ -65,7 +62,27 @@ if err != nil {
 }
 ```
 
-## Struct scanning
+## Ignore missing fields
+
+By default, [Scanner](https://pkg.go.dev/github.com/rfberaldo/sqlz#Scanner) will return error when there's a field/column returning from the database that is not present on the struct.
+To make it ignore these fields/columns, you can set it individually on each scan or globally.
+
+### On each scan
+```go
+err := db.Query(ctx, ...)
+  .SetIgnoreMissingFields(true)
+  .Scan(...)
+```
+
+### Global config
+```go
+pool, err := sql.Open("sqlite3", ":memory:")
+db := sqlz.New("sqlite3", pool, &sqlz.Options{
+  IgnoreMissingFields: true,
+})
+```
+
+## Advanced scanning
 
 Scanning into a struct is straightforward, but there are a few details to keep in mind.
 Under the hood, **sqlz** traverses the struct tree using a [BFS algorithm](https://en.wikipedia.org/wiki/Breadth-first_search) and caches the field mapping for faster slice scanning.
@@ -75,8 +92,8 @@ Under the hood, **sqlz** traverses the struct tree using a [BFS algorithm](https
 
 ### Field key
 
-To get the key of a struct field, it first tries to find the **"db"** tag;
-if it's not present, it then transforms the field name to snake case.
+To get the key of a struct field, it first tries to find the defined `StructTag` (default is `"db"`);
+if it's not present, it then transforms the field name using the defined `FieldNameTransformer` function (default is to snake case).
 
 ```go
 type User struct {

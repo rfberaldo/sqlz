@@ -34,6 +34,7 @@ type Options struct {
 
 	// IgnoreMissingFields causes the scanner to ignore missing struct fields
 	// rather than returning an error.
+	// It's also possible to set it individually on each scan.
 	// Default is false.
 	IgnoreMissingFields bool
 

@@ -54,6 +54,14 @@ func (s *Scanner) Err() error {
 	return s.err
 }
 
+// SetIgnoreMissingFields overrides the global config.
+// Causes the scanner to ignore missing struct fields rather than returning an error.
+// Default is false.
+func (s *Scanner) SetIgnoreMissingFields(v bool) *Scanner {
+	s.config.ignoreMissingFields = v
+	return s
+}
+
 func (s *Scanner) resolveColumns() (err error) {
 	if s.columns != nil {
 		return nil
@@ -301,7 +309,7 @@ func (s *Scanner) setStructPtrs(destValue reflect.Value) error {
 		index, ok := s.fieldIndexByKey[col]
 		if !ok {
 			if !s.ignoreMissingFields {
-				return fmt.Errorf("sqlz/scan: struct field not found: '%s' (maybe unexported?)", col)
+				return fmt.Errorf("sqlz/scan: struct field not found: '%s' (maybe unexported?) -- disable this error by using 'IgnoreMissingFields': https://rfberaldo.github.io/sqlz/scanning#ignore-missing-fields", col)
 			}
 			s.ptrs[i] = &s.noop
 			continue

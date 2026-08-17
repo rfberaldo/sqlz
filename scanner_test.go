@@ -454,7 +454,7 @@ func TestScanner_Scan_struct_missing_fields(t *testing.T) {
 			assert.ErrorContains(t, err, "field not found")
 		})
 
-		t.Run("ignore missing fields", func(t *testing.T) {
+		t.Run("ignore missing fields global", func(t *testing.T) {
 			expect := &User{
 				Id:       1,
 				Name:     "Alice",
@@ -465,6 +465,24 @@ func TestScanner_Scan_struct_missing_fields(t *testing.T) {
 			rows, err := conn.db.Query(query)
 			require.NoError(t, err)
 			scanner := newRowScanner(rows, &config{ignoreMissingFields: true})
+			var user *User
+			err = scanner.Scan(&user)
+			require.NoError(t, err)
+			assert.Equal(t, expect, user)
+		})
+
+		t.Run("ignore missing fields individual", func(t *testing.T) {
+			expect := &User{
+				Id:       1,
+				Name:     "Alice",
+				Salary:   69420.42,
+				IsActive: true,
+			}
+
+			rows, err := conn.db.Query(query)
+			require.NoError(t, err)
+			scanner := newRowScanner(rows, nil)
+			scanner.SetIgnoreMissingFields(true)
 			var user *User
 			err = scanner.Scan(&user)
 			require.NoError(t, err)
