@@ -110,11 +110,11 @@ func (s *Scanner) resolveDestType(dest any) error {
 // Scan automatically iterates over rows and scans into dest regardless of type.
 // Scan should not be called more than once per [Scanner] instance.
 func (s *Scanner) Scan(dest any) error {
-	defer s.rows.Close()
-
 	if s.err != nil {
 		return s.err
 	}
+
+	defer s.rows.Close()
 
 	if err := s.resolveColumns(); err != nil {
 		return err
@@ -134,11 +134,11 @@ func (s *Scanner) Scan(dest any) error {
 type ScanFunc func(arg any) error
 
 func (s *Scanner) ForEach(callback func(scan ScanFunc) error) error {
-	defer s.rows.Close()
-
 	if s.err != nil {
 		return s.err
 	}
+
+	defer s.rows.Close()
 
 	if err := s.resolveColumns(); err != nil {
 		return err
